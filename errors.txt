@@ -1,0 +1,60 @@
+﻿Analyzing ascenso_pro_poli...                                   
+
+   info - Don't invoke 'print' in production code - lib\main.dart:25:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\main.dart:27:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\main.dart:29:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\main.dart:34:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\main.dart:43:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\main.dart:45:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\main.dart:50:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\main.dart:54:7 - avoid_print
+warning - Dead code - lib\pantallas\admin\pantalla_admin.dart:48:46 - dead_code
+warning - The left operand can't be null, so the right operand is never executed - lib\pantallas\admin\pantalla_admin.dart:48:49 - dead_null_aware_expression
+   info - Don't invoke 'print' in production code - lib\pantallas\admin\pantalla_admin.dart:66:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\pantallas\admin\pantalla_admin.dart:93:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\pantallas\admin\pantalla_admin.dart:148:19 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\pantallas\admin\pantalla_admin.dart:355:33 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\pantallas\admin\pantalla_admin.dart:366:28 - deprecated_member_use
+   info - 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre - lib\pantallas\admin\pantalla_admin.dart:639:31 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\pantallas\admin\pantalla_admin.dart:826:31 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\pantallas\admin\pantalla_admin.dart:830:19 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\pantallas\admin\pantalla_admin.dart:834:19 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\pantallas\pantalla_notificaciones.dart:97:28 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\pantallas\pantalla_perfil.dart:83:52 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\pantallas\pantalla_perfil.dart:94:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\pantallas\pantalla_perfil.dart:120:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\pantallas\pantalla_perfil.dart:269:33 - deprecated_member_use
+   info - Don't invoke 'print' in production code - lib\pantallas\pestanas\pestana_estudio.dart:119:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\pantallas\pestanas\pestana_estudio.dart:128:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\pantallas\pestanas\pestana_estudio.dart:182:13 - avoid_print
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\pantallas\pestanas\pestana_estudio.dart:327:29 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\pantallas\pestanas\pestana_estudio.dart:328:29 - deprecated_member_use
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\pantallas\pestanas\pestana_estudio.dart:345:29 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\pantallas\pestanas\pestana_estudio.dart:346:29 - deprecated_member_use
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:36:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:45:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:49:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:54:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:64:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:74:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:85:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:101:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:108:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:120:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:134:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:139:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:147:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:178:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\audio_handler.dart:197:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\auth_service.dart:30:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\servicios\auth_service.dart:48:7 - avoid_print
+  error - The method 'eq' isn't defined for the type 'PostgrestTransformBuilder' - lib\servicios\supabase_service.dart:26:21 - undefined_method
+  error - The method 'or' isn't defined for the type 'PostgrestTransformBuilder' - lib\servicios\supabase_service.dart:30:21 - undefined_method
+warning - Dead code - lib\servicios\supabase_service.dart:72:27 - dead_code
+warning - The left operand can't be null, so the right operand is never executed - lib\servicios\supabase_service.dart:72:30 - dead_null_aware_expression
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\widgets\reproductor_audio\panel_configuracion_audio.dart:63:13 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\widgets\reproductor_audio\panel_configuracion_audio.dart:64:13 - deprecated_member_use
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\widgets\reproductor_audio\panel_configuracion_audio.dart:77:13 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\widgets\reproductor_audio\panel_configuracion_audio.dart:78:13 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\widgets\reproductor_audio\reproductor_audio_completo.dart:97:9 - curly_braces_in_flow_control_structures
+
