@@ -63,7 +63,11 @@ class AuthService {
     if (!_useSupabase) return _currentUser;
     final sb.User? user = _client.auth.currentUser;
     if (user == null) return null;
-    return User(id: user.id, email: user.email, userMetadata: user.userMetadata);
+    return User(
+      id: user.id,
+      email: user.email,
+      userMetadata: user.userMetadata,
+    );
   }
 
   // Stream de cambios de autenticacion
@@ -71,7 +75,7 @@ class AuthService {
       StreamController<void>.broadcast();
   static Stream<void> get authStateChanges {
     if (!_useSupabase) return _authStateController.stream;
-    return _client.auth.onAuthStateChange.map((_) => null);
+    return _client.auth.onAuthStateChange.map((_) {});
   }
 
   static bool get isLoggedIn {
@@ -88,6 +92,8 @@ class AuthService {
   // Stream para cambios en el perfil
   static final _profileUpdateController = StreamController<void>.broadcast();
   static Stream<void> get onProfileUpdated => _profileUpdateController.stream;
+  static String? _lastProfileError;
+  static String? get lastProfileError => _lastProfileError;
 
   static void notifyProfileUpdated() {
     _profileUpdateController.add(null);
@@ -130,41 +136,35 @@ class AuthService {
     try {
       Map<String, dynamic>? usuario;
       try {
-        usuario =
-            await _client
-                .from('usuario')
-                .select(
-                  'id, nombre_completo, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, premium, fecha_registro, metadata',
-                )
-                .eq('id', user.id)
-                .maybeSingle();
+        usuario = await _selectUsuarioByIdOrUserId(
+          select:
+              'id, nombre_completo, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, premium, fecha_registro, metadata',
+          authUserId: user.id,
+        );
       } catch (_) {
         // Compatibilidad con esquemas antiguos donde aun no existen columnas nuevas.
-        usuario =
-            await _client
-                .from('usuario')
-                .select(
-                  'id, nombre_completo, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, metadata',
-                )
-                .eq('id', user.id)
-                .maybeSingle();
+        usuario = await _selectUsuarioByIdOrUserId(
+          select:
+              'id, nombre_completo, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, metadata',
+          authUserId: user.id,
+        );
       }
 
-      final perfil =
-          await _client
-              .from('perfil_usuario')
-              .select(
-                'total_preguntas_respondidas, total_correctas, dias_consecutivos_estudio',
-              )
-              .eq('usuario_id', user.id)
-              .maybeSingle();
+      final usuarioId = (usuario?['id'] ?? user.id).toString();
 
-      final ranking =
-          await _client
-              .from('ranking')
-              .select('puntos_totales')
-              .eq('usuario_id', user.id)
-              .maybeSingle();
+      final perfil = await _client
+          .from('perfil_usuario')
+          .select(
+            'total_preguntas_respondidas, total_correctas, dias_consecutivos_estudio',
+          )
+          .eq('usuario_id', usuarioId)
+          .maybeSingle();
+
+      final ranking = await _client
+          .from('ranking')
+          .select('puntos_totales')
+          .eq('usuario_id', usuarioId)
+          .maybeSingle();
 
       final metadata = _metadataMap(usuario?['metadata']);
 
@@ -178,8 +178,8 @@ class AuthService {
       );
 
       return {
-        'id': user.id,
-        'usuario_id': user.id,
+        'id': usuarioId,
+        'usuario_id': usuarioId,
         'email': user.email ?? usuario?['email'],
         'nombre_completo':
             usuario?['nombre_completo'] ?? _nombreDesdeAuth(user),
@@ -208,7 +208,7 @@ class AuthService {
         'racha_dias': _intValue(perfil?['dias_consecutivos_estudio'], 0),
       };
     } catch (e) {
-      print('Error getCurrentUserProfile: $e');
+      debugPrint('Error getCurrentUserProfile: $e');
       return null;
     }
   }
@@ -337,20 +337,15 @@ class AuthService {
 
       final sb.User? user = response.user;
       if (user == null) {
-        return AuthResult(
-          success: false,
-          error: 'Credenciales invalidas.',
-        );
+        return AuthResult(success: false, error: 'Credenciales invalidas.');
       }
 
       bool requiresCompletion = true;
       try {
-        final existing =
-            await _client
-                .from('usuario')
-                .select('id, grado_actual, metadata')
-                .eq('id', user.id)
-                .maybeSingle();
+        final existing = await _selectUsuarioByIdOrUserId(
+          select: 'id, grado_actual, metadata',
+          authUserId: user.id,
+        );
         requiresCompletion = _needsCompletion(existing);
       } catch (_) {
         // Si no se puede leer el perfil, forzamos completar perfil
@@ -370,6 +365,8 @@ class AuthService {
 
   /// Actualizar perfil del usuario
   static Future<bool> updateProfile(Map<String, dynamic> updates) async {
+    _lastProfileError = null;
+
     if (!_useSupabase) {
       await Future.delayed(const Duration(milliseconds: 500));
       _mockProfile.addAll(updates);
@@ -381,14 +378,15 @@ class AuthService {
     if (user == null) return false;
 
     try {
-      final existing =
-          await _client
-              .from('usuario')
-              .select('id, nombre_completo, grado_actual, email, metadata')
-              .eq('id', user.id)
-              .maybeSingle();
+      final existing = await _selectUsuarioByIdOrUserId(
+        select: 'id, nombre_completo, grado_actual, email, metadata',
+        authUserId: user.id,
+      );
 
       final metadata = _metadataMap(existing?['metadata']);
+      if (updates.containsKey('grado_actual')) {
+        metadata['grado_actual'] = updates['grado_actual'];
+      }
 
       final columnUpdates = <String, dynamic>{};
       if (updates.containsKey('nombre_completo')) {
@@ -419,17 +417,19 @@ class AuthService {
           'metadata': metadata,
         });
       } else {
+        final targetId = existing['id']?.toString() ?? user.id;
         final updateMap = <String, dynamic>{
           ...columnUpdates,
           'metadata': metadata,
         };
-        await _client.from('usuario').update(updateMap).eq('id', user.id);
+        await _client.from('usuario').update(updateMap).eq('id', targetId);
       }
 
       _profileUpdateController.add(null);
       return true;
     } catch (e) {
-      print('Error updateProfile: $e');
+      _lastProfileError = _friendlyAuthError(e, 'actualizar perfil');
+      debugPrint('Error updateProfile: $e');
       return false;
     }
   }
@@ -456,9 +456,7 @@ class AuthService {
         password: currentPassword,
       );
 
-      await _client.auth.updateUser(
-        sb.UserAttributes(password: newPassword),
-      );
+      await _client.auth.updateUser(sb.UserAttributes(password: newPassword));
       return AuthResult(success: true);
     } catch (e) {
       return AuthResult(success: false, error: 'Error al cambiar: $e');
@@ -526,12 +524,10 @@ class AuthService {
           );
         }
 
-        final existing =
-            await _client
-                .from('usuario')
-                .select('id, grado_actual, metadata')
-                .eq('id', user.id)
-                .maybeSingle();
+        final existing = await _selectUsuarioByIdOrUserId(
+          select: 'id, grado_actual, metadata',
+          authUserId: user.id,
+        );
 
         final requiresCompletion = _needsCompletion(existing);
 
@@ -547,20 +543,17 @@ class AuthService {
         redirectTo: kIsWeb ? null : _oauthRedirectTo,
       );
 
-      final session =
-          await _client.auth.onAuthStateChange
-              .where((event) => event.session != null)
-              .map((event) => event.session!)
-              .first
-              .timeout(const Duration(minutes: 2));
+      final session = await _client.auth.onAuthStateChange
+          .where((event) => event.session != null)
+          .map((event) => event.session!)
+          .first
+          .timeout(const Duration(minutes: 2));
 
       final sb.User user = session.user;
-      final existing =
-          await _client
-              .from('usuario')
-              .select('id, grado_actual, metadata')
-              .eq('id', user.id)
-              .maybeSingle();
+      final existing = await _selectUsuarioByIdOrUserId(
+        select: 'id, grado_actual, metadata',
+        authUserId: user.id,
+      );
 
       final requiresCompletion = _needsCompletion(existing);
 
@@ -605,7 +598,8 @@ class AuthService {
         }
         return AuthResult(
           success: false,
-          error: (data['error'] ?? 'No se pudo aplicar el referido.').toString(),
+          error: (data['error'] ?? 'No se pudo aplicar el referido.')
+              .toString(),
         );
       }
 
@@ -614,10 +608,7 @@ class AuthService {
         error: 'Respuesta inesperada al aplicar referido.',
       );
     } catch (e) {
-      return AuthResult(
-        success: false,
-        error: 'Error aplicando referido: $e',
-      );
+      return AuthResult(success: false, error: 'Error aplicando referido: $e');
     }
   }
 
@@ -628,12 +619,10 @@ class AuthService {
     if (user == null) return false;
 
     try {
-      final existing =
-          await _client
-              .from('usuario')
-              .select('id, grado_actual, metadata')
-              .eq('id', user.id)
-              .maybeSingle();
+      final existing = await _selectUsuarioByIdOrUserId(
+        select: 'id, grado_actual, metadata',
+        authUserId: user.id,
+      );
       return !_needsCompletion(existing);
     } catch (_) {
       return false;
@@ -662,8 +651,37 @@ class AuthService {
   // Helpers
   // =====================
 
+  static Future<Map<String, dynamic>?> _selectUsuarioByIdOrUserId({
+    required String select,
+    required String authUserId,
+  }) async {
+    final byId = await _client
+        .from('usuario')
+        .select(select)
+        .eq('id', authUserId)
+        .maybeSingle();
+    if (byId != null) return Map<String, dynamic>.from(byId);
+
+    try {
+      final byUserId = await _client
+          .from('usuario')
+          .select(select)
+          .eq('user_id', authUserId)
+          .maybeSingle();
+      if (byUserId != null) return Map<String, dynamic>.from(byUserId);
+    } catch (_) {
+      // Compatibilidad: algunos esquemas antiguos no tienen user_id o RLS lo bloquea.
+    }
+
+    return null;
+  }
+
   static User _wrapUser(sb.User user) {
-    return User(id: user.id, email: user.email, userMetadata: user.userMetadata);
+    return User(
+      id: user.id,
+      email: user.email,
+      userMetadata: user.userMetadata,
+    );
   }
 
   static String _authProvider(sb.User user) {
@@ -674,7 +692,8 @@ class AuthService {
 
   static String _nombreDesdeAuth(sb.User user) {
     final meta = user.userMetadata ?? {};
-    final dynamic fullName = meta['full_name'] ?? meta['name'] ?? meta['nombre'];
+    final dynamic fullName =
+        meta['full_name'] ?? meta['name'] ?? meta['nombre'];
     if (fullName is String && fullName.trim().isNotEmpty) {
       return fullName.trim();
     }
@@ -688,18 +707,18 @@ class AuthService {
     final categoria = metadata['categoria'];
     final metaDiaria = metadata['meta_diaria_minutos'];
     final especialidad = metadata['especialidad'];
-    final gradoActualRaw = usuarioRow['grado_actual'] ?? metadata['grado_actual'];
+    final gradoActualRaw =
+        usuarioRow['grado_actual'] ?? metadata['grado_actual'];
 
-    final categoriaCompleta =
-        categoria is String ? categoria.trim().isNotEmpty : categoria != null;
-    final especialidadCompleta =
-        especialidad is String
-            ? especialidad.trim().isNotEmpty
-            : especialidad != null;
-    final metaCompleta =
-        metaDiaria is num
-            ? metaDiaria > 0
-            : (int.tryParse(metaDiaria?.toString() ?? '') ?? 0) > 0;
+    final categoriaCompleta = categoria is String
+        ? categoria.trim().isNotEmpty
+        : categoria != null;
+    final especialidadCompleta = especialidad is String
+        ? especialidad.trim().isNotEmpty
+        : especialidad != null;
+    final metaCompleta = metaDiaria is num
+        ? metaDiaria > 0
+        : (int.tryParse(metaDiaria?.toString() ?? '') ?? 0) > 0;
     final gradoActual = gradoActualRaw?.toString().trim() ?? '';
     final gradoCompleto = gradoActual.isNotEmpty;
 
@@ -772,6 +791,33 @@ class AuthService {
 
     if (error is sb.PostgrestException) {
       final msg = error.message.trim();
+      final lower = msg.toLowerCase();
+
+      if (lower.contains("could not find the 'usuario'") ||
+          lower.contains('relation "usuario" does not exist') ||
+          lower.contains('table "usuario" does not exist')) {
+        return 'La tabla public.usuario no existe o no esta accesible. '
+            'Ejecuta nuevamente supabase/database_setup.sql.';
+      }
+
+      if (lower.contains("could not find the 'metadata' column") ||
+          lower.contains('column "metadata"')) {
+        return 'Tu esquema de usuario esta desactualizado (falta columna metadata). '
+            'Actualiza la estructura de Supabase antes de completar perfil.';
+      }
+
+      if (lower.contains('violates unique constraint') &&
+          lower.contains('usuario_user_id_key')) {
+        return 'Ya existe un perfil ligado a este usuario. '
+            'Revisa las politicas RLS o sincroniza id/user_id en public.usuario.';
+      }
+
+      if (lower.contains('violates unique constraint') &&
+          lower.contains('usuario_email_key')) {
+        return 'Ya existe un perfil con este correo en la tabla usuario. '
+            'Ejecuta el script supabase/21_FIX_RLS_USUARIO_EMAIL_DUPLICADO.sql.';
+      }
+
       if (msg.isNotEmpty) return msg;
     }
 

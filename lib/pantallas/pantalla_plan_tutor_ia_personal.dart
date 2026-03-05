@@ -1,15 +1,24 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../modelos/modelo_pregunta.dart';
+import '../modelos/tutor_dashboard_inicio.dart';
 import '../servicios/auth_service.dart';
 import '../servicios/tutor_ia_personal_service.dart';
 import '../servicios/servicio_preguntas.dart';
 import 'pantalla_practica.dart';
-// En este paso, usaremos un Map dinÃ¡mico para el resultado del servicio,
-// pero podrÃ­amos adaptar DiagnosticoIA mÃ¡s adelante.
+import 'pantalla_practica_guiada_config.dart';
+// En este paso, usaremos un Map dinÃƒÂ¡mico para el resultado del servicio,
+// pero podrÃƒÂ­amos adaptar DiagnosticoIA mÃƒÂ¡s adelante.
 
 class PantallaPlanTutorIAPersonal extends StatefulWidget {
-  const PantallaPlanTutorIAPersonal({super.key});
+  final TutorIAPersonalService? iaService;
+  final ServicioPreguntas? servicioPreguntas;
+
+  const PantallaPlanTutorIAPersonal({
+    super.key,
+    this.iaService,
+    this.servicioPreguntas,
+  });
 
   @override
   State<PantallaPlanTutorIAPersonal> createState() =>
@@ -18,24 +27,77 @@ class PantallaPlanTutorIAPersonal extends StatefulWidget {
 
 class _PantallaPlanTutorIAPersonalState
     extends State<PantallaPlanTutorIAPersonal> {
-  final TutorIAPersonalService _iaService = TutorIAPersonalService();
-  final ServicioPreguntas _servicioPreguntas = ServicioPreguntas();
+  late final TutorIAPersonalService _iaService;
+  late final ServicioPreguntas _servicioPreguntas;
+  static const bool _tutorDashboardV2Enabled = true;
   static const Duration _cacheAnalisisFreshWindow = Duration(minutes: 10);
   static final Map<String, Map<String, dynamic>> _cacheAnalisisPorUsuario = {};
   static final Map<String, DateTime> _cacheAnalisisAtPorUsuario = {};
+  static final Map<String, Map<String, dynamic>> _cacheDashboardPorUsuario = {};
+  static final Map<String, DateTime> _cacheDashboardAtPorUsuario = {};
   Map<String, dynamic>? _analisisPerfil;
+  TutorDashboardInicio? _dashboardInicio;
   String _categoriaUsuario = 'Oficiales de Armas';
   String _userId = 'user_test_id';
   bool _cargando = true;
   bool _actualizandoTutor = false;
 
+  Map<String, dynamic> _analisisPerfilInicial() {
+    return {
+      'nivel_global': 'INICIAL',
+      'tasa_acierto': 0.0,
+      'velocidad_promedio': 0.0,
+      'racha_dias': 0,
+      'fortalezas': <String>[],
+      'debilidades': <String>[],
+      'analisis_materias': <Map<String, dynamic>>[],
+      'resumen_materias':
+          'Aun no hay suficiente informacion. Completa una practica para generar recomendaciones.',
+      'diagnostico': 'No se pudo cargar el analisis del tutor en este momento.',
+      'panel_ia': {'cards': <Map<String, dynamic>>[]},
+    };
+  }
+
+  void _limpiarCacheAnalisis() {
+    final now = DateTime.now();
+    const expiracion = Duration(hours: 1);
+    final expiradas = _cacheAnalisisAtPorUsuario.entries
+        .where((entry) => now.difference(entry.value) > expiracion)
+        .map((entry) => entry.key)
+        .toList();
+
+    for (final key in expiradas) {
+      _cacheAnalisisAtPorUsuario.remove(key);
+      _cacheAnalisisPorUsuario.remove(key);
+      _cacheDashboardAtPorUsuario.remove(key);
+      _cacheDashboardPorUsuario.remove(key);
+    }
+
+    const maxEntradas = 20;
+    if (_cacheAnalisisAtPorUsuario.length <= maxEntradas) return;
+
+    final ordenadas = _cacheAnalisisAtPorUsuario.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    final exceso = _cacheAnalisisAtPorUsuario.length - maxEntradas;
+    for (var i = 0; i < exceso; i++) {
+      final key = ordenadas[i].key;
+      _cacheAnalisisAtPorUsuario.remove(key);
+      _cacheAnalisisPorUsuario.remove(key);
+      _cacheDashboardAtPorUsuario.remove(key);
+      _cacheDashboardPorUsuario.remove(key);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _iaService = widget.iaService ?? TutorIAPersonalService();
+    _servicioPreguntas = widget.servicioPreguntas ?? ServicioPreguntas();
     _cargarDatos();
   }
 
   Future<void> _cargarDatos({bool forzarRecarga = false}) async {
+    _limpiarCacheAnalisis();
     try {
       final perfilUsuario = await AuthService.getCurrentUserProfile();
       final categoria = perfilUsuario?['categoria'] as String?;
@@ -49,11 +111,27 @@ class _PantallaPlanTutorIAPersonalState
 
       final cacheAt = _cacheAnalisisAtPorUsuario[userId];
       final cacheData = _cacheAnalisisPorUsuario[userId];
+      final dashboardAt = _cacheDashboardAtPorUsuario[userId];
+      final dashboardData = _cacheDashboardPorUsuario[userId];
+      final cachePareceFallback =
+          (cacheData?['nivel_global']?.toString().toUpperCase().contains(
+                'CALCULANDO',
+              ) ??
+              false) ||
+          (cacheData?['diagnostico']?.toString().toLowerCase().contains(
+                'recopilando',
+              ) ??
+              false) ||
+          ((dashboardData?['estado'] ?? '').toString().toLowerCase() ==
+              'fallback');
 
       // Modo instantaneo: si hay cache, se pinta de inmediato.
       if (!forzarRecarga && cacheData != null && mounted) {
         setState(() {
           _analisisPerfil = Map<String, dynamic>.from(cacheData);
+          if (dashboardData != null) {
+            _dashboardInicio = TutorDashboardInicio.fromMap(dashboardData);
+          }
           _userId = userId;
           if (categoria != null && categoria.isNotEmpty) {
             _categoriaUsuario = categoria;
@@ -63,7 +141,11 @@ class _PantallaPlanTutorIAPersonalState
 
         // Si el cache aun es muy reciente, evitamos pedir de nuevo.
         if (cacheAt != null &&
-            DateTime.now().difference(cacheAt) < _cacheAnalisisFreshWindow) {
+            dashboardAt != null &&
+            DateTime.now().difference(cacheAt) < _cacheAnalisisFreshWindow &&
+            DateTime.now().difference(dashboardAt) <
+                _cacheAnalisisFreshWindow &&
+            !cachePareceFallback) {
           return;
         }
       }
@@ -79,12 +161,21 @@ class _PantallaPlanTutorIAPersonalState
         userId,
         perfilUsuario: perfilUsuario,
       );
+      final dashboard = await _iaService.obtenerDashboardTutorInicio(
+        userId: userId,
+        perfilUsuario: Map<String, dynamic>.from(
+          perfilUsuario ?? const <String, dynamic>{},
+        ),
+      );
       _cacheAnalisisPorUsuario[userId] = Map<String, dynamic>.from(resultado);
       _cacheAnalisisAtPorUsuario[userId] = DateTime.now();
+      _cacheDashboardPorUsuario[userId] = Map<String, dynamic>.from(dashboard);
+      _cacheDashboardAtPorUsuario[userId] = DateTime.now();
 
       if (mounted) {
         setState(() {
           _analisisPerfil = resultado;
+          _dashboardInicio = TutorDashboardInicio.fromMap(dashboard);
           _userId = userId;
           if (categoria != null && categoria.isNotEmpty) {
             _categoriaUsuario = categoria;
@@ -96,6 +187,8 @@ class _PantallaPlanTutorIAPersonalState
     } catch (_) {
       if (mounted) {
         setState(() {
+          _analisisPerfil ??= _analisisPerfilInicial();
+          _dashboardInicio ??= TutorDashboardInicio.fallback();
           _cargando = false;
           _actualizandoTutor = false;
         });
@@ -113,7 +206,8 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   List<Map<String, dynamic>> _obtenerAnalisisMaterias() {
-    final raw = _analisisPerfil?['analisis_materias'];
+    final raw =
+        (_analisisPerfil ?? _analisisPerfilInicial())['analisis_materias'];
     if (raw is List) {
       return raw
           .whereType<Map>()
@@ -124,8 +218,9 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   Future<void> _abrirDetalleMateria(Map<String, dynamic> materia) async {
-    final debilidadesGlobales =
-        List<String>.from(_analisisPerfil?['debilidades'] ?? []);
+    final debilidadesGlobales = List<String>.from(
+      _analisisPerfil?['debilidades'] ?? [],
+    );
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -137,14 +232,22 @@ class _PantallaPlanTutorIAPersonalState
         debilidadesGlobales: debilidadesGlobales,
         iaService: _iaService,
         servicioPreguntas: _servicioPreguntas,
-        onPracticar: (cantidad, tiempoMinutos, materiaNombre, idsCriticas) async {
-          await _iniciarPractica(
-            cantidad: cantidad,
-            tiempoLimite: tiempoMinutos,
-            materia: materiaNombre,
-            preguntaIdsPrioritarias: idsCriticas,
-          );
-        },
+        onPracticar:
+            (
+              cantidad,
+              tiempoMinutos,
+              materiaNombre,
+              idsCriticas, {
+              bool esPracticaGuiada = false,
+            }) async {
+              await _iniciarPractica(
+                cantidad: cantidad,
+                tiempoLimite: tiempoMinutos,
+                materia: materiaNombre,
+                preguntaIdsPrioritarias: idsCriticas,
+                esPracticaGuiada: esPracticaGuiada,
+              );
+            },
       ),
     );
   }
@@ -172,7 +275,7 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   List<Map<String, dynamic>> _obtenerCardsIA() {
-    final panel = _analisisPerfil?['panel_ia'];
+    final panel = (_analisisPerfil ?? _analisisPerfilInicial())['panel_ia'];
     if (panel is Map && panel['cards'] is List) {
       return (panel['cards'] as List)
           .whereType<Map>()
@@ -181,6 +284,143 @@ class _PantallaPlanTutorIAPersonalState
     }
     return [];
   }
+
+  TutorInsightCard? _insightPorId(String id) {
+    final dashboard = _dashboardInicio;
+    if (dashboard == null) return null;
+    final objetivo = id.toLowerCase().trim();
+    for (final card in dashboard.insights) {
+      if (card.id.toLowerCase().trim() == objetivo) return card;
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _obtenerOrdenesTutorParaHoyCards() {
+    final mision = _dashboardInicio?.misionDiaria;
+    final cantidadPractica = mision?.cantidadPractica ?? 30;
+    final tiempoPractica = mision?.tiempoPractica ?? 40;
+    final materiaPrioritaria = _insightPorId('materia_prioritaria')?.materia;
+    final coach = _insightPorId('coach_velocidad');
+    final riesgo = _insightPorId('radar_riesgo');
+
+    final cards = <Map<String, dynamic>>[
+      {
+        'type': 'guided',
+        'title': 'Practica guiada',
+        'message':
+            'La IA organiza tu sesion completa por materias, dificultad y enfoque de mejora.',
+        'cta': 'Abrir practica guiada',
+        'payload': {'cantidad': 100, 'tiempo': 120},
+      },
+      {
+        'type': 'practice',
+        'title': 'Practicar ahora',
+        'message':
+            'Sesion recomendada para hoy segun tu rendimiento y objetivo diario.',
+        'cta': 'Iniciar practica',
+        'payload': {
+          'cantidad': cantidadPractica.clamp(20, 120),
+          'tiempo': tiempoPractica.clamp(20, 120),
+          if (materiaPrioritaria != null &&
+              materiaPrioritaria.trim().isNotEmpty)
+            'materia': materiaPrioritaria.trim(),
+        },
+      },
+      {
+        'type': 'study',
+        'title': 'Estudiar enfoque IA',
+        'message':
+            'Revisa primero la materia mas prioritaria para subir tu nivel hoy.',
+        'cta': 'Ver materia prioritaria',
+        'payload': {
+          if (materiaPrioritaria != null &&
+              materiaPrioritaria.trim().isNotEmpty)
+            'materia': materiaPrioritaria.trim(),
+        },
+      },
+    ];
+
+    if (coach != null && coach.resumen.trim().isNotEmpty) {
+      cards.add({
+        'type': 'recommendation',
+        'title': 'Mejora de velocidad',
+        'message': coach.resumen,
+        'cta': 'Ver coach de velocidad',
+        'insight_id': 'coach_velocidad',
+      });
+    }
+
+    if (riesgo != null && riesgo.resumen.trim().isNotEmpty) {
+      cards.add({
+        'type': 'alert',
+        'title': 'Foco de riesgo',
+        'message': riesgo.resumen,
+        'cta': 'Ver materias en riesgo',
+        'insight_id': 'radar_riesgo',
+      });
+    }
+
+    return cards;
+  }
+
+  Future<void> _abrirOrdenesTutorParaHoy() async {
+    final cards = _obtenerOrdenesTutorParaHoyCards();
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (routeContext) => Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            title: Text(
+              'ORDENES DEL TUTOR PARA HOY',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+          body: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            itemCount: cards.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.92,
+            ),
+            itemBuilder: (_, index) {
+              final card = cards[index];
+              return _buildTarjetaAccionIACompacta(
+                card,
+                onTap: () async {
+                  Navigator.of(routeContext).pop();
+                  await Future<void>.delayed(const Duration(milliseconds: 120));
+                  if (!mounted) return;
+                  await _ejecutarAccionTarjetaIA(card);
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _abrirPracticaGuiada() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            PantallaPracticaGuiadaConfig(categoriaUsuario: _categoriaUsuario),
+      ),
+    );
+    if (!mounted) return;
+    _cargarDatos(forzarRecarga: true);
+  }
+
   Widget _buildFallbackGrid() {
     final cards = <Map<String, dynamic>>[
       {
@@ -213,6 +453,10 @@ class _PantallaPlanTutorIAPersonalState
 
   Color _colorPorTipo(String type) {
     switch (type) {
+      case 'study':
+        return const Color(0xFF7C3AED);
+      case 'guided':
+        return const Color(0xFF2563EB);
       case 'plan':
         return const Color(0xFFF97316);
       case 'practice':
@@ -231,6 +475,10 @@ class _PantallaPlanTutorIAPersonalState
 
   IconData _iconoPorTipo(String type) {
     switch (type) {
+      case 'study':
+        return Icons.menu_book_rounded;
+      case 'guided':
+        return Icons.auto_awesome_rounded;
       case 'plan':
         return Icons.access_time_filled;
       case 'practice':
@@ -253,6 +501,15 @@ class _PantallaPlanTutorIAPersonalState
     int tiempo,
     String? materia,
   ) {
+    if (type == 'study') {
+      if (materia != null && materia.isNotEmpty) {
+        return 'Foco IA: $materia';
+      }
+      return 'Foco tactico por materia';
+    }
+    if (type == 'guided') {
+      return '$cantidad preguntas con IA guiada';
+    }
     if (type == 'plan') {
       return 'Tu meta de hoy: $tiempo min';
     }
@@ -273,6 +530,10 @@ class _PantallaPlanTutorIAPersonalState
 
   String _ctaPorDefecto(String type, int cantidad) {
     switch (type) {
+      case 'study':
+        return 'Ver que estudiar';
+      case 'guided':
+        return 'Abrir practica guiada';
       case 'plan':
         return 'Iniciar Rutina Diaria ($cantidad preguntas)';
       case 'practice':
@@ -314,15 +575,19 @@ class _PantallaPlanTutorIAPersonalState
     );
   }
 
-  Future<void> _abrirChatTutor() async {
+  Future<void> _abrirChatTutor({
+    String? promptInicial,
+    bool enviarAutomatico = false,
+  }) async {
+    final analisis = _analisisPerfil ?? _analisisPerfilInicial();
     final contexto = <String, dynamic>{
       'user_id': _userId,
       'categoria_usuario': _categoriaUsuario,
-      'nivel_global': _analisisPerfil?['nivel_global'],
-      'tasa_acierto': _analisisPerfil?['tasa_acierto'],
-      'fortalezas': _analisisPerfil?['fortalezas'],
-      'debilidades': _analisisPerfil?['debilidades'],
-      'resumen_materias': _analisisPerfil?['resumen_materias'],
+      'nivel_global': analisis['nivel_global'],
+      'tasa_acierto': analisis['tasa_acierto'],
+      'fortalezas': analisis['fortalezas'],
+      'debilidades': analisis['debilidades'],
+      'resumen_materias': analisis['resumen_materias'],
     };
 
     await showModalBottomSheet(
@@ -332,37 +597,202 @@ class _PantallaPlanTutorIAPersonalState
       builder: (_) => _ChatTutorSheet(
         iaService: _iaService,
         contexto: contexto,
+        promptInicial: promptInicial,
+        enviarAutomatico: enviarAutomatico,
+      ),
+    );
+  }
+
+  Future<void> _ejecutarAccionTarjetaIA(Map<String, dynamic> card) async {
+    final type = (card['type'] ?? 'message').toString().trim().toLowerCase();
+    final title = (card['title'] ?? 'Recomendacion IA').toString().trim();
+    final message = (card['message'] ?? '').toString();
+    final items = (card['items'] is List)
+        ? (card['items'] as List)
+              .whereType<String>()
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
+        : <String>[];
+    final payload = card['payload'] is Map
+        ? Map<String, dynamic>.from(card['payload'])
+        : <String, dynamic>{};
+    final cantidad = _intValue(payload['cantidad'], 20);
+    final tiempo = _intValue(payload['tiempo'], 25);
+    final materia = payload['materia'] is String
+        ? payload['materia'] as String
+        : null;
+    final insightId = (card['insight_id'] ?? '').toString().trim();
+    final isStudy = type == 'study';
+    final isGuided = type == 'guided';
+    final canPractice =
+        !isStudy &&
+        !isGuided &&
+        (type == 'plan' ||
+            type == 'practice' ||
+            payload.containsKey('cantidad'));
+
+    if (isStudy) {
+      await _abrirMapaTemasSemaforo();
+      return;
+    }
+    if (isGuided) {
+      await _abrirPracticaGuiada();
+      return;
+    }
+    if (canPractice) {
+      await _iniciarPractica(
+        cantidad: cantidad,
+        tiempoLimite: tiempo,
+        materia: materia,
+      );
+      return;
+    }
+
+    if (insightId.isNotEmpty) {
+      final insight = _insightPorId(insightId);
+      if (insight != null) {
+        await _ejecutarInsightCard(insight);
+        return;
+      }
+    }
+
+    _mostrarDetalleOrden(
+      title: title.isEmpty ? 'Recomendacion IA' : title,
+      message: message,
+      items: items,
+    );
+  }
+
+  Widget _buildTarjetaAccionIACompacta(
+    Map<String, dynamic> card, {
+    required Future<void> Function() onTap,
+  }) {
+    final type = (card['type'] ?? 'message').toString().trim().toLowerCase();
+    final title = (card['title'] ?? 'Recomendacion IA').toString().trim();
+    final message = (card['message'] ?? '').toString().trim();
+    final payload = card['payload'] is Map
+        ? Map<String, dynamic>.from(card['payload'])
+        : <String, dynamic>{};
+    final cantidad = _intValue(payload['cantidad'], 20);
+    final tiempo = _intValue(payload['tiempo'], 25);
+    final materia = payload['materia'] is String
+        ? payload['materia'] as String
+        : null;
+    final color = _colorPorTipo(type);
+    final subtitulo = _subtituloPorTipo(type, cantidad, tiempo, materia);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => onTap(),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.30)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(_iconoPorTipo(type), color: color, size: 20),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title.isEmpty ? 'Recomendacion IA' : title.toUpperCase(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF111827),
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitulo,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Text(
+                message.isEmpty ? 'Sin detalle tactico.' : message,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text(
+                  'Entrar',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Icon(Icons.arrow_forward_ios_rounded, size: 13, color: color),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTarjetaAccionIA(Map<String, dynamic> card) {
-    final type = (card['type'] ?? 'message').toString().trim();
+    final type = (card['type'] ?? 'message').toString().trim().toLowerCase();
     final title = (card['title'] ?? 'Recomendacion IA').toString().trim();
     final message = (card['message'] ?? '').toString();
     final cta = (card['cta'] ?? '').toString().trim();
-    final items =
-        (card['items'] is List)
-            ? (card['items'] as List)
-                .whereType<String>()
-                .map((e) => e.trim())
-                .where((e) => e.isNotEmpty)
-                .toList()
-            : <String>[];
+    final items = (card['items'] is List)
+        ? (card['items'] as List)
+              .whereType<String>()
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
+        : <String>[];
 
-    final payload =
-        card['payload'] is Map
-            ? Map<String, dynamic>.from(card['payload'])
-            : <String, dynamic>{};
+    final payload = card['payload'] is Map
+        ? Map<String, dynamic>.from(card['payload'])
+        : <String, dynamic>{};
     final cantidad = _intValue(payload['cantidad'], 20);
     final tiempo = _intValue(payload['tiempo'], 25);
-    final materia =
-        payload['materia'] is String ? payload['materia'] as String : null;
+    final materia = payload['materia'] is String
+        ? payload['materia'] as String
+        : null;
     final color = _colorPorTipo(type);
     final subtitulo = _subtituloPorTipo(type, cantidad, tiempo, materia);
     final ctaFinal = cta.isNotEmpty ? cta : _ctaPorDefecto(type, cantidad);
-    final canPractice =
-        type == 'plan' || type == 'practice' || payload.containsKey('cantidad');
 
     final description = <String>[
       if (message.trim().isNotEmpty) message.trim(),
@@ -436,21 +866,7 @@ class _PantallaPlanTutorIAPersonalState
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                if (canPractice) {
-                  _iniciarPractica(
-                    cantidad: cantidad,
-                    tiempoLimite: tiempo,
-                    materia: materia,
-                  );
-                  return;
-                }
-                _mostrarDetalleOrden(
-                  title: title.isEmpty ? 'Recomendacion IA' : title,
-                  message: message,
-                  items: items,
-                );
-              },
+              onPressed: () => _ejecutarAccionTarjetaIA(card),
               style: ElevatedButton.styleFrom(
                 backgroundColor: color,
                 foregroundColor: Colors.white,
@@ -473,24 +889,37 @@ class _PantallaPlanTutorIAPersonalState
       ),
     );
   }
+
   Future<void> _iniciarPractica({
     required int cantidad,
     required int tiempoLimite,
     String? materia,
     List<String> preguntaIdsPrioritarias = const [],
+    bool esPracticaGuiada = false,
   }) async {
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(child: CircularProgressIndicator());
+      },
     );
 
+    final preguntas = <Pregunta>[];
+    String? errorMessage;
     try {
-      final priorizadas = await _servicioPreguntas.obtenerPreguntasPorIds(
+      var priorizadas = await _servicioPreguntas.obtenerPreguntasPorIds(
         ids: preguntaIdsPrioritarias,
         categoria: _categoriaUsuario,
         materia: materia,
       );
+      if (priorizadas.isEmpty && preguntaIdsPrioritarias.isNotEmpty) {
+        priorizadas = await _servicioPreguntas.obtenerPreguntasPorIds(
+          ids: preguntaIdsPrioritarias,
+        );
+      }
 
       final faltantes = (cantidad - priorizadas.length).clamp(0, cantidad);
       final aleatorias = await _servicioPreguntas.obtenerPreguntasAleatorias(
@@ -499,7 +928,6 @@ class _PantallaPlanTutorIAPersonalState
         materia: materia,
       );
 
-      final preguntas = <Pregunta>[];
       final usados = <String>{};
       for (final p in priorizadas) {
         if (preguntas.length >= cantidad) break;
@@ -509,55 +937,614 @@ class _PantallaPlanTutorIAPersonalState
         if (preguntas.length >= cantidad) break;
         if (usados.add(p.id)) preguntas.add(p);
       }
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      if (preguntas.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No hay preguntas disponibles')),
-        );
-        return;
-      }
-
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PantallaPractica(
-            tiempoLimiteSegundos: tiempoLimite * 60,
-            preguntas: preguntas,
-            esModoPractica: false,
-          ),
-        ),
-      );
     } catch (e) {
-      if (mounted) Navigator.pop(context);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al iniciar practica: $e')),
-        );
+      errorMessage = 'Error al iniciar practica: $e';
+    } finally {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!).pop();
       }
     }
+
+    if (!mounted) return;
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+      return;
+    }
+
+    if (preguntas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay preguntas disponibles')),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PantallaPractica(
+          tiempoLimiteSegundos: tiempoLimite * 60,
+          preguntas: preguntas,
+          esModoPractica: true,
+          revisarRespuestaInmediata: esPracticaGuiada,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    _cargarDatos(forzarRecarga: true);
+  }
+
+  Color _colorFromHex(String hex, {Color fallback = const Color(0xFFCBD5E1)}) {
+    final raw = hex.trim().replaceAll('#', '');
+    if (raw.length != 6 && raw.length != 8) return fallback;
+    final value = int.tryParse(raw, radix: 16);
+    if (value == null) return fallback;
+    if (raw.length == 6) {
+      return Color(0xFF000000 | value);
+    }
+    return Color(value);
+  }
+
+  IconData _iconByName(String iconName) {
+    switch (iconName) {
+      case 'calendar_month':
+        return Icons.calendar_month_rounded;
+      case 'school':
+      case 'menu_book':
+        return Icons.menu_book_rounded;
+      case 'bolt':
+        return Icons.bolt_rounded;
+      case 'assignment_turned_in':
+        return Icons.assignment_turned_in_rounded;
+      case 'history':
+        return Icons.history_rounded;
+      case 'favorite':
+        return Icons.favorite_rounded;
+      case 'radar':
+        return Icons.radar_rounded;
+      case 'schedule':
+        return Icons.schedule_rounded;
+      case 'insights':
+      default:
+        return Icons.auto_awesome_rounded;
+    }
+  }
+
+  Widget _buildHeroV2(TutorDashboardInicio dashboard) {
+    final resumenCorto = _mensajeHeroCorto(dashboard);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C3AED), Color(0xFF2563EB)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.psychology_alt, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'IA Tutor Personal',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Analisis tactico en tiempo real para tu ascenso.',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    resumenCorto,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 13,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _mensajeHeroCorto(TutorDashboardInicio dashboard) {
+    String raw = '';
+    for (final card in dashboard.insights) {
+      final id = card.id.toLowerCase();
+      final titulo = card.titulo.toLowerCase();
+      if (id.contains('mensaje') || titulo.contains('mensaje personal')) {
+        raw = card.resumen.trim();
+        break;
+      }
+    }
+    if (raw.isEmpty) {
+      raw =
+          'Hoy toca avanzar con foco. Una sesion corta bien hecha vale mas que postergarlo.';
+    }
+    if (raw.length > 120) {
+      return '${raw.substring(0, 117).trim()}...';
+    }
+    return raw;
+  }
+
+  double _doubleValue(dynamic value, [double fallback = 0.0]) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  String _normalizarTextoSimple(String value) {
+    var text = value.toLowerCase().trim();
+    const reemplazos = {
+      'Ã¡': 'a',
+      'Ã©': 'e',
+      'Ã­': 'i',
+      'Ã³': 'o',
+      'Ãº': 'u',
+      'Ã¼': 'u',
+      'Ã±': 'n',
+    };
+    reemplazos.forEach((k, v) {
+      text = text.replaceAll(k, v);
+    });
+    text = text.replaceAll(RegExp(r'[^a-z0-9]+'), ' ');
+    return text.trim();
+  }
+
+  String _nombreMateriaDesdeMap(Map<String, dynamic> materia) {
+    final raw = materia['materia'] ?? materia['nombre'];
+    if (raw is Map) {
+      return (raw['nombre'] ?? 'Materia').toString().trim();
+    }
+    return (raw ?? 'Materia').toString().trim();
+  }
+
+  String _nivelDesdePorcentaje(double porcentaje) {
+    if (porcentaje < 40) return 'CRITICO';
+    if (porcentaje < 60) return 'BASICO';
+    if (porcentaje < 80) return 'INTERMEDIO';
+    if (porcentaje < 90) return 'AVANZADO';
+    return 'EXPERTO';
+  }
+
+  _SemaforoTema _clasificarSemaforo({
+    required double porcentaje,
+    required double tiempoRecomendadoMin,
+    required bool sinRegistro,
+  }) {
+    if (sinRegistro || porcentaje <= 0 || porcentaje < 50) {
+      return _SemaforoTema.rojo;
+    }
+    final esLenta = tiempoRecomendadoMin >= 35;
+    if (porcentaje >= 80 && !esLenta) {
+      return _SemaforoTema.verde;
+    }
+    return _SemaforoTema.ambar;
+  }
+
+  List<_MateriaSemaforoItem> _construirMapaSemaforoMaterias({
+    required List<Map<String, dynamic>> materiasAnalisis,
+    required List<Materia> materiasCatalogo,
+  }) {
+    final analisisByKey = <String, Map<String, dynamic>>{};
+    for (final materia in materiasAnalisis) {
+      final nombre = _nombreMateriaDesdeMap(materia);
+      final key = _normalizarTextoSimple(nombre);
+      if (key.isEmpty) continue;
+      analisisByKey[key] = {...materia, 'materia': nombre};
+    }
+
+    final items = <_MateriaSemaforoItem>[];
+    final keysAgregadas = <String>{};
+
+    for (final materia in materiasCatalogo) {
+      final nombre = materia.nombre.trim();
+      final key = _normalizarTextoSimple(nombre);
+      if (key.isEmpty || !keysAgregadas.add(key)) continue;
+      final analisis = analisisByKey.remove(key);
+      final porcentaje = _doubleValue(analisis?['porcentaje']);
+      final tiempoRecomendado = _doubleValue(
+        analisis?['tiempo_recomendado_minutos'],
+      );
+      final semaforo = _clasificarSemaforo(
+        porcentaje: porcentaje,
+        tiempoRecomendadoMin: tiempoRecomendado,
+        sinRegistro: analisis == null,
+      );
+      final descripcion = switch (semaforo) {
+        _SemaforoTema.verde =>
+          'Dominio solido: ${porcentaje.toStringAsFixed(1)}%.',
+        _SemaforoTema.ambar =>
+          tiempoRecomendado >= 35
+              ? 'Conoces este tema, pero tu ritmo aun es lento.'
+              : 'Conoces el tema, pero aun hay dudas por consolidar.',
+        _SemaforoTema.rojo =>
+          (analisis == null || porcentaje <= 0)
+              ? 'Punto ciego: aun no has empezado este tema.'
+              : 'Punto ciego prioritario para hoy.',
+      };
+
+      items.add(
+        _MateriaSemaforoItem(
+          nombre: nombre,
+          porcentaje: porcentaje,
+          semaforo: semaforo,
+          descripcion: descripcion,
+          materia: {
+            ...?analisis,
+            'materia': nombre,
+            'porcentaje': porcentaje,
+            'nivel': (analisis?['nivel'] ?? _nivelDesdePorcentaje(porcentaje))
+                .toString(),
+          },
+        ),
+      );
+    }
+
+    for (final analisis in analisisByKey.values) {
+      final nombre = _nombreMateriaDesdeMap(analisis);
+      final key = _normalizarTextoSimple(nombre);
+      if (key.isEmpty || !keysAgregadas.add(key)) continue;
+      final porcentaje = _doubleValue(analisis['porcentaje']);
+      final tiempoRecomendado = _doubleValue(
+        analisis['tiempo_recomendado_minutos'],
+      );
+      final semaforo = _clasificarSemaforo(
+        porcentaje: porcentaje,
+        tiempoRecomendadoMin: tiempoRecomendado,
+        sinRegistro: false,
+      );
+      final descripcion = switch (semaforo) {
+        _SemaforoTema.verde =>
+          'Dominio solido: ${porcentaje.toStringAsFixed(1)}%.',
+        _SemaforoTema.ambar =>
+          tiempoRecomendado >= 35
+              ? 'Conoces este tema, pero tu ritmo aun es lento.'
+              : 'Conoces el tema, pero aun hay dudas por consolidar.',
+        _SemaforoTema.rojo => 'Punto ciego prioritario para hoy.',
+      };
+
+      items.add(
+        _MateriaSemaforoItem(
+          nombre: nombre,
+          porcentaje: porcentaje,
+          semaforo: semaforo,
+          descripcion: descripcion,
+          materia: {
+            ...analisis,
+            'materia': nombre,
+            'porcentaje': porcentaje,
+            'nivel': (analisis['nivel'] ?? _nivelDesdePorcentaje(porcentaje))
+                .toString(),
+          },
+        ),
+      );
+    }
+
+    int ordenSemaforo(_SemaforoTema s) {
+      switch (s) {
+        case _SemaforoTema.rojo:
+          return 0;
+        case _SemaforoTema.ambar:
+          return 1;
+        case _SemaforoTema.verde:
+          return 2;
+      }
+    }
+
+    items.sort((a, b) {
+      final bySemaforo = ordenSemaforo(a.semaforo) - ordenSemaforo(b.semaforo);
+      if (bySemaforo != 0) return bySemaforo;
+      final byPorcentaje = a.porcentaje.compareTo(b.porcentaje);
+      if (byPorcentaje != 0) return byPorcentaje;
+      return a.nombre.compareTo(b.nombre);
+    });
+
+    return items;
+  }
+
+  String _construirResumenMapaTemas({
+    required List<_MateriaSemaforoItem> items,
+    required String resumenBase,
+  }) {
+    if (items.isEmpty) {
+      return 'Aun no hay datos por materia. Los porcentajes mostrados representan tu porcentaje de dominio por materia.';
+    }
+
+    final totalVerde = items.where((e) => e.semaforo == _SemaforoTema.verde).length;
+    final totalAmbar = items.where((e) => e.semaforo == _SemaforoTema.ambar).length;
+    final totalRojo = items.where((e) => e.semaforo == _SemaforoTema.rojo).length;
+
+    final ordenadas = [...items]
+      ..sort((a, b) => b.porcentaje.compareTo(a.porcentaje));
+    final top = ordenadas.first;
+
+    final topMsg = top.porcentaje > 0
+        ? 'La materia ${top.nombre} es la que mas dominas (${top.porcentaje.toStringAsFixed(1)}%).'
+        : 'Aun no tienes dominio registrado por materia.';
+
+    final semaforoMsg =
+        'Semaforo actual: Verde $totalVerde, Ambar $totalAmbar y Rojo $totalRojo.';
+    const aclaracion =
+        'Los porcentajes que se muestran son porcentaje de dominio por materia.';
+
+    if (resumenBase.trim().isEmpty) {
+      return '$topMsg $aclaracion $semaforoMsg';
+    }
+
+    return '$topMsg $aclaracion $semaforoMsg';
+  }
+
+  Future<void> _abrirMapaTemasSemaforo() async {
+    final materiasAnalisis = _obtenerAnalisisMaterias();
+    List<Materia> materiasCatalogo = const <Materia>[];
+    try {
+      materiasCatalogo = await _servicioPreguntas.obtenerMateriasPorCategoria(
+        categoria: _categoriaUsuario,
+      );
+    } catch (_) {
+      materiasCatalogo = const <Materia>[];
+    }
+
+    final items = _construirMapaSemaforoMaterias(
+      materiasAnalisis: materiasAnalisis,
+      materiasCatalogo: materiasCatalogo,
+    );
+    final resumenMapa = _construirResumenMapaTemas(
+      items: items,
+      resumenBase: (_analisisPerfil?['resumen_materias'] ?? '').toString(),
+    );
+
+    if (!mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _PantallaMapaTemasSemaforo(
+          items: items,
+          resumen: resumenMapa,
+          onMateriaTap: (materia) async {
+            await _abrirDetalleMateria(materia);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _ejecutarInsightCard(TutorInsightCard card) async {
+    final id = card.id.toLowerCase().trim();
+    if (id == 'analisis_perfil') {
+      await _abrirMapaTemasSemaforo();
+      return;
+    }
+
+    if (id == 'plan_hoy' || id == 'ordenes_tutor_hoy') {
+      await _abrirOrdenesTutorParaHoy();
+      return;
+    }
+
+    if (card.promptAccion.trim().isNotEmpty) {
+      await _abrirChatTutor(
+        promptInicial: card.promptAccion.trim(),
+        enviarAutomatico: true,
+      );
+      return;
+    }
+
+    if (card.cantidadPractica != null && card.tiempoPractica != null) {
+      await _iniciarPractica(
+        cantidad: card.cantidadPractica!,
+        tiempoLimite: card.tiempoPractica!,
+        materia: card.materia,
+      );
+    }
+  }
+
+  Widget _buildInsightTileV2(TutorInsightCard card) {
+    final color = _colorFromHex(card.colorHex);
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _ejecutarInsightCard(card),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.55)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(_iconByName(card.iconName), color: color, size: 20),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              card.titulo.toUpperCase(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF111827),
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Text(
+                card.resumen,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text(
+                  'Entrar',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Icon(Icons.arrow_forward_ios_rounded, size: 13, color: color),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInsightsGridV2(TutorDashboardInicio dashboard) {
+    final cards = dashboard.insights;
+    if (cards.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'FUNCIONES IA',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: cards.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 0.95,
+          ),
+          itemBuilder: (_, index) => _buildInsightTileV2(cards[index]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDashboardV2({required Map<String, dynamic> analisis}) {
+    final dashboard = _dashboardInicio ?? TutorDashboardInicio.fallback();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeroV2(dashboard),
+          const SizedBox(height: 14),
+          _buildInsightsGridV2(dashboard),
+          const SizedBox(height: 24),
+          Text(
+            'PROGRESO',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _ProgresoDetalladoCard(analisis: analisis),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final analisis = _analisisPerfil ?? _analisisPerfilInicial();
     final cardsIa = _obtenerCardsIA();
-    final diagnostico = (_analisisPerfil?['diagnostico'] ?? '').toString();
-    final resumenMaterias =
-        (_analisisPerfil?['resumen_materias'] ?? '').toString();
+    final diagnostico = (analisis['diagnostico'] ?? '').toString();
+    final resumenMaterias = (analisis['resumen_materias'] ?? '').toString();
     final materiasAnalisis = _obtenerAnalisisMaterias();
     final fortalezasAnalisis = [
-      ...List<String>.from(_analisisPerfil?['fortalezas'] ?? []),
-      if ((_analisisPerfil?['velocidad_promedio'] as num?) != null &&
-          (_analisisPerfil?['velocidad_promedio'] as num) < 15)
-        "Buena velocidad (${_analisisPerfil?['velocidad_promedio']} seg/preg)",
-      if ((_analisisPerfil?['racha_dias'] as int? ?? 0) >= 3)
-        "Racha de ${_analisisPerfil?['racha_dias']} dias",
+      ...List<String>.from(analisis['fortalezas'] ?? []),
+      if ((analisis['velocidad_promedio'] as num?) != null &&
+          (analisis['velocidad_promedio'] as num) < 15)
+        "Buena velocidad (${analisis['velocidad_promedio']} seg/preg)",
+      if ((analisis['racha_dias'] as int? ?? 0) >= 3)
+        "Racha de ${analisis['racha_dias']} dias",
     ];
     final debilidadesAnalisis = [
-      ...List<String>.from(_analisisPerfil?['debilidades'] ?? []),
-      if ((_analisisPerfil?['tasa_acierto'] as num? ?? 0) < 50)
+      ...List<String>.from(analisis['debilidades'] ?? []),
+      if ((analisis['tasa_acierto'] as num? ?? 0) < 50)
         "Tendencia a impulsividad (Necesitas mas analisis)",
     ];
 
@@ -613,15 +1600,17 @@ class _PantallaPlanTutorIAPersonalState
                 ],
               ),
             )
+          : _tutorDashboardV2Enabled
+          ? _buildDashboardV2(analisis: analisis)
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Tarjeta de DiagnÃ³stico Principal (Nivel Global)
+                  // 1. Tarjeta de DiagnÃƒÂ³stico Principal (Nivel Global)
                   _SeccionNivelGlobal(
-                    nivel: _analisisPerfil!['nivel_global'],
-                    tasaAcierto: _analisisPerfil!['tasa_acierto'],
+                    nivel: analisis['nivel_global'] ?? 'INICIAL',
+                    tasaAcierto: analisis['tasa_acierto'] ?? 0,
                   ),
 
                   const SizedBox(height: 24),
@@ -646,9 +1635,9 @@ class _PantallaPlanTutorIAPersonalState
 
                   const SizedBox(height: 30),
 
-                  // 3. SECCIÃ“N DE PROGRESO (Mockup Requerido)
+                  // 3. SECCIÃƒâ€œN DE PROGRESO (Mockup Requerido)
                   Text(
-                    "ðŸ“ˆ PROGRESO",
+                    "Ã°Å¸â€œË† PROGRESO",
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -657,7 +1646,7 @@ class _PantallaPlanTutorIAPersonalState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _ProgresoDetalladoCard(analisis: _analisisPerfil!),
+                  _ProgresoDetalladoCard(analisis: analisis),
 
                   const SizedBox(height: 30),
 
@@ -676,8 +1665,7 @@ class _PantallaPlanTutorIAPersonalState
                     _buildFallbackGrid()
                   else
                     Column(
-                      children:
-                          cardsIa.map(_buildTarjetaAccionIA).toList(),
+                      children: cardsIa.map(_buildTarjetaAccionIA).toList(),
                     ),
 
                   const SizedBox(height: 50),
@@ -698,10 +1686,14 @@ class _MensajeChatTutor {
 class _ChatTutorSheet extends StatefulWidget {
   final TutorIAPersonalService iaService;
   final Map<String, dynamic> contexto;
+  final String? promptInicial;
+  final bool enviarAutomatico;
 
   const _ChatTutorSheet({
     required this.iaService,
     required this.contexto,
+    this.promptInicial,
+    this.enviarAutomatico = false,
   });
 
   @override
@@ -720,10 +1712,18 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
     _mensajes.add(
       const _MensajeChatTutor(
         texto:
-            'Soy Tutor IA Personal. Preguntame por materias debiles, plan diario, estrategia o simulacros.',
+            'Soy Tutor IA Personal. Pideme plan diario, que estudiar hoy, analisis de sesion, velocidad, horario, patrones de error, materias en riesgo o prediccion de olvido.',
         esUsuario: false,
       ),
     );
+    if (widget.enviarAutomatico &&
+        widget.promptInicial != null &&
+        widget.promptInicial!.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _enviarMensaje(widget.promptInicial);
+      });
+    }
   }
 
   @override
@@ -744,11 +1744,13 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
     });
   }
 
-  Future<void> _enviarMensaje() async {
-    final mensaje = _controller.text.trim();
+  Future<void> _enviarMensaje([String? mensajeForzado]) async {
+    final mensaje = (mensajeForzado ?? _controller.text).trim();
     if (mensaje.isEmpty || _enviando) return;
 
-    _controller.clear();
+    if (mensajeForzado == null) {
+      _controller.clear();
+    }
     setState(() {
       _mensajes.add(_MensajeChatTutor(texto: mensaje, esUsuario: true));
       _enviando = true;
@@ -760,17 +1762,34 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
       'historial_chat': _historialParaIA(),
     };
 
-    final respuesta = await widget.iaService.enviarMensajeTutor(
-      mensaje: mensaje,
-      contexto: contextoChat,
-    );
+    try {
+      final respuesta = await widget.iaService.enviarMensajeTutor(
+        mensaje: mensaje,
+        contexto: contextoChat,
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _mensajes.add(_MensajeChatTutor(texto: respuesta, esUsuario: false));
-      _enviando = false;
-    });
-    _scrollAlFinal();
+      if (!mounted) return;
+      setState(() {
+        _mensajes.add(_MensajeChatTutor(texto: respuesta, esUsuario: false));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _mensajes.add(
+          const _MensajeChatTutor(
+            texto: 'No pude responder en este momento. Intenta nuevamente.',
+            esUsuario: false,
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _enviando = false;
+        });
+        _scrollAlFinal();
+      }
+    }
   }
 
   List<Map<String, String>> _historialParaIA() {
@@ -779,10 +1798,7 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
     return _mensajes
         .sublist(start)
         .map(
-          (m) => {
-            'rol': m.esUsuario ? 'usuario' : 'tutor',
-            'texto': m.texto,
-          },
+          (m) => {'rol': m.esUsuario ? 'usuario' : 'tutor', 'texto': m.texto},
         )
         .toList();
   }
@@ -791,8 +1807,7 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
     final esUsuario = mensaje.esUsuario;
     final bg = esUsuario ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9);
     final fg = esUsuario ? Colors.white : const Color(0xFF0F172A);
-    final align =
-        esUsuario ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final align = esUsuario ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(14),
       topRight: const Radius.circular(14),
@@ -807,17 +1822,10 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
           constraints: const BoxConstraints(maxWidth: 320),
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: radius,
-          ),
+          decoration: BoxDecoration(color: bg, borderRadius: radius),
           child: Text(
             mensaje.texto,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: fg,
-              height: 1.4,
-            ),
+            style: GoogleFonts.inter(fontSize: 13, color: fg, height: 1.4),
           ),
         ),
       ],
@@ -937,15 +1945,11 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.grey.shade300,
-                            ),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.grey.shade300,
-                            ),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1072,7 +2076,10 @@ class _ProgresoDetalladoCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+          ),
         ],
       ),
       child: Column(
@@ -1166,20 +2173,24 @@ class _BloqueAnalisisTactico extends StatelessWidget {
     String tipo,
   ) {
     final regex = RegExp(r'^(.*)\(([\d.]+)%\)$');
-    return items.map((raw) {
-      final texto = raw.trim();
-      final match = regex.firstMatch(texto);
-      final nombre = match != null ? match.group(1)!.trim() : texto;
-      final score =
-          match != null ? double.tryParse(match.group(2) ?? '') : null;
-      final porcentaje = score ?? (tipo == 'fortaleza' ? 75.0 : 45.0);
-      return {
-        'materia': nombre,
-        'porcentaje': porcentaje,
-        'nivel': _nivelDesdePorcentaje(porcentaje),
-        'tipo': tipo,
-      };
-    }).where((e) => (e['materia'] as String).isNotEmpty).toList();
+    return items
+        .map((raw) {
+          final texto = raw.trim();
+          final match = regex.firstMatch(texto);
+          final nombre = match != null ? match.group(1)!.trim() : texto;
+          final score = match != null
+              ? double.tryParse(match.group(2) ?? '')
+              : null;
+          final porcentaje = score ?? (tipo == 'fortaleza' ? 75.0 : 45.0);
+          return {
+            'materia': nombre,
+            'porcentaje': porcentaje,
+            'nivel': _nivelDesdePorcentaje(porcentaje),
+            'tipo': tipo,
+          };
+        })
+        .where((e) => (e['materia'] as String).isNotEmpty)
+        .toList();
   }
 
   String _nivelDesdePorcentaje(double value) {
@@ -1283,10 +2294,7 @@ class _BloqueAnalisisTactico extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white70,
-                ),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white70),
               ],
             ),
             const SizedBox(height: 14),
@@ -1344,8 +2352,8 @@ class _BloqueAnalisisTactico extends StatelessWidget {
     final porcentaje = (materia['porcentaje'] is num)
         ? (materia['porcentaje'] as num).toDouble()
         : double.tryParse(materia['porcentaje']?.toString() ?? '0') ?? 0.0;
-    final nivel =
-        (materia['nivel'] ?? _nivelDesdePorcentaje(porcentaje)).toString();
+    final nivel = (materia['nivel'] ?? _nivelDesdePorcentaje(porcentaje))
+        .toString();
 
     return InkWell(
       onTap: () => onMateriaTap({
@@ -1387,11 +2395,7 @@ class _BloqueAnalisisTactico extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: color,
-                ),
+                Icon(Icons.chevron_right_rounded, size: 18, color: color),
               ],
             ),
             const SizedBox(height: 8),
@@ -1631,6 +2635,340 @@ class _PantallaAnalisisMaterias extends StatelessWidget {
   }
 }
 
+enum _SemaforoTema { verde, ambar, rojo }
+
+class _MateriaSemaforoItem {
+  final String nombre;
+  final double porcentaje;
+  final _SemaforoTema semaforo;
+  final String descripcion;
+  final Map<String, dynamic> materia;
+
+  const _MateriaSemaforoItem({
+    required this.nombre,
+    required this.porcentaje,
+    required this.semaforo,
+    required this.descripcion,
+    required this.materia,
+  });
+}
+
+class _PantallaMapaTemasSemaforo extends StatelessWidget {
+  final List<_MateriaSemaforoItem> items;
+  final String resumen;
+  final Future<void> Function(Map<String, dynamic> materia) onMateriaTap;
+
+  const _PantallaMapaTemasSemaforo({
+    required this.items,
+    required this.resumen,
+    required this.onMateriaTap,
+  });
+
+  Color _colorSemaforo(_SemaforoTema semaforo) {
+    switch (semaforo) {
+      case _SemaforoTema.verde:
+        return const Color(0xFF16A34A);
+      case _SemaforoTema.ambar:
+        return const Color(0xFFD97706);
+      case _SemaforoTema.rojo:
+        return const Color(0xFFDC2626);
+    }
+  }
+
+  String _tituloSemaforo(_SemaforoTema semaforo) {
+    switch (semaforo) {
+      case _SemaforoTema.verde:
+        return 'Verde Â· Dominadas (>80%)';
+      case _SemaforoTema.ambar:
+        return 'Ambar Â· Dudas o ritmo lento';
+      case _SemaforoTema.rojo:
+        return 'Rojo Â· Puntos ciegos (<50% o sin iniciar)';
+    }
+  }
+
+  List<_MateriaSemaforoItem> _itemsPor(
+    _SemaforoTema semaforo, {
+    _SemaforoTema? filtroActivo,
+  }) {
+    final base = items.where((e) => e.semaforo == semaforo).toList();
+    if (filtroActivo == null) return base;
+    if (filtroActivo != semaforo) return const <_MateriaSemaforoItem>[];
+    return base;
+  }
+
+  Widget _buildFiltroChip({
+    required bool selected,
+    required VoidCallback onTap,
+    required Color color,
+    required String titulo,
+    required int total,
+  }) {
+    return ChoiceChip(
+      label: Text(
+        '$titulo ($total)',
+        style: GoogleFonts.inter(
+          color: selected ? Colors.white : color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: color,
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.25)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+    );
+  }
+
+  Widget _buildSeccion(
+    BuildContext context, {
+    required _SemaforoTema semaforo,
+    _SemaforoTema? filtroActivo,
+  }) {
+    final lista = _itemsPor(semaforo, filtroActivo: filtroActivo);
+    if (lista.isEmpty) return const SizedBox.shrink();
+    final color = _colorSemaforo(semaforo);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _tituloSemaforo(semaforo),
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...lista.map(
+            (item) => InkWell(
+              onTap: () async {
+                await onMateriaTap(item.materia);
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: color.withValues(alpha: 0.18)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      margin: const EdgeInsets.only(top: 5),
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.nombre,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            item.descripcion,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF475569),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Dominio ${item.porcentaje.toStringAsFixed(1)}%',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalVerdes = _itemsPor(_SemaforoTema.verde).length;
+    final totalAmbar = _itemsPor(_SemaforoTema.ambar).length;
+    final totalRojos = _itemsPor(_SemaforoTema.rojo).length;
+    _SemaforoTema? filtroActivo;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: Text(
+          'Mapa de temas del prospecto',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+      ),
+      body: StatefulBuilder(
+        builder: (context, setLocalState) {
+          final visibles = filtroActivo == null
+              ? items
+              : items.where((e) => e.semaforo == filtroActivo).toList();
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Text(
+                    resumen.trim().isEmpty
+                        ? 'Aqui tienes el estado de tus materias segun tu banco actual. Toca una para ver su diagnostico y plan de refuerzo.'
+                        : resumen.trim(),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: const Color(0xFF1E3A8A),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildFiltroChip(
+                      selected: filtroActivo == _SemaforoTema.verde,
+                      onTap: () {
+                        setLocalState(() {
+                          filtroActivo = filtroActivo == _SemaforoTema.verde
+                              ? null
+                              : _SemaforoTema.verde;
+                        });
+                      },
+                      color: _colorSemaforo(_SemaforoTema.verde),
+                      titulo: 'Verde',
+                      total: totalVerdes,
+                    ),
+                    _buildFiltroChip(
+                      selected: filtroActivo == _SemaforoTema.ambar,
+                      onTap: () {
+                        setLocalState(() {
+                          filtroActivo = filtroActivo == _SemaforoTema.ambar
+                              ? null
+                              : _SemaforoTema.ambar;
+                        });
+                      },
+                      color: _colorSemaforo(_SemaforoTema.ambar),
+                      titulo: 'Ambar',
+                      total: totalAmbar,
+                    ),
+                    _buildFiltroChip(
+                      selected: filtroActivo == _SemaforoTema.rojo,
+                      onTap: () {
+                        setLocalState(() {
+                          filtroActivo = filtroActivo == _SemaforoTema.rojo
+                              ? null
+                              : _SemaforoTema.rojo;
+                        });
+                      },
+                      color: _colorSemaforo(_SemaforoTema.rojo),
+                      titulo: 'Rojo',
+                      total: totalRojos,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (filtroActivo == null) ...[
+                  _buildSeccion(
+                    context,
+                    semaforo: _SemaforoTema.rojo,
+                    filtroActivo: filtroActivo,
+                  ),
+                  _buildSeccion(
+                    context,
+                    semaforo: _SemaforoTema.ambar,
+                    filtroActivo: filtroActivo,
+                  ),
+                  _buildSeccion(
+                    context,
+                    semaforo: _SemaforoTema.verde,
+                    filtroActivo: filtroActivo,
+                  ),
+                ] else
+                  _buildSeccion(
+                    context,
+                    semaforo: filtroActivo!,
+                    filtroActivo: filtroActivo,
+                  ),
+                if (visibles.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Text(
+                      filtroActivo == null
+                          ? 'Aun no hay materias para mostrar. Realiza una practica para activar este panel.'
+                          : 'No hay materias en este semaforo con el filtro actual.',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _DetalleMateriaSheet extends StatefulWidget {
   final String userId;
   final Map<String, dynamic> materia;
@@ -1642,8 +2980,10 @@ class _DetalleMateriaSheet extends StatefulWidget {
     int cantidad,
     int tiempoMinutos,
     String materia,
-    List<String> preguntaIdsPrioritarias,
-  ) onPracticar;
+    List<String> preguntaIdsPrioritarias, {
+    bool esPracticaGuiada,
+  })
+  onPracticar;
 
   const _DetalleMateriaSheet({
     required this.userId,
@@ -1664,7 +3004,6 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
   Map<String, dynamic> _recomendacion = const {};
   Map<String, dynamic> _detalleMateria = const {};
   List<Map<String, dynamic>> _preguntasCriticas = const [];
-  List<Pregunta> _preguntas = const [];
 
   String get _materia =>
       (widget.materia['materia'] ?? widget.materia['nombre'] ?? 'Materia')
@@ -1686,40 +3025,98 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
   }
 
   Future<void> _cargarDetalle() async {
-    final rec = await widget.iaService.recomendarPorMateria(
-      materia: _materia,
-      porcentaje: _porcentaje,
-      nivel: _nivel,
-      debilidadesGlobales: widget.debilidadesGlobales,
-    );
+    try {
+      final recFuture = widget.iaService.recomendarPorMateria(
+        materia: _materia,
+        porcentaje: _porcentaje,
+        nivel: _nivel,
+        debilidadesGlobales: widget.debilidadesGlobales,
+      );
+      final detalleFuture = widget.iaService.obtenerDetalleMateria(
+        userId: widget.userId,
+        materia: _materia,
+        porcentajeActual: _porcentaje,
+        nivelActual: _nivel,
+      );
+      final criticasFuture = widget.iaService.obtenerPreguntasQueBajanMateria(
+        userId: widget.userId,
+        materia: _materia,
+        limit: 10,
+      );
 
-    final detalle = await widget.iaService.obtenerDetalleMateria(
-      userId: widget.userId,
-      materia: _materia,
-      porcentajeActual: _porcentaje,
-      nivelActual: _nivel,
-    );
+      final rec = await recFuture;
+      final detalle = await detalleFuture;
+      final criticas = await criticasFuture;
+      var criticasFinales = criticas;
+      if (criticasFinales.isEmpty) {
+        final fallidas = (detalle['fallidas'] is Map)
+            ? Map<String, dynamic>.from(detalle['fallidas'])
+            : <String, dynamic>{};
+        final preguntasEstado = (detalle['preguntas_por_estado'] is Map)
+            ? Map<String, dynamic>.from(detalle['preguntas_por_estado'])
+            : <String, dynamic>{};
+        final idsFallidas = (fallidas['ids'] is List)
+            ? (fallidas['ids'] as List)
+                  .map((e) => e.toString().trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList()
+            : <String>[];
+        final idsIncorrectas = (preguntasEstado['incorrectas_ids'] is List)
+            ? (preguntasEstado['incorrectas_ids'] as List)
+                  .map((e) => e.toString().trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList()
+            : <String>[];
+        final idsFallback = <String>{
+          ...idsFallidas,
+          ...idsIncorrectas,
+        }.take(10).toList();
+        if (idsFallback.isNotEmpty) {
+          var preguntasFallback = await widget.servicioPreguntas
+              .obtenerPreguntasPorIds(
+                ids: idsFallback,
+                categoria: widget.categoriaUsuario,
+                materia: _materia,
+              );
+          if (preguntasFallback.isEmpty) {
+            preguntasFallback = await widget.servicioPreguntas
+                .obtenerPreguntasPorIds(ids: idsFallback);
+          }
+          if (preguntasFallback.isNotEmpty) {
+            criticasFinales = preguntasFallback
+                .map(
+                  (p) => <String, dynamic>{
+                    'pregunta_id': p.id,
+                    'numero': p.numero,
+                    'texto': p.texto,
+                    'fallos': null,
+                    'intentos': null,
+                    'tasa_error': null,
+                  },
+                )
+                .toList();
+          }
+        }
+      }
 
-    final criticas = await widget.iaService.obtenerPreguntasQueBajanMateria(
-      userId: widget.userId,
-      materia: _materia,
-      limit: 6,
-    );
-
-    final sugeridas = await widget.servicioPreguntas.obtenerPreguntasAleatorias(
-      cantidad: 5,
-      materia: _materia,
-      categoria: widget.categoriaUsuario,
-    );
-
-    if (!mounted) return;
-    setState(() {
-      _recomendacion = rec;
-      _detalleMateria = detalle;
-      _preguntasCriticas = criticas;
-      _preguntas = sugeridas;
-      _cargando = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _recomendacion = rec;
+        _detalleMateria = detalle;
+        _preguntasCriticas = criticasFinales;
+        _cargando = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cargando = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo cargar el detalle de la materia.'),
+        ),
+      );
+    }
   }
 
   int _intValue(dynamic value, int fallback) {
@@ -1752,94 +3149,269 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
       ],
     );
   }
-
   Widget _buildMiniStat({
     required String label,
     required String value,
     required Color color,
+    VoidCallback? onTap,
   }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.black54,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFieldChip(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    final tarjeta = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$label: ',
+            label,
             style: GoogleFonts.inter(
               fontSize: 11,
-              color: Colors.black54,
               fontWeight: FontWeight.w600,
+              color: Colors.black54,
             ),
           ),
+          const SizedBox(height: 4),
           Text(
             value,
             style: GoogleFonts.inter(
-              fontSize: 11,
-              color: const Color(0xFF0F172A),
+              fontSize: 14,
               fontWeight: FontWeight.w800,
+              color: color,
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Ver',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+
+    if (onTap == null) {
+      return Expanded(child: tarjeta);
+    }
+
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: tarjeta,
       ),
     );
   }
 
-  Future<void> _iniciarSoloFallidas({
-    required int cantidad,
-    required int tiempo,
-    required List<String> idsFallidas,
+  List<String> _toIdList(dynamic value) {
+    if (value is! List) return <String>[];
+    final ids = <String>[];
+    final vistos = <String>{};
+    for (final raw in value) {
+      final id = raw.toString().trim();
+      if (id.isEmpty) continue;
+      if (vistos.add(id)) {
+        ids.add(id);
+      }
+    }
+    return ids;
+  }
+
+  Future<void> _abrirListadoPreguntasEstado({
+    required String titulo,
+    required List<String> ids,
+    required Color color,
   }) async {
-    if (idsFallidas.isEmpty) {
+    final idsLimpios = _toIdList(ids);
+    if (idsLimpios.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No hay preguntas fallidas suficientes en esta materia'),
+          content: Text('No hay preguntas disponibles en este grupo.'),
         ),
       );
       return;
     }
 
-    Navigator.pop(context);
-    await widget.onPracticar(cantidad, tiempo, _materia, idsFallidas);
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    List<Pregunta> preguntas = const [];
+    String? error;
+    try {
+      preguntas = await widget.servicioPreguntas.obtenerPreguntasPorIds(
+        ids: idsLimpios,
+        categoria: widget.categoriaUsuario,
+        materia: _materia,
+      );
+      if (preguntas.isEmpty) {
+        preguntas = await widget.servicioPreguntas.obtenerPreguntasPorIds(
+          ids: idsLimpios,
+        );
+      }
+    } catch (e) {
+      error = 'No se pudieron cargar las preguntas: $e';
+    } finally {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!).pop();
+      }
+    }
+
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    if (preguntas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se encontraron preguntas para este grupo.'),
+        ),
+      );
+      return;
+    }
+
+    final idsPractica = preguntas.map((p) => p.id).toList();
+    final cantidadPractica = idsPractica.length;
+    final tiempoPractica = _intValue(_recomendacion['tiempo_minutos'], 20);
+    final textoBoton = 'Practicar ${idsPractica.length} preguntas';
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.88,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            titulo,
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${preguntas.length}',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      itemCount: preguntas.length,
+                      itemBuilder: (_, index) {
+                        final p = preguntas[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Text(
+                            '#${p.numero} ${p.texto}',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: const Color(0xFF1F2937),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final onPracticar = widget.onPracticar;
+                          final materiaActual = _materia;
+                          Navigator.of(sheetContext).pop();
+                          Navigator.of(context).pop();
+                          await onPracticar(
+                            cantidadPractica,
+                            tiempoPractica,
+                            materiaActual,
+                            idsPractica,
+                            esPracticaGuiada: true,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          textoBoton,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -1850,42 +3422,17 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     final progreso = (_detalleMateria['progreso_usuario'] is Map)
         ? Map<String, dynamic>.from(_detalleMateria['progreso_usuario'])
         : <String, dynamic>{};
-    final stats = (_detalleMateria['estadisticas_clave'] is Map)
-        ? Map<String, dynamic>.from(_detalleMateria['estadisticas_clave'])
-        : <String, dynamic>{};
     final pred = (_detalleMateria['prediccion'] is Map)
         ? Map<String, dynamic>.from(_detalleMateria['prediccion'])
         : <String, dynamic>{};
-    final fallidas = (_detalleMateria['fallidas'] is Map)
-        ? Map<String, dynamic>.from(_detalleMateria['fallidas'])
+    final preguntasPorEstado = (_detalleMateria['preguntas_por_estado'] is Map)
+        ? Map<String, dynamic>.from(_detalleMateria['preguntas_por_estado'])
         : <String, dynamic>{};
-    final tutorIaRaw = _detalleMateria['tutor_ia_personal'];
-    final tutorIa = (tutorIaRaw is Map)
-        ? Map<String, dynamic>.from(tutorIaRaw)
-        : <String, dynamic>{};
-    final recomendaciones = (_detalleMateria['recomendaciones'] is Map)
-        ? Map<String, dynamic>.from(_detalleMateria['recomendaciones'])
-        : <String, dynamic>{};
-
-    final focos = (_recomendacion['focos'] is List)
-        ? (_recomendacion['focos'] as List)
-            .whereType<String>()
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList()
-        : <String>[];
-
-    final cantidad = (_recomendacion['cantidad_preguntas'] is num)
-        ? (_recomendacion['cantidad_preguntas'] as num).toInt()
-        : 15;
     final tiempo = (_recomendacion['tiempo_minutos'] is num)
         ? (_recomendacion['tiempo_minutos'] as num).toInt()
         : 20;
 
     final totalPreguntas = _intValue(info['total_preguntas'], 0);
-    final codigoMateria = (info['codigo'] ?? 'SIN-COD').toString();
-    final areaMateria = (info['area'] ?? 'Area general').toString();
-    final dificultad = (info['dificultad'] ?? 'media').toString().toUpperCase();
 
     final correctas = _intValue(progreso['correctas'], 0);
     final incorrectas = _intValue(progreso['incorrectas'], 0);
@@ -1893,52 +3440,28 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     final porcentajeAvance = _doubleValue(progreso['porcentaje_avance'], 0);
     final preguntasVistas = _intValue(progreso['preguntas_vistas'], 0);
 
-    final tiempoPromMateria = _doubleValue(stats['tiempo_promedio_pregunta'], 0);
-    final tiempoPromGlobal = _doubleValue(stats['promedio_general'], 0);
-    final comparacionTexto =
-        (stats['comparacion_texto'] ?? 'Sin datos de comparacion').toString();
-    final intentosRealizados = _intValue(stats['intentos_realizados'], 0);
-    final tendencia = (stats['tendencia'] ?? 'estable').toString();
-    final deltaTendencia = _doubleValue(stats['delta_tendencia'], 0);
-
     final probActual = _doubleValue(pred['probabilidad_actual'], _porcentaje);
     final prob7 = _doubleValue(pred['proyeccion_7_dias'], _porcentaje);
     final prob14 = _doubleValue(pred['proyeccion_14_dias'], _porcentaje);
     final prob30 = _doubleValue(pred['proyeccion_30_dias'], _porcentaje);
-
-    final totalFallidas = _intValue(fallidas['total'], _preguntasCriticas.length);
-    final idsFallidas = (fallidas['ids'] is List)
-        ? (fallidas['ids'] as List)
-            .map((e) => e.toString().trim())
-            .where((e) => e.isNotEmpty)
-            .toList()
-        : <String>[];
-    final practicarFallidasCantidad = _intValue(
-      fallidas['practicar_cantidad'],
-      idsFallidas.isEmpty ? 0 : idsFallidas.length.clamp(10, 30),
+    final idsCorrectas = _toIdList(preguntasPorEstado['correctas_ids']);
+    var idsIncorrectas = _toIdList(preguntasPorEstado['incorrectas_ids']);
+    final idsNoRespondidas = _toIdList(
+      preguntasPorEstado['no_respondidas_ids'],
     );
-    final simulacroFallidasCantidad = _intValue(
-      fallidas['simulacro_cantidad'],
-      idsFallidas.isEmpty ? 0 : idsFallidas.length.clamp(20, 60),
-    );
-
-    final temaRiesgoso = (tutorIa['tema_riesgoso'] ?? 'Sin datos suficientes')
-        .toString();
-    final temaImpacto = (tutorIa['tema_impacto'] ?? 'Sin datos suficientes')
-        .toString();
-    final nivelUsuario = (tutorIa['nivel_usuario'] ?? _nivel).toString();
-    final materiasTiempo = (tutorIa['materias_tiempo_perdido'] is List)
-        ? (tutorIa['materias_tiempo_perdido'] as List)
-            .map((e) => e.toString())
-            .where((e) => e.trim().isNotEmpty)
-            .toList()
-        : <String>[];
-
-    final tiempoDiario = _intValue(recomendaciones['tiempo_diario_sugerido'], tiempo);
-    final temaPrioritario =
-        (recomendaciones['tema_prioritario'] ?? temaRiesgoso).toString();
-    final objetivo = (recomendaciones['objetivo'] ?? 'Alcanzar 80% en 10 dias')
-        .toString();
+    if (idsIncorrectas.isEmpty && _preguntasCriticas.isNotEmpty) {
+      idsIncorrectas = _preguntasCriticas
+          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty)
+          .toList();
+    }
+    final preguntasCriticasTop = _preguntasCriticas.take(10).toList();
+    final idsPrioritariasDetalle = <String>{
+      ...preguntasCriticasTop
+          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty),
+    }.toList();
+    final cantidadPracticarCriticas = idsPrioritariasDetalle.length;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.86,
@@ -1976,15 +3499,19 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Text(
-                              _nivel,
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1D4ED8),
+                            Expanded(
+                              child: Text(
+                                'PROBABILIDAD DE APROBAR ESTA MATERIA',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1D4ED8),
+                                ),
                               ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 10),
                             Text(
                               '${probActual.toStringAsFixed(0)}%',
                               style: GoogleFonts.inter(
@@ -2007,35 +3534,9 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Avance de materia: ${porcentajeAvance.toStringAsFixed(1)}%',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        _buildSectionTitle(
-                          '1) Informacion basica',
-                          Icons.badge_outlined,
-                          const Color(0xFF1D4ED8),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildFieldChip('Codigo', codigoMateria),
-                            _buildFieldChip('Area', areaMateria),
-                            _buildFieldChip('Preguntas', '$totalPreguntas'),
-                            _buildFieldChip('Dificultad', dificultad),
-                          ],
-                        ),
                         const SizedBox(height: 16),
                         _buildSectionTitle(
-                          '2) Progreso del usuario',
+                          '1) Progreso del usuario',
                           Icons.assessment_rounded,
                           const Color(0xFF059669),
                         ),
@@ -2046,18 +3547,33 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                               label: 'Correctas',
                               value: '$correctas',
                               color: const Color(0xFF16A34A),
+                              onTap: () => _abrirListadoPreguntasEstado(
+                                titulo: 'Preguntas correctas',
+                                ids: idsCorrectas,
+                                color: const Color(0xFF16A34A),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             _buildMiniStat(
                               label: 'Incorrectas',
                               value: '$incorrectas',
                               color: const Color(0xFFDC2626),
+                              onTap: () => _abrirListadoPreguntasEstado(
+                                titulo: 'Preguntas incorrectas',
+                                ids: idsIncorrectas,
+                                color: const Color(0xFFDC2626),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             _buildMiniStat(
                               label: 'No respondidas',
                               value: '$noRespondidas',
                               color: const Color(0xFFD97706),
+                              onTap: () => _abrirListadoPreguntasEstado(
+                                titulo: 'Preguntas no respondidas',
+                                ids: idsNoRespondidas,
+                                color: const Color(0xFFD97706),
+                              ),
                             ),
                           ],
                         ),
@@ -2071,70 +3587,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                         ),
                         const SizedBox(height: 16),
                         _buildSectionTitle(
-                          '4) Estadisticas clave',
-                          Icons.stacked_line_chart_rounded,
-                          const Color(0xFF7C3AED),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tiempo promedio: ${tiempoPromMateria.toStringAsFixed(1)} seg/preg',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Promedio general: ${tiempoPromGlobal.toStringAsFixed(1)} seg/preg',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                comparacionTexto,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Intentos realizados: $intentosRealizados',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Tendencia: ${tendencia.toUpperCase()} (${deltaTendencia >= 0 ? '+' : ''}${deltaTendencia.toStringAsFixed(1)}%)',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: tendencia == 'empeorando'
-                                      ? const Color(0xFFB91C1C)
-                                      : const Color(0xFF0F766E),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildSectionTitle(
-                          '5) Prediccion',
+                          '2) Prediccion',
                           Icons.auto_awesome_rounded,
                           const Color(0xFF1D4ED8),
                         ),
@@ -2146,259 +3599,34 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: const Color(0xFFBFDBFE)),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Probabilidad actual: ${probActual.toStringAsFixed(0)}%',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF1E3A8A),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '7 dias: ${prob7.toStringAsFixed(0)}%   |   14 dias: ${prob14.toStringAsFixed(0)}%   |   30 dias: ${prob30.toStringAsFixed(0)}%',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF1E3A8A),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildSectionTitle(
-                          '6) Preguntas fallidas',
-                          Icons.error_outline_rounded,
-                          const Color(0xFFDC2626),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFFECACA)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Total fallidas: $totalFallidas',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF7F1D1D),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: idsFallidas.isEmpty
-                                          ? null
-                                          : () async {
-                                              await _iniciarSoloFallidas(
-                                                cantidad: practicarFallidasCantidad,
-                                                tiempo: tiempo,
-                                                idsFallidas: idsFallidas,
-                                              );
-                                            },
-                                      child: const Text('Practicar solo fallidas'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: idsFallidas.isEmpty
-                                          ? null
-                                          : () async {
-                                              await _iniciarSoloFallidas(
-                                                cantidad: simulacroFallidasCantidad,
-                                                tiempo: tiempo < 40 ? 40 : tiempo,
-                                                idsFallidas: idsFallidas,
-                                              );
-                                            },
-                                      child: const Text('Simulacro fallidas'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildSectionTitle(
-                          '7) Tutor IA Personal (lectura)',
-                          Icons.psychology_alt_rounded,
-                          const Color(0xFF7C3AED),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF5F3FF),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFFDDD6FE),
+                          child: Text(
+                            'Tu esfuerzo da frutos. Aunque hoy tu probabilidad es del ${probActual.toStringAsFixed(0)}%, si cumples con tus tareas diarias, en solo una semana habras subido al ${prob7.toStringAsFixed(0)}%. Sigue asi para llegar al ${prob30.toStringAsFixed(0)}% en un mes.',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              height: 1.45,
+                              color: const Color(0xFF1E3A8A),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tema mas riesgoso: $temaRiesgoso',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: const Color(0xFF4C1D95),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Tema que mas impacta en puntaje: $temaImpacto',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF4C1D95),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                materiasTiempo.isEmpty
-                                    ? 'Materias que te hacen perder tiempo: Sin datos suficientes'
-                                    : 'Materias que te hacen perder tiempo: ${materiasTiempo.join(', ')}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF4C1D95),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Nivel actual: $nivelUsuario',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF4C1D95),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                         const SizedBox(height: 16),
                         _buildSectionTitle(
-                          '8) Recomendaciones automaticas',
-                          Icons.tips_and_updates_outlined,
-                          const Color(0xFF0F766E),
+                          '3) Preguntas que bajan tu porcentaje',
+                          Icons.warning_amber_rounded,
+                          const Color(0xFFD97706),
                         ),
                         const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFA7F3D0)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tiempo diario sugerido: $tiempoDiario min',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF065F46),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Tema prioritario: $temaPrioritario',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF065F46),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Objetivo sugerido: $objetivo',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF065F46),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Focos tacticos de refuerzo',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (focos.isEmpty)
-                          Text(
-                            'Aun no hay focos generados.',
-                            style: GoogleFonts.inter(color: Colors.grey.shade600),
-                          )
-                        else
-                          ...focos.map(
-                            (f) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 6),
-                                    child: Icon(
-                                      Icons.circle,
-                                      size: 8,
-                                      color: Color(0xFF334155),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      f,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        color: const Color(0xFF334155),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Preguntas que bajan tu porcentaje',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (_preguntasCriticas.isEmpty)
-                          Text(
-                            'Aun no hay suficientes intentos para detectar preguntas criticas en esta materia.',
-                            style: GoogleFonts.inter(color: Colors.grey.shade600),
-                          )
-                        else
-                          ..._preguntasCriticas.map(
+                        if (preguntasCriticasTop.isNotEmpty)
+                          ...preguntasCriticasTop.map(
                             (q) => Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFFBEB),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFFDE68A)),
+                                border: Border.all(
+                                  color: const Color(0xFFFDE68A),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2414,51 +3642,25 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    'Fallos: ${q['fallos']}/${q['intentos']}  |  Error: ${(q['tasa_error'] as num).toStringAsFixed(0)}%',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: const Color(0xFF92400E),
+                                  if (q['fallos'] is num &&
+                                      q['intentos'] is num &&
+                                      q['tasa_error'] is num)
+                                    Text(
+                                      'Fallos: ${q['fallos']}/${q['intentos']}  |  Error: ${(q['tasa_error'] as num).toStringAsFixed(0)}%',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: const Color(0xFF92400E),
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
-                          ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Preguntas sugeridas',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (_preguntas.isEmpty)
-                          Text(
-                            'No hay preguntas disponibles para esta materia por ahora.',
-                            style: GoogleFonts.inter(color: Colors.grey.shade600),
                           )
                         else
-                          ..._preguntas.map(
-                            (p) => Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Text(
-                                '#${p.numero} ${p.texto}',
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: const Color(0xFF1F2937),
-                                ),
-                              ),
+                          Text(
+                            'Aun no hay preguntas falladas en esta materia.',
+                            style: GoogleFonts.inter(
+                              color: Colors.grey.shade600,
                             ),
                           ),
                       ],
@@ -2470,19 +3672,19 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                 child: SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () async {
-                      final idsCriticas = _preguntasCriticas
-                          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
-                          .where((id) => id.isNotEmpty)
-                          .toList();
-                      Navigator.pop(context);
-                      await widget.onPracticar(
-                        cantidad,
-                        tiempo,
-                        _materia,
-                        idsCriticas,
-                      );
-                    },
+                    onPressed: cantidadPracticarCriticas == 0
+                        ? null
+                        : () async {
+                            final tiempoPractica = tiempo > 0 ? tiempo : 20;
+                            Navigator.pop(context);
+                            await widget.onPracticar(
+                              cantidadPracticarCriticas,
+                              tiempoPractica,
+                              _materia,
+                              idsPrioritariasDetalle,
+                              esPracticaGuiada: true,
+                            );
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
                       foregroundColor: Colors.white,
@@ -2492,7 +3694,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                       ),
                     ),
                     child: Text(
-                      'Practicar $cantidad preguntas de $_materia',
+                      'Practicar preguntas',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -2507,5 +3709,8 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     );
   }
 }
+
+
+
 
 

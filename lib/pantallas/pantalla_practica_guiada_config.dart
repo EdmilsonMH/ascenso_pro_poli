@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../modelos/modelo_pregunta.dart';
@@ -22,23 +22,28 @@ class PantallaPracticaGuiadaConfig extends StatefulWidget {
 
 class _PantallaPracticaGuiadaConfigState
     extends State<PantallaPracticaGuiadaConfig> {
+  static const String _opcionTodasMaterias = 'Todas las materias';
   final ServicioPreguntas _servicioPreguntas = ServicioPreguntas();
   final ServicioProgreso _servicioProgreso = ServicioProgreso();
   final TextEditingController _cantidadController = TextEditingController(
-    text: '30',
+    text: '100',
   );
 
-  int _cantidadPreguntas = 30;
+  int _cantidadPreguntas = 100;
   int _preguntasDisponibles = 0;
   bool _cargando = true;
   List<String> _todasLasMateriasDisponibles = [];
   List<String> _materiasSeleccionadas = [];
+  String? _materiaActiva;
   List<Pregunta> _preguntasTotalesCache = [];
   List<_PreguntaConFallos> _preguntasFalladasOrdenadas = [];
   bool _bancoFalladasCargado = false;
   bool _cargandoBancoFalladas = false;
 
+  bool get _enVistaMaterias => _materiaActiva == null;
+  String get _textoSeleccionActual => _materiaActiva ?? '';
   bool get _puedeIniciar =>
+      !_enVistaMaterias &&
       _cantidadPreguntas > 0 &&
       _preguntasDisponibles > 0 &&
       _materiasSeleccionadas.isNotEmpty;
@@ -64,11 +69,11 @@ class _PantallaPracticaGuiadaConfigState
 
     setState(() {
       _preguntasTotalesCache = preguntas;
-      _todasLasMateriasDisponibles = preguntas
-          .map((p) => p.materia)
-          .toSet()
-          .toList();
+      _todasLasMateriasDisponibles =
+          preguntas.map((p) => p.materia).toSet().toList()
+            ..sort((a, b) => a.compareTo(b));
       _materiasSeleccionadas = List.from(_todasLasMateriasDisponibles);
+      _materiaActiva = null;
       _cargando = false;
     });
 
@@ -93,189 +98,69 @@ class _PantallaPracticaGuiadaConfigState
     });
   }
 
-  void _mostrarDialogoSeleccionMaterias() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateModal) {
-            final todasSeleccionadas =
-                _materiasSeleccionadas.length ==
-                _todasLasMateriasDisponibles.length;
-
-            return SafeArea(
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.86,
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.menu_book_rounded,
-                          color: Color(0xFF1D4ED8),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Selecciona materias',
-                          style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE0E7FF),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            '${_materiasSeleccionadas.length} seleccionadas',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF3730A3),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    CheckboxListTile(
-                      value: todasSeleccionadas,
-                      activeColor: const Color(0xFF1D4ED8),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        'Todas las materias',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        setStateModal(() {
-                          if (value == true) {
-                            _materiasSeleccionadas = List.from(
-                              _todasLasMateriasDisponibles,
-                            );
-                          } else {
-                            _materiasSeleccionadas.clear();
-                          }
-                        });
-                      },
-                    ),
-                    const Divider(height: 18),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _todasLasMateriasDisponibles.length,
-                        itemBuilder: (context, index) {
-                          final materia = _todasLasMateriasDisponibles[index];
-                          return CheckboxListTile(
-                            value: _materiasSeleccionadas.contains(materia),
-                            activeColor: const Color(0xFF1D4ED8),
-                            controlAffinity: ListTileControlAffinity.leading,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              materia,
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                color: const Color(0xFF334155),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setStateModal(() {
-                                if (value == true) {
-                                  _materiasSeleccionadas.add(materia);
-                                } else {
-                                  _materiasSeleccionadas.remove(materia);
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _actualizarPreguntasDisponibles();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1D4ED8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: Text(
-                          'Aplicar filtros',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+  void _abrirMateria(String materia) {
+    setState(() {
+      _materiaActiva = materia;
+      _materiasSeleccionadas = [materia];
+    });
+    _actualizarPreguntasDisponibles();
   }
 
-  String _obtenerTextoSeleccionMaterias() {
-    if (_materiasSeleccionadas.isEmpty) {
-      return 'Ninguna seleccionada';
-    }
-    if (_materiasSeleccionadas.length == _todasLasMateriasDisponibles.length) {
-      return 'Todas las materias';
-    }
-    if (_materiasSeleccionadas.length == 1) {
-      return _materiasSeleccionadas.first;
-    }
-    return '${_materiasSeleccionadas.length} materias seleccionadas';
+  void _abrirTodasLasMaterias() {
+    setState(() {
+      _materiaActiva = _opcionTodasMaterias;
+      _materiasSeleccionadas = List.from(_todasLasMateriasDisponibles);
+    });
+    _actualizarPreguntasDisponibles();
   }
 
-  void _iniciarPracticaGuiada() {
+  void _volverAMaterias() {
+    setState(() {
+      _materiaActiva = null;
+      _materiasSeleccionadas = List.from(_todasLasMateriasDisponibles);
+    });
+    _actualizarPreguntasDisponibles();
+  }
+
+  int _obtenerPrioridadFallo(EstadisticaPregunta? estadistica) {
+    if (estadistica == null) return 0;
+    // Regla: al completar 3 aciertos seguidos, contadores visibles vuelven a 0.
+    if (estadistica.rachaAciertos >= 3) return 0;
+    return estadistica.fallosVisibles;
+  }
+
+  Future<List<Pregunta>> _ordenarPorFallasActuales(
+    List<Pregunta> preguntas,
+  ) async {
+    if (preguntas.length <= 1) return List<Pregunta>.from(preguntas);
+
+    try {
+      final estadisticas = await _servicioProgreso.obtenerEstadisticasPreguntas(
+        preguntaIds: preguntas.map((p) => p.id).toList(),
+      );
+
+      final ordenadas = List<Pregunta>.from(preguntas);
+      ordenadas.sort((a, b) {
+        final prioridadA = _obtenerPrioridadFallo(estadisticas[a.id]);
+        final prioridadB = _obtenerPrioridadFallo(estadisticas[b.id]);
+        final porPrioridad = prioridadB.compareTo(prioridadA);
+        if (porPrioridad != 0) return porPrioridad;
+        return a.numero.compareTo(b.numero);
+      });
+      return ordenadas;
+    } catch (_) {
+      final fallback = List<Pregunta>.from(preguntas);
+      fallback.sort((a, b) => a.numero.compareTo(b.numero));
+      return fallback;
+    }
+  }
+
+  Future<void> _iniciarPracticaGuiada() async {
     if (!_puedeIniciar) return;
 
-    if (_materiasSeleccionadas.isEmpty) {
+    if (_materiaActiva == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Debes seleccionar al menos una materia.'),
-        ),
+        const SnackBar(content: Text('Debes seleccionar una materia.')),
       );
       return;
     }
@@ -297,7 +182,7 @@ class _PantallaPracticaGuiadaConfigState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No hay preguntas disponibles para las materias seleccionadas.',
+            'No hay preguntas disponibles para la selección actual.',
           ),
         ),
       );
@@ -308,11 +193,12 @@ class _PantallaPracticaGuiadaConfigState
         .where((p) => _materiasSeleccionadas.contains(p.materia))
         .toList();
 
-    candidatas.shuffle();
+    final ordenadas = await _ordenarPorFallasActuales(candidatas);
     var n = cantidadFinal;
-    if (n > candidatas.length) n = candidatas.length;
+    if (n > ordenadas.length) n = ordenadas.length;
 
-    final seleccionadas = candidatas.take(n).toList();
+    final seleccionadas = ordenadas.take(n).toList();
+    if (!mounted) return;
 
     Navigator.push(
       context,
@@ -337,15 +223,17 @@ class _PantallaPracticaGuiadaConfigState
     });
 
     try {
-      final estadisticas = await _servicioProgreso.obtenerEstadisticasPreguntas();
-      final conFallos = estadisticas.values
-          .where((s) => s.estaEnIncorrectas && s.totalFallos > 0)
-          .toList()
-        ..sort((a, b) {
-          final porFallos = b.totalFallos.compareTo(a.totalFallos);
-          if (porFallos != 0) return porFallos;
-          return a.preguntaId.compareTo(b.preguntaId);
-        });
+      final estadisticas = await _servicioProgreso
+          .obtenerEstadisticasPreguntas();
+      final conFallos =
+          estadisticas.values
+              .where((s) => s.estaEnIncorrectas && s.fallosVisibles > 0)
+              .toList()
+            ..sort((a, b) {
+              final porFallos = b.fallosVisibles.compareTo(a.fallosVisibles);
+              if (porFallos != 0) return porFallos;
+              return a.preguntaId.compareTo(b.preguntaId);
+            });
 
       if (conFallos.isEmpty) {
         if (!mounted) return;
@@ -357,19 +245,31 @@ class _PantallaPracticaGuiadaConfigState
       }
 
       final ids = conFallos.map((s) => s.preguntaId).toList();
-      final fallosPorId = {for (final s in conFallos) s.preguntaId: s.totalFallos};
-      final preguntas = await _servicioPreguntas.obtenerPreguntasPorIds(ids: ids);
+      final fallosPorId = <String, int>{
+        for (final s in conFallos) s.preguntaId: s.fallosVisibles,
+      };
+      final preguntas = await _servicioPreguntas.obtenerPreguntasPorIds(
+        ids: ids,
+      );
 
       if (!mounted) return;
+      final preguntasConFallo =
+          preguntas
+              .map(
+                (pregunta) => _PreguntaConFallos(
+                  pregunta: pregunta,
+                  fallosActuales: fallosPorId[pregunta.id] ?? 0,
+                ),
+              )
+              .toList()
+            ..sort((a, b) {
+              final porFallos = b.fallosActuales.compareTo(a.fallosActuales);
+              if (porFallos != 0) return porFallos;
+              return a.pregunta.numero.compareTo(b.pregunta.numero);
+            });
+
       setState(() {
-        _preguntasFalladasOrdenadas = preguntas
-            .map(
-              (pregunta) => _PreguntaConFallos(
-                pregunta: pregunta,
-                totalFallos: fallosPorId[pregunta.id] ?? 0,
-              ),
-            )
-            .toList();
+        _preguntasFalladasOrdenadas = preguntasConFallo;
         _bancoFalladasCargado = true;
       });
     } catch (_) {
@@ -392,7 +292,9 @@ class _PantallaPracticaGuiadaConfigState
     if (preguntas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No hay preguntas disponibles para iniciar la práctica.'),
+          content: Text(
+            'No hay preguntas disponibles para iniciar la práctica.',
+          ),
         ),
       );
       return;
@@ -426,11 +328,12 @@ class _PantallaPracticaGuiadaConfigState
       return;
     }
 
-    final materiasDisponibles = _preguntasFalladasOrdenadas
-        .map((item) => item.pregunta.materia)
-        .toSet()
-        .toList()
-      ..sort();
+    final materiasDisponibles =
+        _preguntasFalladasOrdenadas
+            .map((item) => item.pregunta.materia)
+            .toSet()
+            .toList()
+          ..sort();
 
     int tempCantidad = _preguntasFalladasOrdenadas.length < 30
         ? _preguntasFalladasOrdenadas.length
@@ -614,8 +517,8 @@ class _PantallaPracticaGuiadaConfigState
                         border: Border.all(color: const Color(0xFFFED7AA)),
                       ),
                       child: Text(
-                        'Se priorizan las preguntas que más veces fallaste. '
-                        'Aquí aparecen las que actualmente están en falladas.',
+                        'Se priorizan las preguntas donde actualmente fallas mas. '
+                        'Si completas 3 aciertos seguidos, sus contadores vuelven a 0.',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -689,7 +592,8 @@ class _PantallaPracticaGuiadaConfigState
                             ),
                           ),
                           IconButton(
-                            onPressed: disponibles <= 0 || tempCantidad >= disponibles
+                            onPressed:
+                                disponibles <= 0 || tempCantidad >= disponibles
                                 ? null
                                 : () {
                                     setStateModal(() {
@@ -779,7 +683,9 @@ class _PantallaPracticaGuiadaConfigState
                                     .map((item) => item.pregunta)
                                     .toList();
                                 Navigator.pop(context);
-                                _iniciarPracticaGuiadaConPreguntas(seleccionadas);
+                                _iniciarPracticaGuiadaConPreguntas(
+                                  seleccionadas,
+                                );
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFB91C1C),
@@ -812,31 +718,273 @@ class _PantallaPracticaGuiadaConfigState
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FC),
       appBar: const BarraSuperior(),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          12,
-          16,
-          24 + MediaQuery.of(context).padding.bottom + 84,
+      body: _enVistaMaterias
+          ? _buildVistaMaterias()
+          : _buildVistaConfiguracionMateria(),
+    );
+  }
+
+  Map<String, int> _contarPreguntasPorMateria() {
+    final conteo = <String, int>{};
+    for (final pregunta in _preguntasTotalesCache) {
+      conteo[pregunta.materia] = (conteo[pregunta.materia] ?? 0) + 1;
+    }
+    return conteo;
+  }
+
+  Widget _buildVistaMaterias() {
+    final conteoPorMateria = _contarPreguntasPorMateria();
+    final totalGeneral = _preguntasTotalesCache.length;
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        24 + MediaQuery.of(context).padding.bottom + 84,
+      ),
+      children: [
+        _buildTarjetaPreguntasFalladas(),
+        const SizedBox(height: 16),
+        Text(
+          'Elige una materia para practica guiada',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF0F172A),
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildTarjetaPreguntasFalladas(),
-            const SizedBox(height: 16),
-            _buildTarjetaConfiguracion(),
-            const SizedBox(height: 24),
-            _buildBotonPrincipal(),
-          ],
+        const SizedBox(height: 6),
+        Text(
+          'Selecciona una materia o todas, luego define cuantas preguntas practicar.',
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            color: const Color(0xFF64748B),
+            fontWeight: FontWeight.w500,
+          ),
         ),
+        const SizedBox(height: 14),
+        if (_todasLasMateriasDisponibles.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Text(
+              'No hay materias disponibles por ahora.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: _abrirTodasLasMaterias,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFD1D5DB)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0E7FF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.apps_rounded,
+                          color: Color(0xFF4338CA),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _opcionTodasMaterias,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$totalGeneral preguntas',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          ..._todasLasMateriasDisponibles.map((materia) {
+            final total = conteoPorMateria[materia] ?? 0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => _abrirMateria(materia),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.menu_book_rounded,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                materia,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF111827),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$total preguntas',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF6B7280),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildVistaConfiguracionMateria() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        24 + MediaQuery.of(context).padding.bottom + 84,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildEncabezadoMateriaActiva(),
+          const SizedBox(height: 14),
+          _buildTarjetaConfiguracion(),
+          const SizedBox(height: 24),
+          _buildBotonPrincipal(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEncabezadoMateriaActiva() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _volverAMaterias,
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Volver a materias',
+          ),
+          Expanded(
+            child: Text(
+              _textoSeleccionActual,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF111827),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$_preguntasDisponibles preg.',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(width: 6),
+        ],
       ),
     );
   }
@@ -986,141 +1134,117 @@ class _PantallaPracticaGuiadaConfigState
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabelCampo('Preguntas'),
-                    const SizedBox(height: 6),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFD1D9E6)),
-                      ),
-                      child: TextField(
-                        controller: _cantidadController,
-                        keyboardType: TextInputType.number,
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF111827),
-                        ),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          prefixIcon: const Icon(
-                            Icons.help_outline_rounded,
-                            size: 19,
-                            color: Color(0xFF64748B),
-                          ),
-                          hintText: '0',
-                          hintStyle: GoogleFonts.inter(
-                            color: const Color(0xFF94A3B8),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 14,
-                          ),
-                        ),
-                        onChanged: (value) {
-                          final n = int.tryParse(value);
-                          if (n != null) {
-                            setState(() {
-                              _cantidadPreguntas = n;
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Disponibles: $_preguntasDisponibles',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF475569),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (excedeDisponibles)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          'Se ajustará automáticamente al máximo disponible.',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: const Color(0xFFB91C1C),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
+          _buildLabelCampo('Materia seleccionada'),
+          const SizedBox(height: 6),
+          Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFD1D9E6)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.menu_book_rounded,
+                  color: Color(0xFF64748B),
+                  size: 18,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabelCampo('Materia'),
-                    const SizedBox(height: 6),
-                    InkWell(
-                      onTap: _mostrarDialogoSeleccionMaterias,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Ink(
-                        height: 52,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFD1D9E6)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.menu_book_rounded,
-                              color: Color(0xFF64748B),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _obtenerTextoSeleccionMaterias(),
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Color(0xFF64748B),
-                            ),
-                          ],
-                        ),
-                      ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _textoSeleccionActual,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF0F172A),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Elige una o varias materias para practicar.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _volverAMaterias,
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              label: Text(
+                'Cambiar seleccion',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1D4ED8),
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          _buildLabelCampo('Preguntas'),
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFD1D9E6)),
+            ),
+            child: TextField(
+              controller: _cantidadController,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF111827),
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                prefixIcon: const Icon(
+                  Icons.help_outline_rounded,
+                  size: 19,
+                  color: Color(0xFF64748B),
+                ),
+                hintText: '0',
+                hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8)),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
+              ),
+              onChanged: (value) {
+                final n = int.tryParse(value);
+                if (n != null) {
+                  setState(() {
+                    _cantidadPreguntas = n;
+                  });
+                }
+              },
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Disponibles: $_preguntasDisponibles',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: const Color(0xFF475569),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (excedeDisponibles)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Se ajustará automáticamente al máximo disponible.',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: const Color(0xFFB91C1C),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(12),
@@ -1257,10 +1381,10 @@ class _PantallaPracticaGuiadaConfigState
 
 class _PreguntaConFallos {
   final Pregunta pregunta;
-  final int totalFallos;
+  final int fallosActuales;
 
   const _PreguntaConFallos({
     required this.pregunta,
-    required this.totalFallos,
+    required this.fallosActuales,
   });
 }

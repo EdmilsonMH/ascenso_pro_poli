@@ -9,28 +9,34 @@ import 'supabase_service.dart';
 
 class ServicioPreguntas {
   static const Duration _cacheMateriasTtl = Duration(minutes: 10);
+  static const Duration _cacheBancosTtl = Duration(minutes: 10);
   static const Duration _cachePremiumTtl = Duration(minutes: 2);
   static const int _limiteInvitadoPorMateria = 10;
   static const int _limiteRegistradoNoActivoPorMateria = 50;
+  // Incrementar esta version cuando se publique un nuevo banco para que
+  // invitados regeneren su snapshot y no queden anclados a IDs antiguos.
   static const String _prefsGuestSnapshotPrefix =
-      'guest_fixed_question_ids_v1_';
+      'guest_fixed_question_ids_v3_';
   static List<Map<String, dynamic>>? _materiasActivasCache;
   static DateTime? _materiasActivasCacheAt;
+  static List<Map<String, dynamic>>? _bancosActivosCache;
+  static DateTime? _bancosActivosCacheAt;
   static String? _premiumCacheUserId;
   static bool? _premiumCacheValue;
   static DateTime? _premiumCacheAt;
   static final Map<String, List<String>> _idsCachePorFiltro = {};
   static final Map<String, Map<String, List<String>>> _guestSnapshotCache = {};
   static final Map<String, Map<String, List<String>>>
-      _registradoNoActivoSnapshotCache = {};
+  _registradoNoActivoSnapshotCache = {};
   bool get _esInvitadoConSupabase =>
       SupabaseService.isInitialized && !AuthService.isLoggedIn;
 
   String _claveSnapshotInvitado(String categoria) {
-    final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
-    if (prefijoCategoria == 'SUB-') return 'suboficial';
-    if (prefijoCategoria == 'OFI-') return 'oficial';
-    return 'ambos';
+    final tipoBanco = _tipoBancoPorCategoria(categoria);
+    if (tipoBanco != null) return tipoBanco;
+    final normalizada = _normalizar(categoria);
+    if (normalizada.isEmpty) return 'ambos';
+    return normalizada;
   }
 
   Map<String, List<String>> _snapshotDesdeJson(String raw) {
@@ -70,10 +76,87 @@ class ServicioPreguntas {
     return ids;
   }
 
+  String? _tipoBancoPorCategoria(String? categoria) {
+    final value = _normalizar(categoria);
+    final compact = value.replaceAll(RegExp(r'[\s\-_]+'), '');
+    if (value.isEmpty || value == 'ambos') return null;
+    if (value.contains('suboficial') ||
+        value.contains('sub oficial') ||
+        compact.contains('suboficial')) {
+      return 'suboficial';
+    }
+    if (value.contains('oficial')) return 'oficial';
+    return null;
+  }
+
+  bool _esBancoSuboficial(Map<String, dynamic> banco) {
+    final texto = _normalizar(
+      '${banco['nombre'] ?? ''} ${banco['descripcion'] ?? ''} ${banco['version'] ?? ''}',
+    );
+    return texto.contains('suboficial');
+  }
+
+  bool _esBancoOficial(Map<String, dynamic> banco) {
+    final texto = _normalizar(
+      '${banco['nombre'] ?? ''} ${banco['descripcion'] ?? ''} ${banco['version'] ?? ''}',
+    );
+    if (_esBancoSuboficial(banco)) return false;
+    return texto.contains('oficial');
+  }
+
+  Future<List<Map<String, dynamic>>> _obtenerBancosActivosCached() async {
+    if (!SupabaseService.isInitialized) return const [];
+
+    final now = DateTime.now();
+    final cache = _bancosActivosCache;
+    final cacheAt = _bancosActivosCacheAt;
+    if (cache != null &&
+        cacheAt != null &&
+        now.difference(cacheAt) <= _cacheBancosTtl) {
+      return cache;
+    }
+
+    final bancosRaw = await SupabaseService.client
+        .from('banco_de_pregunta')
+        .select('id, nombre, version, descripcion, activo')
+        .eq('activo', true);
+    final bancos = (bancosRaw as List<dynamic>).map(_toMap).toList();
+
+    _bancosActivosCache = bancos;
+    _bancosActivosCacheAt = now;
+    return bancos;
+  }
+
+  Future<Set<String>?> _resolverBancoIdsPorCategoria(String categoria) async {
+    final tipoBanco = _tipoBancoPorCategoria(categoria);
+    if (tipoBanco == null) return null;
+
+    final bancos = await _obtenerBancosActivosCached();
+    final ids = bancos
+        .where((banco) {
+          if (tipoBanco == 'suboficial') return _esBancoSuboficial(banco);
+          return _esBancoOficial(banco);
+        })
+        .map((banco) => banco['id']?.toString().trim() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    if (ids.isEmpty) {
+      debugPrint(
+        'ServicioPreguntas._resolverBancoIdsPorCategoria: sin bancos para categoria="$categoria"',
+      );
+    }
+    return ids;
+  }
+
   Future<Map<String, List<String>>> _generarSnapshotInvitadoPorMateria(
     String categoria,
   ) async {
-    final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
+    final bancoIds = await _resolverBancoIdsPorCategoria(categoria);
+    if (bancoIds != null && bancoIds.isEmpty) {
+      return <String, List<String>>{};
+    }
+
     final materiasActivas = await _obtenerMateriasActivasCached();
     final materiasObjetivo = materiasActivas
         .map((m) => m['id']?.toString().trim() ?? '')
@@ -85,8 +168,8 @@ class ServicioPreguntas {
         .select('id, materia_id, numero_oficial, codigo_pregunta')
         .eq('activo', true);
 
-    if (prefijoCategoria != null) {
-      query = query.like('codigo_pregunta', '$prefijoCategoria%');
+    if (bancoIds != null) {
+      query = query.inFilter('banco_id', bancoIds.toList());
     }
 
     const pageSize = 1000;
@@ -176,10 +259,13 @@ class ServicioPreguntas {
     return '$userId|$base';
   }
 
-  Future<Map<String, List<String>>> _generarSnapshotRegistradoNoActivoPorMateria(
-    String categoria,
-  ) async {
-    final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
+  Future<Map<String, List<String>>>
+  _generarSnapshotRegistradoNoActivoPorMateria(String categoria) async {
+    final bancoIds = await _resolverBancoIdsPorCategoria(categoria);
+    if (bancoIds != null && bancoIds.isEmpty) {
+      return <String, List<String>>{};
+    }
+
     final materiasActivas = await _obtenerMateriasActivasCached();
     final materiasObjetivo = materiasActivas
         .map((m) => m['id']?.toString().trim() ?? '')
@@ -191,8 +277,8 @@ class ServicioPreguntas {
         .select('id, materia_id, numero_oficial, codigo_pregunta')
         .eq('activo', true);
 
-    if (prefijoCategoria != null) {
-      query = query.like('codigo_pregunta', '$prefijoCategoria%');
+    if (bancoIds != null) {
+      query = query.inFilter('banco_id', bancoIds.toList());
     }
 
     const pageSize = 1000;
@@ -241,9 +327,8 @@ class ServicioPreguntas {
     return snapshot;
   }
 
-  Future<Map<String, List<String>>> _obtenerSnapshotRegistradoNoActivoPorMateria(
-    String categoria,
-  ) async {
+  Future<Map<String, List<String>>>
+  _obtenerSnapshotRegistradoNoActivoPorMateria(String categoria) async {
     try {
       final clave = _claveSnapshotRegistradoNoActivo(categoria);
       final cached = _registradoNoActivoSnapshotCache[clave];
@@ -272,13 +357,13 @@ class ServicioPreguntas {
 
     try {
       String? materiaFiltrada = materia;
-      final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
       final categoriaNormalizada = _normalizar(categoria);
+      final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
 
       if (materiaFiltrada == null &&
           _debeCategoriaActuarComoFiltroMateria(
             categoriaNormalizada: categoriaNormalizada,
-            prefijoCategoria: prefijoCategoria,
+            categoriaFiltraBanco: categoriaFiltraBanco,
           )) {
         materiaFiltrada = categoria;
       }
@@ -355,13 +440,13 @@ class ServicioPreguntas {
     if (!_esInvitadoConSupabase) return const [];
     try {
       String? materiaFiltrada = materia;
-      final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
       final categoriaNormalizada = _normalizar(categoria);
+      final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
 
       if (materiaFiltrada == null &&
           _debeCategoriaActuarComoFiltroMateria(
             categoriaNormalizada: categoriaNormalizada,
-            prefijoCategoria: prefijoCategoria,
+            categoriaFiltraBanco: categoriaFiltraBanco,
           )) {
         materiaFiltrada = categoria;
       }
@@ -623,7 +708,10 @@ class ServicioPreguntas {
     String? materia,
     String categoria = 'Ambos',
   }) async {
-    final ordenIds = ids.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final ordenIds = ids
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
     if (ordenIds.isEmpty) return [];
 
     if (_esInvitadoConSupabase) {
@@ -647,7 +735,9 @@ class ServicioPreguntas {
           preguntas: preguntasInvitado,
         );
       } catch (e) {
-        debugPrint('ServicioPreguntas.obtenerPreguntasPorIds invitado error: $e');
+        debugPrint(
+          'ServicioPreguntas.obtenerPreguntasPorIds invitado error: $e',
+        );
         return [];
       }
     }
@@ -724,6 +814,90 @@ class ServicioPreguntas {
     }
   }
 
+  Future<List<Materia>> obtenerMateriasPorCategoria({
+    required String categoria,
+  }) async {
+    if (!SupabaseService.isInitialized) {
+      return _obtenerMateriasMock();
+    }
+
+    final tipoBanco = _tipoBancoPorCategoria(categoria);
+    if (tipoBanco == null) {
+      return obtenerMaterias();
+    }
+
+    try {
+      final bancoIds = await _resolverBancoIdsPorCategoria(categoria);
+      if (bancoIds != null && bancoIds.isEmpty) {
+        return const <Materia>[];
+      }
+
+      dynamic query = SupabaseService.client
+          .from('pregunta')
+          .select('materia_id')
+          .eq('activo', true);
+
+      if (bancoIds != null) {
+        query = query.inFilter('banco_id', bancoIds.toList());
+      }
+
+      const pageSize = 1000;
+      const maxPaginas = 80;
+      var offset = 0;
+      var paginasLeidas = 0;
+      final materiaIds = <String>{};
+
+      while (true) {
+        final pageRaw = await query
+            .order('materia_id', ascending: true)
+            .range(offset, offset + pageSize - 1);
+        final page = (pageRaw as List<dynamic>).map(_toMap).toList();
+        if (page.isEmpty) break;
+
+        for (final row in page) {
+          final materiaId = row['materia_id']?.toString().trim() ?? '';
+          if (materiaId.isNotEmpty) {
+            materiaIds.add(materiaId);
+          }
+        }
+
+        paginasLeidas++;
+        if (page.length < pageSize || paginasLeidas >= maxPaginas) break;
+        offset += pageSize;
+      }
+
+      if (materiaIds.isEmpty) return const <Materia>[];
+
+      final rows = await SupabaseService.client
+          .from('materia')
+          .select(
+            'id, nombre, descripcion, icono, color_hex, orden_visualizacion, activo',
+          )
+          .eq('activo', true)
+          .inFilter('id', materiaIds.toList())
+          .order('orden_visualizacion', ascending: true);
+
+      final materias = (rows as List<dynamic>)
+          .map((e) => _toMap(e))
+          .map(
+            (m) => Materia(
+              id: m['id'].toString(),
+              nombre: (m['nombre'] ?? 'Sin nombre').toString(),
+              descripcion: m['descripcion']?.toString(),
+              icono: (m['icono'] ?? 'book').toString(),
+              color: (m['color_hex'] ?? '#3B82F6').toString(),
+              orden: _toInt(m['orden_visualizacion']) ?? 0,
+            ),
+          )
+          .toList();
+
+      return materias;
+    } catch (e) {
+      debugPrint('ServicioPreguntas.obtenerMateriasPorCategoria error: $e');
+      return const <Materia>[];
+    }
+  }
+
   Future<void> precalentarPreguntas({
     String categoria = 'Ambos',
     String? materia,
@@ -792,15 +966,15 @@ class ServicioPreguntas {
     String? materia,
     String categoria = 'Ambos',
   }) async {
-    final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
     final categoriaNormalizada = _normalizar(categoria);
+    final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
     String? materiaFiltrada = materia;
 
     // Compatibilidad: categoria usada como nombre de materia.
     if (materiaFiltrada == null &&
         _debeCategoriaActuarComoFiltroMateria(
           categoriaNormalizada: categoriaNormalizada,
-          prefijoCategoria: prefijoCategoria,
+          categoriaFiltraBanco: categoriaFiltraBanco,
         )) {
       materiaFiltrada = categoria;
     }
@@ -819,13 +993,18 @@ class ServicioPreguntas {
       return const [];
     }
 
+    final bancoIds = await _resolverBancoIdsPorCategoria(categoria);
+    if (bancoIds != null && bancoIds.isEmpty) {
+      return const [];
+    }
+
     dynamic query = SupabaseService.client
         .from('pregunta')
         .select('id')
         .eq('activo', true);
 
-    if (prefijoCategoria != null) {
-      query = query.like('codigo_pregunta', '$prefijoCategoria%');
+    if (bancoIds != null) {
+      query = query.inFilter('banco_id', bancoIds.toList());
     }
 
     if (materiaIdsPermitidas != null) {
@@ -867,22 +1046,26 @@ class ServicioPreguntas {
     String categoria = 'Ambos',
   }) async {
     if (!SupabaseService.isInitialized) {
-      return _obtenerPreguntasMock(ids: ids, materia: materia, categoria: categoria);
+      return _obtenerPreguntasMock(
+        ids: ids,
+        materia: materia,
+        categoria: categoria,
+      );
     }
 
     try {
       final client = SupabaseService.client;
 
       String? materiaFiltrada = materia;
-      final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
       final categoriaNormalizada = _normalizar(categoria);
+      final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
 
       // Compatibilidad: si "categoria" viene como nombre de materia
       // (ej. "Legislacion Policial"), lo aplicamos como filtro de materia.
       if (materiaFiltrada == null &&
           _debeCategoriaActuarComoFiltroMateria(
             categoriaNormalizada: categoriaNormalizada,
-            prefijoCategoria: prefijoCategoria,
+            categoriaFiltraBanco: categoriaFiltraBanco,
           )) {
         materiaFiltrada = categoria;
       }
@@ -896,6 +1079,11 @@ class ServicioPreguntas {
       if (materiaFiltrada != null &&
           materiaFiltrada != 'Todas' &&
           (materiaIdsPermitidas == null || materiaIdsPermitidas.isEmpty)) {
+        return [];
+      }
+
+      final bancoIds = await _resolverBancoIdsPorCategoria(categoria);
+      if (bancoIds != null && bancoIds.isEmpty) {
         return [];
       }
 
@@ -919,8 +1107,8 @@ class ServicioPreguntas {
               materiaIdsPermitidas.toList(),
             );
           }
-          if (prefijoCategoria != null) {
-            chunkQuery = chunkQuery.like('codigo_pregunta', '$prefijoCategoria%');
+          if (bancoIds != null) {
+            chunkQuery = chunkQuery.inFilter('banco_id', bancoIds.toList());
           }
 
           final chunkRaw = await chunkQuery
@@ -943,8 +1131,8 @@ class ServicioPreguntas {
             materiaIdsPermitidas.toList(),
           );
         }
-        if (prefijoCategoria != null) {
-          baseQuery = baseQuery.like('codigo_pregunta', '$prefijoCategoria%');
+        if (bancoIds != null) {
+          baseQuery = baseQuery.inFilter('banco_id', bancoIds.toList());
         }
 
         // Supabase suele tener "API max rows" = 1000.
@@ -984,9 +1172,7 @@ class ServicioPreguntas {
             .from('alternativa')
             .select('pregunta_id, letra, texto, es_correcta, orden')
             .inFilter('pregunta_id', chunk);
-        alternativasRows.addAll(
-          (alternativasRaw as List<dynamic>).map(_toMap),
-        );
+        alternativasRows.addAll((alternativasRaw as List<dynamic>).map(_toMap));
       }
 
       final alternativasPorPregunta = <String, List<Map<String, dynamic>>>{};
@@ -1019,8 +1205,9 @@ class ServicioPreguntas {
           opciones.add('Opcion no disponible');
         }
 
-        var indiceCorrecta =
-            alternativas.indexWhere((a) => a['es_correcta'] == true);
+        var indiceCorrecta = alternativas.indexWhere(
+          (a) => a['es_correcta'] == true,
+        );
         if (indiceCorrecta < 0 || indiceCorrecta >= opciones.length) {
           indiceCorrecta = 0;
         }
@@ -1044,7 +1231,9 @@ class ServicioPreguntas {
             materiaId: materiaId,
             materia: materiaNombre.toString(),
             categoria: 'Ambos',
-            dificultad: _normalizarDificultad(p['dificultad_estimada']?.toString()),
+            dificultad: _normalizarDificultad(
+              p['dificultad_estimada']?.toString(),
+            ),
           ),
         );
       }
@@ -1055,7 +1244,11 @@ class ServicioPreguntas {
       if (_esInvitadoConSupabase) {
         return [];
       }
-      return _obtenerPreguntasMock(ids: ids, materia: materia, categoria: categoria);
+      return _obtenerPreguntasMock(
+        ids: ids,
+        materia: materia,
+        categoria: categoria,
+      );
     }
   }
 
@@ -1068,11 +1261,11 @@ class ServicioPreguntas {
 
     String? materiaFiltrada = materia;
     final categoriaNormalizada = _normalizar(categoria);
-    final prefijoCategoria = _prefijoCodigoPorCategoria(categoria);
+    final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
     if (materiaFiltrada == null &&
         _debeCategoriaActuarComoFiltroMateria(
           categoriaNormalizada: categoriaNormalizada,
-          prefijoCategoria: prefijoCategoria,
+          categoriaFiltraBanco: categoriaFiltraBanco,
         )) {
       materiaFiltrada = categoria;
     }
@@ -1137,9 +1330,9 @@ class ServicioPreguntas {
 
   bool _debeCategoriaActuarComoFiltroMateria({
     required String categoriaNormalizada,
-    required String? prefijoCategoria,
+    required bool categoriaFiltraBanco,
   }) {
-    if (prefijoCategoria != null) return false;
+    if (categoriaFiltraBanco) return false;
     if (categoriaNormalizada.isEmpty || categoriaNormalizada == 'ambos') {
       return false;
     }
@@ -1189,14 +1382,6 @@ class ServicioPreguntas {
     if (value.startsWith('facil')) return 'Facil';
     if (value.startsWith('dificil')) return 'Dificil';
     return 'Media';
-  }
-
-  String? _prefijoCodigoPorCategoria(String? categoria) {
-    final value = _normalizar(categoria);
-    if (value.isEmpty || value == 'ambos') return null;
-    if (value.contains('suboficial')) return 'SUB-';
-    if (value.contains('oficial')) return 'OFI-';
-    return null;
   }
 
   List<List<T>> _chunkList<T>(List<T> items, int size) {

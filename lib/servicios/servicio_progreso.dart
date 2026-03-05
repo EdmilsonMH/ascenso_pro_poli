@@ -48,7 +48,9 @@ class ServicioProgreso {
       final sesionesMigradas = await _migrarSesionesMockASupabase(
         usuarioId: usuarioId,
       );
-      final resumen = await _migrarExposicionMockASupabase(usuarioId: usuarioId);
+      final resumen = await _migrarExposicionMockASupabase(
+        usuarioId: usuarioId,
+      );
       await _actualizarPerfilDesdeResumenMigracion(
         usuarioId: usuarioId,
         resumen: resumen,
@@ -78,6 +80,7 @@ class ServicioProgreso {
     required String respuestaSeleccionada,
     required bool esCorrecta,
     int? tiempoSegundos,
+    int? numeroCambiosRespuesta,
   }) async {
     final id = preguntaId.trim();
     if (id.isEmpty) return;
@@ -92,6 +95,7 @@ class ServicioProgreso {
         respuestaSeleccionada: letra,
         esCorrecta: esCorrecta,
         tiempoSegundos: tiempoSegundos,
+        numeroCambiosRespuesta: numeroCambiosRespuesta,
         fechaIntento: DateTime.now(),
       ),
     );
@@ -115,15 +119,16 @@ class ServicioProgreso {
         return _obtenerPreguntasIncorrectasPorUltimoIntento();
       }
 
-      final entradas = estadisticas.values
-          .where((s) => s.estaEnIncorrectas)
-          .toList()
-        ..sort((a, b) => b.totalFallos.compareTo(a.totalFallos));
+      final entradas =
+          estadisticas.values.where((s) => s.estaEnIncorrectas).toList()
+            ..sort((a, b) => b.totalFallos.compareTo(a.totalFallos));
 
       if (entradas.isEmpty) return [];
 
       final ids = entradas.map((s) => s.preguntaId).toList();
-      final preguntas = await _servicioPreguntas.obtenerPreguntasPorIds(ids: ids);
+      final preguntas = await _servicioPreguntas.obtenerPreguntasPorIds(
+        ids: ids,
+      );
       if (preguntas.isEmpty) return [];
 
       final usuarioId = _usuarioId;
@@ -191,10 +196,9 @@ class ServicioProgreso {
         return _obtenerPreguntasAcertadasPorUltimoIntento();
       }
 
-      final entradas = estadisticas.values
-          .where((s) => s.estaEnAcertadas)
-          .toList()
-        ..sort((a, b) => b.totalAciertos.compareTo(a.totalAciertos));
+      final entradas =
+          estadisticas.values.where((s) => s.estaEnAcertadas).toList()
+            ..sort((a, b) => b.totalAciertos.compareTo(a.totalAciertos));
 
       if (entradas.isEmpty) return [];
       final ids = entradas.map((s) => s.preguntaId).toList();
@@ -373,12 +377,16 @@ class ServicioProgreso {
     bool registrarHistorial = true,
   }) async {
     if (_registrandoSesion) {
-      debugPrint('ServicioProgreso.registrarSesion: llamada duplicada ignorada.');
+      debugPrint(
+        'ServicioProgreso.registrarSesion: llamada duplicada ignorada.',
+      );
       return;
     }
     _registrandoSesion = true;
 
-    final porcentaje = totalPreguntas > 0 ? (correctas / totalPreguntas) * 100 : 0.0;
+    final porcentaje = totalPreguntas > 0
+        ? (correctas / totalPreguntas) * 100
+        : 0.0;
 
     debugPrint(
       'ServicioProgreso.registrarSesion: useSupabase=$_useSupabase, '
@@ -519,14 +527,16 @@ class ServicioProgreso {
       for (final item in (rows as List<dynamic>)) {
         final row = _toMap(item);
 
-        final totalPreguntas = _toInt(row['total_preguntas_planeadas']) ??
+        final totalPreguntas =
+            _toInt(row['total_preguntas_planeadas']) ??
             _toInt(row['preguntas_respondidas']) ??
             ((_toInt(row['preguntas_correctas']) ?? 0) +
                 (_toInt(row['preguntas_incorrectas']) ?? 0));
 
         final metadata = _toMap(row['metadata']);
         final tipoSesion = _normalizar(row['tipo_sesion']);
-        final esRanking = metadata['cuenta_para_ranking'] == true ||
+        final esRanking =
+            metadata['cuenta_para_ranking'] == true ||
             tipoSesion == 'ranking' ||
             totalPreguntas >= 100;
 
@@ -541,7 +551,8 @@ class ServicioProgreso {
             preguntasIncorrectas: _toInt(row['preguntas_incorrectas']) ?? 0,
             tiempoSegundos: _toInt(row['duracion_real_segundos']) ?? 0,
             cuentaParaRanking: esRanking,
-            fechaCreacion: _toDateTime(row['fecha_fin']) ??
+            fechaCreacion:
+                _toDateTime(row['fecha_fin']) ??
                 _toDateTime(row['creado_at']) ??
                 _toDateTime(row['fecha_inicio']) ??
                 DateTime.now(),
@@ -715,7 +726,9 @@ class ServicioProgreso {
       );
       try {
         await SupabaseService.client.from('respuesta_usuario').insert(row);
-        _intentosPendientes.removeWhere((x) => x.preguntaId == intento.preguntaId);
+        _intentosPendientes.removeWhere(
+          (x) => x.preguntaId == intento.preguntaId,
+        );
       } catch (e) {
         debugPrint(
           'ServicioProgreso._persistirIntentosPendientes error en pregunta '
@@ -737,6 +750,7 @@ class ServicioProgreso {
       'es_correcta': intento.esCorrecta,
       'fue_omitida': false,
       'tiempo_total_respuesta': intento.tiempoSegundos ?? 0,
+      'numero_cambios_respuesta': intento.numeroCambiosRespuesta ?? 0,
       'respondida_at': intento.fechaIntento.toIso8601String(),
     };
     if (sesionId != null && sesionId.isNotEmpty) {
@@ -920,7 +934,8 @@ class ServicioProgreso {
     await SupabaseService.client
         .from('ranking')
         .update({
-          'puntos_totales': (_toInt(row['puntos_totales']) ?? 0) + puntosGanados,
+          'puntos_totales':
+              (_toInt(row['puntos_totales']) ?? 0) + puntosGanados,
           'puntos_mes_actual':
               (_toInt(row['puntos_mes_actual']) ?? 0) + puntosGanados,
           'puntos_semana_actual':
@@ -928,7 +943,7 @@ class ServicioProgreso {
           'simulacros_100_completados': nuevoSimulacros,
           'simulacros_aprobados':
               (_toInt(row['simulacros_aprobados']) ?? 0) +
-                  (simulacroAprobado ? 1 : 0),
+              (simulacroAprobado ? 1 : 0),
           'mejor_puntaje_simulacro': nuevoMejor,
           'promedio_simulacros': nuevoPromedio,
           'actualizado_at': nowIso,
@@ -985,11 +1000,12 @@ class ServicioProgreso {
       if (rawSesiones != null && rawSesiones.trim().isNotEmpty) {
         final decoded = jsonDecode(rawSesiones);
         if (decoded is List) {
-          _mockSesiones = decoded
-              .whereType<Map>()
-              .map((e) => _sesionFromMap(Map<String, dynamic>.from(e)))
-              .toList()
-            ..sort((a, b) => b.fechaCreacion.compareTo(a.fechaCreacion));
+          _mockSesiones =
+              decoded
+                  .whereType<Map>()
+                  .map((e) => _sesionFromMap(Map<String, dynamic>.from(e)))
+                  .toList()
+                ..sort((a, b) => b.fechaCreacion.compareTo(a.fechaCreacion));
         }
       }
     } catch (e) {
@@ -1031,9 +1047,7 @@ class ServicioProgreso {
         _mockSesiones.isNotEmpty;
   }
 
-  Future<void> _limpiarDatosMockPersistidos({
-    SharedPreferences? prefs,
-  }) async {
+  Future<void> _limpiarDatosMockPersistidos({SharedPreferences? prefs}) async {
     final storage = prefs ?? await SharedPreferences.getInstance();
     await storage.remove(_prefsGuestStatsKey);
     await storage.remove(_prefsGuestIncorrectMetaKey);
@@ -1045,9 +1059,7 @@ class ServicioProgreso {
     _mockDataLoaded = true;
   }
 
-  Future<int> _migrarSesionesMockASupabase({
-    required String usuarioId,
-  }) async {
+  Future<int> _migrarSesionesMockASupabase({required String usuarioId}) async {
     if (_mockSesiones.isEmpty) return 0;
 
     final yaMigradas = await _obtenerGuestSessionIdsYaMigrados(
@@ -1080,7 +1092,8 @@ class ServicioProgreso {
         'tipo_sesion': 'practica',
         'nombre_sesion': 'Practica migrada (invitado)',
         'total_preguntas_planeadas': totalPreguntas,
-        'preguntas_respondidas': sesion.preguntasCorrectas + sesion.preguntasIncorrectas,
+        'preguntas_respondidas':
+            sesion.preguntasCorrectas + sesion.preguntasIncorrectas,
         'preguntas_correctas': sesion.preguntasCorrectas,
         'preguntas_incorrectas': sesion.preguntasIncorrectas,
         'fecha_inicio': fechaInicio.toIso8601String(),
@@ -1306,7 +1319,8 @@ class ServicioProgreso {
   }
 
   void _aplicarIntentoEnMocks(_IntentoPendiente intento) {
-    final actual = _mockEstadoPreguntas[intento.preguntaId] ??
+    final actual =
+        _mockEstadoPreguntas[intento.preguntaId] ??
         const _MockPreguntaEstado(
           totalAciertos: 0,
           totalFallos: 0,
@@ -1439,7 +1453,8 @@ class ServicioProgreso {
     return (value ?? '').toString().trim().toLowerCase();
   }
 
-  Future<List<IntentoFallido>> _obtenerPreguntasIncorrectasPorUltimoIntento() async {
+  Future<List<IntentoFallido>>
+  _obtenerPreguntasIncorrectasPorUltimoIntento() async {
     final usuarioId = _usuarioId;
     if (usuarioId == null) return [];
 
@@ -1458,10 +1473,14 @@ class ServicioProgreso {
       latest.putIfAbsent(preguntaId, () => row);
     }
 
-    final incorrectas = latest.values.where((row) => row['es_correcta'] == false).toList();
+    final incorrectas = latest.values
+        .where((row) => row['es_correcta'] == false)
+        .toList();
     if (incorrectas.isEmpty) return [];
 
-    final ids = incorrectas.map((row) => row['pregunta_id'].toString()).toList();
+    final ids = incorrectas
+        .map((row) => row['pregunta_id'].toString())
+        .toList();
     final preguntas = await _servicioPreguntas.obtenerPreguntasPorIds(ids: ids);
     final preguntaById = {for (final p in preguntas) p.id: p};
 
@@ -1516,14 +1535,17 @@ class ServicioProgreso {
 
   Future<List<Pregunta>> _obtenerPreguntasAcertadasMock() async {
     await _asegurarMockPersistidoCargado();
-    final ids = _mockEstadoPreguntas.entries
-        .where(
-          (e) =>
-              e.value.ultimoResultadoCorrecto == true &&
-              e.value.totalAciertos > 0,
-        )
-        .toList()
-      ..sort((a, b) => b.value.totalAciertos.compareTo(a.value.totalAciertos));
+    final ids =
+        _mockEstadoPreguntas.entries
+            .where(
+              (e) =>
+                  e.value.ultimoResultadoCorrecto == true &&
+                  e.value.totalAciertos > 0,
+            )
+            .toList()
+          ..sort(
+            (a, b) => b.value.totalAciertos.compareTo(a.value.totalAciertos),
+          );
 
     if (ids.isEmpty) return [];
     return _servicioPreguntas.obtenerPreguntasPorIds(
@@ -1533,14 +1555,15 @@ class ServicioProgreso {
 
   Future<List<IntentoFallido>> _obtenerPreguntasIncorrectasMock() async {
     await _asegurarMockPersistidoCargado();
-    final entradas = _mockEstadoPreguntas.entries
-        .where(
-          (e) =>
-              e.value.ultimoResultadoCorrecto == false &&
-              e.value.totalFallos > 0,
-        )
-        .toList()
-      ..sort((a, b) => b.value.totalFallos.compareTo(a.value.totalFallos));
+    final entradas =
+        _mockEstadoPreguntas.entries
+            .where(
+              (e) =>
+                  e.value.ultimoResultadoCorrecto == false &&
+                  e.value.totalFallos > 0,
+            )
+            .toList()
+          ..sort((a, b) => b.value.totalFallos.compareTo(a.value.totalFallos));
 
     if (entradas.isEmpty) return [];
     final ids = entradas.map((e) => e.key).toList();
@@ -1792,6 +1815,7 @@ class _IntentoPendiente {
   final String respuestaSeleccionada;
   final bool esCorrecta;
   final int? tiempoSegundos;
+  final int? numeroCambiosRespuesta;
   final DateTime fechaIntento;
 
   const _IntentoPendiente({
@@ -1799,6 +1823,7 @@ class _IntentoPendiente {
     required this.respuestaSeleccionada,
     required this.esCorrecta,
     required this.tiempoSegundos,
+    required this.numeroCambiosRespuesta,
     required this.fechaIntento,
   });
 }

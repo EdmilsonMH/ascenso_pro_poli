@@ -50,7 +50,9 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     final gradosIniciales = ConstantesPNP.obtenerGradosParaCategoria(
       _categoriaSeleccionada,
     );
-    _gradoSeleccionado = gradosIniciales.isNotEmpty ? gradosIniciales.first : '';
+    _gradoSeleccionado = gradosIniciales.isNotEmpty
+        ? gradosIniciales.first
+        : '';
 
     if (widget.completarPerfilGoogle) {
       _precargarDatosGoogle();
@@ -63,14 +65,16 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     if (!mounted) return;
 
     final metadata = currentUser?.userMetadata ?? <String, dynamic>{};
-    final nombreSugerido = (profile?['nombre_completo'] ??
-            metadata['full_name'] ??
-            metadata['name'] ??
-            metadata['nombre'])
+    final nombreSugerido =
+        (profile?['nombre_completo'] ??
+                metadata['full_name'] ??
+                metadata['name'] ??
+                metadata['nombre'])
+            ?.toString()
+            .trim();
+    final correoSugerido = (profile?['email'] ?? currentUser?.email)
         ?.toString()
         .trim();
-    final correoSugerido =
-        (profile?['email'] ?? currentUser?.email)?.toString().trim();
 
     setState(() {
       if (nombreSugerido != null && nombreSugerido.isNotEmpty) {
@@ -187,9 +191,14 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
           (route) => false,
         );
       } else {
+        final detalle = AuthService.lastProfileError?.trim();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo completar el perfil.'),
+          SnackBar(
+            content: Text(
+              (detalle != null && detalle.isNotEmpty)
+                  ? detalle
+                  : 'No se pudo completar el perfil.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -342,8 +351,9 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                 alPresionar: () {
                   setState(() {
                     _categoriaSeleccionada = categoria;
-                    final grados =
-                        ConstantesPNP.obtenerGradosParaCategoria(categoria);
+                    final grados = ConstantesPNP.obtenerGradosParaCategoria(
+                      categoria,
+                    );
                     _gradoSeleccionado = grados.isNotEmpty ? grados.first : '';
                   });
                 },
@@ -379,12 +389,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
           value: _gradoSeleccionado,
           isExpanded: true,
           items: grados
-              .map(
-                (g) => DropdownMenuItem<String>(
-                  value: g,
-                  child: Text(g),
-                ),
-              )
+              .map((g) => DropdownMenuItem<String>(value: g, child: Text(g)))
               .toList(),
           onChanged: (val) {
             if (val == null) return;
@@ -408,12 +413,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
           value: _especialidadSeleccionada,
           isExpanded: true,
           items: ConstantesPNP.especialidades
-              .map(
-                (e) => DropdownMenuItem<String>(
-                  value: e,
-                  child: Text(e),
-                ),
-              )
+              .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
               .toList(),
           onChanged: (val) {
             if (val == null) return;
@@ -650,6 +650,33 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                                 : 'Registrarse',
                           ),
                   ),
+
+                  if (widget.completarPerfilGoogle) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '¿Ya tienes cuenta? ',
+                          style: TextStyle(
+                            color: TemaAplicacion.textoSecundario,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushReplacementNamed(context, '/login');
+                          },
+                          child: Text(
+                            'Iniciar sesión',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: TemaAplicacion.colorPrimario,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
 
                   if (!widget.completarPerfilGoogle) ...[
                     const SizedBox(height: 24),

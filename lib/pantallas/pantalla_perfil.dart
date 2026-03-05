@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../servicios/auth_service.dart';
@@ -838,63 +838,62 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                   // Tarjeta de creditos de referidos
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFF6B21A8), Color(0xFFA855F7)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFA855F7).withValues(alpha: 0.4),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: const Color(
+                            0xFFA855F7,
+                          ).withValues(alpha: 0.28),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(9),
                           ),
                           child: const Icon(
-                            Icons.diamond,
+                            Icons.developer_board_outlined,
                             color: Colors.white,
-                            size: 30,
+                            size: 18,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Creditos de referidos',
+                                'REFERIDOS',
                                 style: GoogleFonts.inter(
                                   color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$_creditosReferidos acumulado',
-                                style: GoogleFonts.inter(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 14,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '$_diasEnApp días en la app',
-                                style: GoogleFonts.inter(
+                                'CR: $_creditosReferidos | DIAS: $_diasEnApp',
+                                style: GoogleFonts.robotoMono(
                                   color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 12,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -902,19 +901,20 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
+                            horizontal: 10,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white.withValues(alpha: 0.94),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            _premiumActivo ? 'Activada' : 'Desactivada',
+                            _premiumActivo ? 'ON' : 'OFF',
                             style: GoogleFonts.inter(
                               color: const Color(0xFF6B21A8),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                              letterSpacing: 0.4,
                             ),
                           ),
                         ),
@@ -1100,6 +1100,3 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
     );
   }
 }
-
-
-

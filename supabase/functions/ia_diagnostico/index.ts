@@ -451,6 +451,44 @@ function logEjecucion(data: Record<string, unknown>) {
   );
 }
 
+function extraerBearerToken(authHeader: string | null) {
+  const raw = String(authHeader ?? "").trim();
+  if (!raw) return "";
+  const match = /^Bearer\s+(.+)$/i.exec(raw);
+  if (!match || !match[1]) return "";
+  return match[1].trim();
+}
+
+async function resolverUsuarioAutenticado({
+  supabaseUrl,
+  serviceRoleKey,
+  bearerToken,
+}: {
+  supabaseUrl: string | undefined;
+  serviceRoleKey: string | undefined;
+  bearerToken: string;
+}) {
+  if (!supabaseUrl || !serviceRoleKey || !bearerToken) return "";
+
+  const authUrl = `${supabaseUrl}/auth/v1/user`;
+  try {
+    const response = await fetch(authUrl, {
+      method: "GET",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${bearerToken}`,
+      },
+    });
+    if (!response.ok) return "";
+
+    const data = await response.json();
+    const id = typeof data?.id === "string" ? data.id.trim() : "";
+    return id;
+  } catch (_) {
+    return "";
+  }
+}
+
 async function obtenerContextoUsuarioDesdeBD(
   userId: string,
   supabaseUrl: string,
@@ -631,7 +669,7 @@ serve(async (req) => {
   }
 
   let prompt = "";
-  let userId = "";
+  let requestedUserId = "";
   let mode: Mode = "chat";
   let usarContextoBd = true;
   try {
@@ -640,7 +678,7 @@ serve(async (req) => {
       prompt = body.prompt;
     }
     if (body && typeof body.user_id === "string") {
-      userId = body.user_id.trim();
+      requestedUserId = body.user_id.trim();
     }
     if (body && typeof body.usar_contexto_bd === "boolean") {
       usarContextoBd = body.usar_contexto_bd;
@@ -659,6 +697,45 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const bearerToken = extraerBearerToken(authHeader);
+  const callerUserId = await resolverUsuarioAutenticado({
+    supabaseUrl,
+    serviceRoleKey,
+    bearerToken,
+  });
+
+  if (requestedUserId && !callerUserId) {
+    return new Response(
+      JSON.stringify({
+        error: "Sesion invalida para usar contexto personal",
+      }),
+      {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (
+    requestedUserId &&
+    callerUserId &&
+    requestedUserId !== callerUserId
+  ) {
+    return new Response(
+      JSON.stringify({
+        error: "No autorizado para usar user_id distinto al de tu sesion",
+      }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  const userId = callerUserId;
+  if (!userId) {
+    usarContextoBd = false;
+  }
 
   let contextoBD = null;
   if (usarContextoBd && userId && supabaseUrl && serviceRoleKey) {

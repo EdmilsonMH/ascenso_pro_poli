@@ -4,12 +4,16 @@ import 'package:ascenso_pro_poli/pantallas/pantalla_perfil.dart';
 import 'package:ascenso_pro_poli/pantallas/pantalla_notificaciones.dart';
 
 class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
+  final bool mostrarBotonAtras;
+  final VoidCallback? onAtrasPressed;
   final bool mostrarBotonAudio;
   final bool audioVisible;
   final VoidCallback? onToggleAudio;
 
   const BarraSuperior({
     super.key,
+    this.mostrarBotonAtras = false,
+    this.onAtrasPressed,
     this.mostrarBotonAudio = false,
     this.audioVisible = false,
     this.onToggleAudio,
@@ -18,6 +22,14 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
+      automaticallyImplyLeading: false,
+      leading: mostrarBotonAtras && onAtrasPressed != null
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: onAtrasPressed,
+              tooltip: 'Volver',
+            )
+          : null,
       backgroundColor: Colors.white,
       elevation: 0,
       titleSpacing: 0,

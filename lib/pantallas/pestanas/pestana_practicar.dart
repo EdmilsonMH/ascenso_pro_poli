@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../modelos/modelo_pregunta.dart';
 import '../../servicios/auth_service.dart';
@@ -26,9 +26,9 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
   final ServicioPreguntas _servicioPreguntas = ServicioPreguntas();
   final ServicioProgreso _servicioProgreso = ServicioProgreso();
   final TextEditingController _cantidadController = TextEditingController(
-    text: '30',
+    text: '100',
   );
-  int _cantidadPreguntas = 30;
+  int _cantidadPreguntas = 100;
   List<String> _todasLasMateriasDisponibles = [];
   List<String> _materiasSeleccionadas = [];
   int _preguntasDisponibles = 0;
@@ -45,9 +45,9 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
 
   Future<void> _cargarDatos() async {
     try {
-      final preguntasFuture = _servicioPreguntas.obtenerTodas(
-        categoria: widget.categoriaUsuario,
-      ).timeout(const Duration(seconds: 20));
+      final preguntasFuture = _servicioPreguntas
+          .obtenerTodas(categoria: widget.categoriaUsuario)
+          .timeout(const Duration(seconds: 20));
       final perfilFuture = widget.esInvitado
           ? Future<Map<String, dynamic>?>.value(null)
           : AuthService.getCurrentUserProfile();
@@ -146,8 +146,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
   bool get _esRegistradoNoActivo => !widget.esInvitado && !_premiumActivo;
 
   int get _rankingPracticasRestantesNoActivo {
-    final restantes =
-        _limitePracticasRankingNoActivo - _rankingPracticasUsadas;
+    final restantes = _limitePracticasRankingNoActivo - _rankingPracticasUsadas;
     return restantes < 0 ? 0 : restantes;
   }
 
@@ -302,9 +301,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                       ),
                     ),
                   ),
-                  SizedBox(
-                    height: 12 + MediaQuery.of(context).padding.bottom,
-                  ),
+                  SizedBox(height: 12 + MediaQuery.of(context).padding.bottom),
                 ],
               ),
             );
@@ -583,32 +580,31 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                                               ),
                                             ])
                                     : _intentaRankingSinIntentosNoActivo
-                                        ? const [
-                                            TextSpan(
-                                              text:
-                                                  'Ya usaste tus 3 prácticas ranking. ',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text:
-                                                  'Activa tu cuenta para seguir compitiendo en el ranking.',
-                                            ),
-                                          ]
-                                        : const [
-                                            TextSpan(
-                                              text:
-                                                  'No aparecerás en el ranking ',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text:
-                                                  'porque estás en modo invitado. Regístrate o inicia sesión para que tu práctica cuente.',
-                                            ),
-                                          ],
+                                    ? const [
+                                        TextSpan(
+                                          text:
+                                              'Ya usaste tus 3 prácticas ranking. ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              'Activa tu cuenta para seguir compitiendo en el ranking.',
+                                        ),
+                                      ]
+                                    : const [
+                                        TextSpan(
+                                          text: 'No aparecerás en el ranking ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              'porque estás en modo invitado. Regístrate o inicia sesión para que tu práctica cuente.',
+                                        ),
+                                      ],
                               ),
                             ),
                           ),
@@ -838,6 +834,14 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                     return;
                   }
 
+                  final materiasParaRegistroRanking = esRankingFinal
+                      ? _preguntasTotalesCache
+                            .map((p) => p.materiaId?.trim() ?? '')
+                            .where((id) => id.isNotEmpty)
+                            .toSet()
+                            .toList()
+                      : <String>[];
+
                   if (!mounted) return;
                   await navigator.push(
                     MaterialPageRoute(
@@ -847,6 +851,10 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                         esModoPractica: !esRankingFinal,
                         esRanking: esRankingFinal,
                         avanzarSoloConBotonEnPractica: !esRankingFinal,
+                        materiasIncluidasParaRegistro:
+                            materiasParaRegistroRanking.isEmpty
+                            ? null
+                            : materiasParaRegistroRanking,
                       ),
                     ),
                   );
@@ -944,4 +952,3 @@ class _ResumenCard extends StatelessWidget {
     );
   }
 }
-

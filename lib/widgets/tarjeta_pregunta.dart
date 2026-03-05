@@ -5,7 +5,7 @@ import '../modelos/modelo_pregunta.dart';
 import '../tema/tema_aplicacion.dart';
 
 /// Tarjeta reutilizable para mostrar una pregunta con alternativas.
-class TarjetaPregunta extends StatelessWidget {
+class TarjetaPregunta extends StatefulWidget {
   final Pregunta pregunta;
   final Color colorBordeIzquierdo;
   final Color colorEtiquetaId;
@@ -14,6 +14,7 @@ class TarjetaPregunta extends StatelessWidget {
   final int? numeroOrden;
   final int? aciertosCount;
   final int? fallosCount;
+  final bool mostrarRespuestaAlInicio;
 
   const TarjetaPregunta({
     super.key,
@@ -25,7 +26,32 @@ class TarjetaPregunta extends StatelessWidget {
     this.numeroOrden,
     this.aciertosCount,
     this.fallosCount,
+    this.mostrarRespuestaAlInicio = true,
   });
+
+  @override
+  State<TarjetaPregunta> createState() => _TarjetaPreguntaState();
+}
+
+class _TarjetaPreguntaState extends State<TarjetaPregunta> {
+  late bool _mostrarRespuesta;
+
+  bool get _detallesVisibles => _mostrarRespuesta;
+
+  @override
+  void initState() {
+    super.initState();
+    _mostrarRespuesta = widget.mostrarRespuestaAlInicio;
+  }
+
+  @override
+  void didUpdateWidget(covariant TarjetaPregunta oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pregunta.id != widget.pregunta.id ||
+        oldWidget.mostrarRespuestaAlInicio != widget.mostrarRespuestaAlInicio) {
+      _mostrarRespuesta = widget.mostrarRespuestaAlInicio;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,8 +60,10 @@ class TarjetaPregunta extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: colorBordeIzquierdo != Colors.transparent
-            ? Border(left: BorderSide(color: colorBordeIzquierdo, width: 4))
+        border: widget.colorBordeIzquierdo != Colors.transparent
+            ? Border(
+                left: BorderSide(color: widget.colorBordeIzquierdo, width: 4),
+              )
             : Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
@@ -49,12 +77,12 @@ class TarjetaPregunta extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
-          if (colorBordeIzquierdo == Colors.transparent)
+          if (widget.colorBordeIzquierdo == Colors.transparent)
             const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              pregunta.texto,
+              widget.pregunta.texto,
               style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -63,10 +91,13 @@ class TarjetaPregunta extends StatelessWidget {
             ),
           ),
           _buildOpciones(),
-          const SizedBox(height: 16),
-          _buildCajaRespuestaCorrecta(),
           const SizedBox(height: 12),
-          _buildCajaExplicacion(),
+          if (!_detallesVisibles) _buildBotonVerRespuesta(),
+          if (_detallesVisibles) ...[
+            _buildCajaRespuestaCorrecta(),
+            const SizedBox(height: 12),
+            _buildCajaExplicacion(),
+          ],
           const SizedBox(height: 16),
         ],
       ),
@@ -74,10 +105,12 @@ class TarjetaPregunta extends StatelessWidget {
   }
 
   Widget _buildHeader() {
-    final idCorto = pregunta.id.length > 8
-        ? pregunta.id.substring(0, 8)
-        : pregunta.id;
-    final etiquetaId = numeroOrden != null ? '#$numeroOrden' : '#$idCorto';
+    final idCorto = widget.pregunta.id.length > 8
+        ? widget.pregunta.id.substring(0, 8)
+        : widget.pregunta.id;
+    final etiquetaId = widget.numeroOrden != null
+        ? '#${widget.numeroOrden}'
+        : '#$idCorto';
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -87,7 +120,7 @@ class TarjetaPregunta extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 90),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: colorEtiquetaId,
+              color: widget.colorEtiquetaId,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -97,7 +130,7 @@ class TarjetaPregunta extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: colorTextoEtiquetaId,
+                color: widget.colorTextoEtiquetaId,
               ),
             ),
           ),
@@ -110,7 +143,7 @@ class TarjetaPregunta extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                pregunta.materia,
+                widget.pregunta.materia,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: Colors.blue.shade700,
@@ -120,20 +153,20 @@ class TarjetaPregunta extends StatelessWidget {
               ),
             ),
           ),
-          if (aciertosCount != null || fallosCount != null) ...[
+          if (widget.aciertosCount != null || widget.fallosCount != null) ...[
             const SizedBox(width: 8),
             _buildBadgeContador(
               colorFondo: const Color(0xFFD1FAE5),
               colorTexto: const Color(0xFF065F46),
               icono: Icons.check_circle,
-              valor: aciertosCount ?? 0,
+              valor: widget.aciertosCount ?? 0,
             ),
             const SizedBox(width: 6),
             _buildBadgeContador(
               colorFondo: const Color(0xFFFEE2E2),
               colorTexto: const Color(0xFF991B1B),
               icono: Icons.cancel,
-              valor: fallosCount ?? 0,
+              valor: widget.fallosCount ?? 0,
             ),
           ],
         ],
@@ -182,22 +215,22 @@ class TarjetaPregunta extends StatelessWidget {
             style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
-          ...List.generate(pregunta.opciones.length, (index) {
-            final esCorrecta = index == pregunta.indiceRespuestaCorrecta;
+          ...List.generate(widget.pregunta.opciones.length, (index) {
+            final esCorrecta = index == widget.pregunta.indiceRespuestaCorrecta;
             final esSeleccionadaIncorrecta =
-                indiceSeleccionadoIncorrecto != null &&
-                index == indiceSeleccionadoIncorrecto;
+                widget.indiceSeleccionadoIncorrecto != null &&
+                index == widget.indiceSeleccionadoIncorrecto;
 
             Color colorBorde = Colors.grey.shade300;
             Color colorFondo = Colors.white;
             IconData? icono;
             Color? colorIcono;
 
-            if (esCorrecta) {
+            if (_detallesVisibles && esCorrecta) {
               colorBorde = const Color(0xFF10B981);
               icono = Icons.check_circle_outline;
               colorIcono = const Color(0xFF10B981);
-            } else if (esSeleccionadaIncorrecta) {
+            } else if (_detallesVisibles && esSeleccionadaIncorrecta) {
               colorBorde = const Color(0xFFEF4444);
               colorFondo = const Color(0xFFFEF2F2);
               icono = Icons.cancel_outlined;
@@ -223,7 +256,7 @@ class TarjetaPregunta extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      pregunta.opciones[index],
+                      widget.pregunta.opciones[index],
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         color: TemaAplicacion.textoPrimario,
@@ -236,6 +269,40 @@ class TarjetaPregunta extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBotonVerRespuesta() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () {
+            setState(() {
+              _mostrarRespuesta = true;
+            });
+          },
+          icon: const Icon(
+            Icons.visibility_outlined,
+            color: Color(0xFF16A34A),
+            size: 18,
+          ),
+          label: Text(
+            'Ver respuesta',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF16A34A),
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: const Size(0, 0),
+          ),
+        ),
       ),
     );
   }
@@ -272,7 +339,7 @@ class TarjetaPregunta extends StatelessWidget {
                   ),
                   TextSpan(
                     text:
-                        '${String.fromCharCode(65 + pregunta.indiceRespuestaCorrecta)}. ${pregunta.opciones[pregunta.indiceRespuestaCorrecta]}',
+                        '${String.fromCharCode(65 + widget.pregunta.indiceRespuestaCorrecta)}. ${widget.pregunta.opciones[widget.pregunta.indiceRespuestaCorrecta]}',
                   ),
                 ],
               ),
@@ -305,7 +372,7 @@ class TarjetaPregunta extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            pregunta.explicacion,
+            widget.pregunta.explicacion,
             style: GoogleFonts.inter(
               fontSize: 13,
               color: const Color(0xFF1E3A8A),
