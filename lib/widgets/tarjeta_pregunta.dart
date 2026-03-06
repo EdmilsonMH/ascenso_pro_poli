@@ -330,16 +330,20 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
               text: TextSpan(
                 style: GoogleFonts.inter(
                   fontSize: 13,
-                  color: const Color(0xFF15803D),
+                  color: const Color(0xFF374151),
                 ),
                 children: [
-                  const TextSpan(
+                  TextSpan(
                     text: 'Respuesta Correcta: ',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF16A34A),
+                    ),
                   ),
                   TextSpan(
                     text:
                         '${String.fromCharCode(65 + widget.pregunta.indiceRespuestaCorrecta)}. ${widget.pregunta.opciones[widget.pregunta.indiceRespuestaCorrecta]}',
+                    style: const TextStyle(color: Color(0xFF374151)),
                   ),
                 ],
               ),

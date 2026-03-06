@@ -707,9 +707,9 @@ class _PantallaPreguntasAcertadasState
                                         0xFF15803D,
                                       ),
                                       aciertosCount:
-                                          estadistica?.aciertosVisibles ?? 0,
+                                          estadistica?.totalAciertos ?? 0,
                                       fallosCount:
-                                          estadistica?.fallosVisibles ?? 0,
+                                          estadistica?.totalFallos ?? 0,
                                     );
                                   },
                                 ),

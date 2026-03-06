@@ -1,12 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../modelos/modelo_pregunta.dart';
 import '../modelos/tutor_dashboard_inicio.dart';
 import '../servicios/auth_service.dart';
 import '../servicios/tutor_ia_personal_service.dart';
 import '../servicios/servicio_preguntas.dart';
+import '../servicios/servicio_progreso.dart';
 import 'pantalla_practica.dart';
-import 'pantalla_practica_guiada_config.dart';
 // En este paso, usaremos un Map dinÃƒÂ¡mico para el resultado del servicio,
 // pero podrÃƒÂ­amos adaptar DiagnosticoIA mÃƒÂ¡s adelante.
 
@@ -29,6 +29,7 @@ class _PantallaPlanTutorIAPersonalState
     extends State<PantallaPlanTutorIAPersonal> {
   late final TutorIAPersonalService _iaService;
   late final ServicioPreguntas _servicioPreguntas;
+  late final ServicioProgreso _servicioProgreso;
   static const bool _tutorDashboardV2Enabled = true;
   static const Duration _cacheAnalisisFreshWindow = Duration(minutes: 10);
   static final Map<String, Map<String, dynamic>> _cacheAnalisisPorUsuario = {};
@@ -93,6 +94,7 @@ class _PantallaPlanTutorIAPersonalState
     super.initState();
     _iaService = widget.iaService ?? TutorIAPersonalService();
     _servicioPreguntas = widget.servicioPreguntas ?? ServicioPreguntas();
+    _servicioProgreso = ServicioProgreso();
     _cargarDatos();
   }
 
@@ -296,12 +298,83 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   List<Map<String, dynamic>> _obtenerOrdenesTutorParaHoyCards() {
+    final dashboard = _dashboardInicio;
     final mision = _dashboardInicio?.misionDiaria;
-    final cantidadPractica = mision?.cantidadPractica ?? 30;
-    final tiempoPractica = mision?.tiempoPractica ?? 40;
-    final materiaPrioritaria = _insightPorId('materia_prioritaria')?.materia;
+    final cantidadBase = _intValue(mision?.cantidadPractica, 30).clamp(15, 120);
+    final tiempoBase = _intValue(mision?.tiempoPractica, 40).clamp(15, 120);
+
+    final planHoy = _insightPorId('plan_hoy');
+    final materiaPrioritaria = _insightPorId('materia_prioritaria');
     final coach = _insightPorId('coach_velocidad');
     final riesgo = _insightPorId('radar_riesgo');
+
+    List<String> idsUnicos(Iterable<String> ids) {
+      final salida = <String>[];
+      final vistos = <String>{};
+      for (final raw in ids) {
+        final id = raw.trim();
+        if (id.isEmpty) continue;
+        if (vistos.add(id)) salida.add(id);
+      }
+      return salida;
+    }
+
+    Map<String, dynamic> cardPracticaDesdeInsight({
+      required String title,
+      required TutorInsightCard? insight,
+      String? fallbackMessage,
+      String? fallbackMateria,
+      List<String> fallbackMaterias = const <String>[],
+      List<String> fallbackPreguntaIds = const <String>[],
+      bool excluirIdsInsight = false,
+    }) {
+      var cantidad = _intValue(
+        insight?.cantidadPractica,
+        cantidadBase,
+      ).clamp(10, 120);
+      final tiempo = _intValue(
+        insight?.tiempoPractica,
+        tiempoBase,
+      ).clamp(10, 120);
+      final materia = (insight?.materia ?? fallbackMateria ?? '').trim();
+      final preguntaIds = idsUnicos([
+        if (!excluirIdsInsight) ...?insight?.preguntaIds,
+        ...fallbackPreguntaIds,
+      ]);
+      if (preguntaIds.isNotEmpty && cantidad < preguntaIds.length) {
+        cantidad = preguntaIds.length;
+      }
+      final materias = <String>{
+        if (materia.isNotEmpty) materia,
+        ...fallbackMaterias.map((m) => m.trim()).where((m) => m.isNotEmpty),
+      }.toList();
+
+      return {
+        'type': 'practice',
+        'title': title,
+        'message':
+            (insight?.resumen ?? fallbackMessage ?? 'Sin recomendacion IA.')
+                .toString()
+                .trim(),
+        'cta': 'Entrar',
+        if (insight != null) 'insight_id': insight.id,
+        'payload': {
+          'cantidad': cantidad,
+          'tiempo': tiempo,
+          if (materia.isNotEmpty) 'materia': materia,
+          if (materias.isNotEmpty) 'materias': materias,
+          if (preguntaIds.isNotEmpty) 'pregunta_ids': preguntaIds,
+        },
+      };
+    }
+
+    final materiaRiesgo = (riesgo != null && riesgo.riesgos.isNotEmpty)
+        ? riesgo.riesgos.first.materia
+        : null;
+    final materiasRiesgo = (riesgo?.riesgos ?? const <TutorRiskItem>[])
+        .map((e) => e.materia.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     final cards = <Map<String, dynamic>>[
       {
@@ -309,55 +382,88 @@ class _PantallaPlanTutorIAPersonalState
         'title': 'Practica guiada',
         'message':
             'La IA organiza tu sesion completa por materias, dificultad y enfoque de mejora.',
-        'cta': 'Abrir practica guiada',
+        'cta': 'Entrar',
         'payload': {'cantidad': 100, 'tiempo': 120},
       },
-      {
-        'type': 'practice',
-        'title': 'Practicar ahora',
-        'message':
+      cardPracticaDesdeInsight(
+        title: 'Practicar ahora',
+        insight: planHoy,
+        fallbackMessage:
             'Sesion recomendada para hoy segun tu rendimiento y objetivo diario.',
-        'cta': 'Iniciar practica',
-        'payload': {
-          'cantidad': cantidadPractica.clamp(20, 120),
-          'tiempo': tiempoPractica.clamp(20, 120),
-          if (materiaPrioritaria != null &&
-              materiaPrioritaria.trim().isNotEmpty)
-            'materia': materiaPrioritaria.trim(),
-        },
-      },
-      {
-        'type': 'study',
-        'title': 'Estudiar enfoque IA',
-        'message':
+        fallbackMaterias: materiasRiesgo,
+      ),
+      cardPracticaDesdeInsight(
+        title: 'Materia prioritaria',
+        insight: materiaPrioritaria,
+        fallbackMessage:
             'Revisa primero la materia mas prioritaria para subir tu nivel hoy.',
-        'cta': 'Ver materia prioritaria',
-        'payload': {
-          if (materiaPrioritaria != null &&
-              materiaPrioritaria.trim().isNotEmpty)
-            'materia': materiaPrioritaria.trim(),
-        },
+        fallbackMateria: materiaPrioritaria?.materia,
+        fallbackMaterias: materiasRiesgo,
+      ),
+      cardPracticaDesdeInsight(
+        title: 'Mejora de velocidad',
+        insight: coach,
+        fallbackMessage: 'Refuerza tu precision y ritmo con practica dirigida.',
+        fallbackMaterias: materiasRiesgo,
+      ),
+      cardPracticaDesdeInsight(
+        title: 'Foco de riesgo',
+        insight: riesgo,
+        fallbackMessage:
+            'Atiende primero tus materias con mayor riesgo para no perder avance.',
+        fallbackMateria: materiaRiesgo ?? materiaPrioritaria?.materia,
+        fallbackMaterias: materiasRiesgo,
+      ),
+      {
+        'type': 'failed',
+        'title': 'Preguntas falladas',
+        'message':
+            'Practica guiada para corregir tus errores recurrentes en preguntas que ya fallaste.',
+        'cta': 'Entrar',
+        'payload': {'cantidad': 20, 'tiempo': tiempoBase},
       },
     ];
 
-    if (coach != null && coach.resumen.trim().isNotEmpty) {
-      cards.add({
-        'type': 'recommendation',
-        'title': 'Mejora de velocidad',
-        'message': coach.resumen,
-        'cta': 'Ver coach de velocidad',
-        'insight_id': 'coach_velocidad',
-      });
+    if (planHoy != null && planHoy.preguntasRepasoIds.isNotEmpty) {
+      cards.insert(
+        2,
+        cardPracticaDesdeInsight(
+          title: 'Repaso urgente IA',
+          insight: planHoy,
+          fallbackMessage:
+              'Repasa ahora las preguntas con mayor riesgo de olvido.',
+          fallbackMateria: materiaPrioritaria?.materia,
+          fallbackMaterias: materiasRiesgo,
+          fallbackPreguntaIds: planHoy.preguntasRepasoIds,
+          excluirIdsInsight: true,
+        ),
+      );
     }
 
-    if (riesgo != null && riesgo.resumen.trim().isNotEmpty) {
-      cards.add({
-        'type': 'alert',
-        'title': 'Foco de riesgo',
-        'message': riesgo.resumen,
-        'cta': 'Ver materias en riesgo',
-        'insight_id': 'radar_riesgo',
-      });
+    if (planHoy != null && planHoy.preguntasNuevasIds.isNotEmpty) {
+      cards.insert(
+        3,
+        cardPracticaDesdeInsight(
+          title: 'Nuevas prioritarias IA',
+          insight: planHoy,
+          fallbackMessage:
+              'Avanza en preguntas nuevas de alta importancia para tu meta.',
+          fallbackMateria: materiaPrioritaria?.materia,
+          fallbackMaterias: materiasRiesgo,
+          fallbackPreguntaIds: planHoy.preguntasNuevasIds,
+          excluirIdsInsight: true,
+        ),
+      );
+    }
+
+    if (dashboard?.sesionValida != true) {
+      return cards.map((c) {
+        if (c['type'] == 'guided') return c;
+        final copy = Map<String, dynamic>.from(c);
+        copy['type'] = 'message';
+        copy.remove('payload');
+        return copy;
+      }).toList();
     }
 
     return cards;
@@ -370,7 +476,7 @@ class _PantallaPlanTutorIAPersonalState
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (routeContext) => Scaffold(
+        builder: (_) => Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
           appBar: AppBar(
             title: Text(
@@ -396,8 +502,6 @@ class _PantallaPlanTutorIAPersonalState
               return _buildTarjetaAccionIACompacta(
                 card,
                 onTap: () async {
-                  Navigator.of(routeContext).pop();
-                  await Future<void>.delayed(const Duration(milliseconds: 120));
                   if (!mounted) return;
                   await _ejecutarAccionTarjetaIA(card);
                 },
@@ -407,18 +511,6 @@ class _PantallaPlanTutorIAPersonalState
         ),
       ),
     );
-  }
-
-  Future<void> _abrirPracticaGuiada() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            PantallaPracticaGuiadaConfig(categoriaUsuario: _categoriaUsuario),
-      ),
-    );
-    if (!mounted) return;
-    _cargarDatos(forzarRecarga: true);
   }
 
   Widget _buildFallbackGrid() {
@@ -467,6 +559,8 @@ class _PantallaPlanTutorIAPersonalState
         return const Color(0xFF8B5CF6);
       case 'alert':
         return const Color(0xFFEF4444);
+      case 'failed':
+        return const Color(0xFFDC2626);
       case 'message':
       default:
         return const Color(0xFF111827);
@@ -489,6 +583,8 @@ class _PantallaPlanTutorIAPersonalState
         return Icons.tips_and_updates_rounded;
       case 'alert':
         return Icons.warning_amber_rounded;
+      case 'failed':
+        return Icons.cancel_outlined;
       case 'message':
       default:
         return Icons.psychology_alt;
@@ -519,6 +615,9 @@ class _PantallaPlanTutorIAPersonalState
       }
       return '$cantidad preguntas aleatorias';
     }
+    if (type == 'failed') {
+      return '$cantidad preguntas mas falladas';
+    }
     if (type == 'streak') {
       final racha = _intValue(_analisisPerfil?['racha_dias'], 0);
       return racha > 0 ? 'Racha actual: $racha dias' : 'Disciplina diaria';
@@ -544,6 +643,8 @@ class _PantallaPlanTutorIAPersonalState
         return 'Aplicar consejo';
       case 'alert':
         return 'Revisar alerta';
+      case 'failed':
+        return 'Practicar falladas';
       case 'message':
       default:
         return 'Ver detalle';
@@ -622,12 +723,26 @@ class _PantallaPlanTutorIAPersonalState
     final materia = payload['materia'] is String
         ? payload['materia'] as String
         : null;
+    final materiasObjetivo = payload['materias'] is List
+        ? (payload['materias'] as List)
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
+        : <String>[];
+    final preguntaIds = payload['pregunta_ids'] is List
+        ? (payload['pregunta_ids'] as List)
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
+        : <String>[];
     final insightId = (card['insight_id'] ?? '').toString().trim();
     final isStudy = type == 'study';
     final isGuided = type == 'guided';
+    final isFailed = type == 'failed';
     final canPractice =
         !isStudy &&
         !isGuided &&
+        !isFailed &&
         (type == 'plan' ||
             type == 'practice' ||
             payload.containsKey('cantidad'));
@@ -637,7 +752,11 @@ class _PantallaPlanTutorIAPersonalState
       return;
     }
     if (isGuided) {
-      await _abrirPracticaGuiada();
+      await _iniciarPracticaGuiadaDesdeIA();
+      return;
+    }
+    if (isFailed) {
+      await _iniciarPracticaFalladasDesdeIA(cantidad: cantidad);
       return;
     }
     if (canPractice) {
@@ -645,6 +764,8 @@ class _PantallaPlanTutorIAPersonalState
         cantidad: cantidad,
         tiempoLimite: tiempo,
         materia: materia,
+        materiasObjetivo: materiasObjetivo,
+        preguntaIdsPrioritarias: preguntaIds,
       );
       return;
     }
@@ -662,6 +783,184 @@ class _PantallaPlanTutorIAPersonalState
       message: message,
       items: items,
     );
+  }
+
+  Future<void> _iniciarPracticaGuiadaDesdeIA() async {
+    if (!mounted) return;
+    if (_dashboardInicio?.sesionValida != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Necesitas una sesion valida para generar practica guiada IA.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    List<Pregunta> seleccionadas = const [];
+    try {
+      final mision = _dashboardInicio?.misionDiaria;
+      final planHoy = _insightPorId('plan_hoy');
+      var cantidad = _intValue(planHoy?.cantidadPractica, 0);
+      if (cantidad <= 0) {
+        cantidad = _intValue(mision?.cantidadPractica, 20);
+      }
+      cantidad = cantidad.clamp(10, 120);
+
+      final materiasObjetivo = <String>{};
+      final materiaPrioritaria =
+          (_insightPorId('materia_prioritaria')?.materia ?? '').trim();
+      if (materiaPrioritaria.isNotEmpty) {
+        materiasObjetivo.add(materiaPrioritaria);
+      }
+      final radar = _insightPorId('radar_riesgo');
+      for (final riesgo in (radar?.riesgos ?? const <TutorRiskItem>[])) {
+        final materia = riesgo.materia.trim();
+        if (materia.isNotEmpty) {
+          materiasObjetivo.add(materia);
+        }
+      }
+
+      final idsDisponibles = await _servicioPreguntas.obtenerIdsDisponibles(
+        categoria: _categoriaUsuario,
+        materias: materiasObjetivo.toList(),
+      );
+      if (idsDisponibles.isEmpty) {
+        throw Exception('No hay preguntas disponibles en tu banco.');
+      }
+
+      final estadisticas = await _servicioProgreso
+          .obtenerEstadisticasPreguntas();
+      int prioridadFallo(EstadisticaPregunta? estadistica) {
+        if (estadistica == null) return 0;
+        if (estadistica.rachaAciertos >= 3) return 0;
+        return estadistica.fallosVisibles;
+      }
+
+      final posicionOriginal = <String, int>{};
+      for (var i = 0; i < idsDisponibles.length; i++) {
+        posicionOriginal[idsDisponibles[i]] = i;
+      }
+
+      final idsOrdenados = List<String>.from(idsDisponibles);
+      idsOrdenados.sort((a, b) {
+        final prioridadA = prioridadFallo(estadisticas[a]);
+        final prioridadB = prioridadFallo(estadisticas[b]);
+        final byFallos = prioridadB.compareTo(prioridadA);
+        if (byFallos != 0) return byFallos;
+        final aciertosA = estadisticas[a]?.aciertosVisibles ?? 0;
+        final aciertosB = estadisticas[b]?.aciertosVisibles ?? 0;
+        final byAciertos = aciertosA.compareTo(aciertosB);
+        if (byAciertos != 0) return byAciertos;
+        final idxA = posicionOriginal[a] ?? 999999;
+        final idxB = posicionOriginal[b] ?? 999999;
+        return idxA.compareTo(idxB);
+      });
+
+      final n = cantidad > idsOrdenados.length ? idsOrdenados.length : cantidad;
+      final idsSeleccionados = idsOrdenados.take(n).toList();
+      seleccionadas = await _servicioPreguntas.obtenerPreguntasPorIds(
+        ids: idsSeleccionados,
+        categoria: _categoriaUsuario,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo generar practica guiada IA: $e')),
+        );
+      }
+      return;
+    } finally {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!).pop();
+      }
+    }
+
+    if (!mounted || seleccionadas.isEmpty) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PantallaPractica(
+          preguntas: seleccionadas,
+          tiempoLimiteSegundos: null,
+          esModoPractica: true,
+          esRanking: false,
+          revisarRespuestaInmediata: true,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    _cargarDatos(forzarRecarga: true);
+  }
+
+  Future<void> _iniciarPracticaFalladasDesdeIA({int cantidad = 20}) async {
+    if (!mounted) return;
+
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    List<IntentoFallido> intentos = const <IntentoFallido>[];
+    try {
+      intentos = await _servicioProgreso.obtenerPreguntasIncorrectas();
+    } finally {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!).pop();
+      }
+    }
+
+    if (!mounted) return;
+    if (intentos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aun no tienes preguntas falladas.')),
+      );
+      return;
+    }
+
+    final limite = cantidad <= 0 ? 20 : cantidad;
+    final preguntas = intentos.map((e) => e.pregunta).take(limite).toList();
+    if (preguntas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay preguntas disponibles para practicar.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PantallaPractica(
+          preguntas: preguntas,
+          tiempoLimiteSegundos: null,
+          esModoPractica: true,
+          esRanking: false,
+          revisarRespuestaInmediata: true,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    _cargarDatos(forzarRecarga: true);
   }
 
   Widget _buildTarjetaAccionIACompacta(
@@ -894,6 +1193,7 @@ class _PantallaPlanTutorIAPersonalState
     required int cantidad,
     required int tiempoLimite,
     String? materia,
+    List<String> materiasObjetivo = const <String>[],
     List<String> preguntaIdsPrioritarias = const [],
     bool esPracticaGuiada = false,
   }) async {
@@ -910,33 +1210,13 @@ class _PantallaPlanTutorIAPersonalState
     final preguntas = <Pregunta>[];
     String? errorMessage;
     try {
-      var priorizadas = await _servicioPreguntas.obtenerPreguntasPorIds(
-        ids: preguntaIdsPrioritarias,
-        categoria: _categoriaUsuario,
+      final seleccionadas = await _seleccionarPreguntasDeterministicas(
+        cantidad: cantidad,
         materia: materia,
+        materiasObjetivo: materiasObjetivo,
+        preguntaIdsPrioritarias: preguntaIdsPrioritarias,
       );
-      if (priorizadas.isEmpty && preguntaIdsPrioritarias.isNotEmpty) {
-        priorizadas = await _servicioPreguntas.obtenerPreguntasPorIds(
-          ids: preguntaIdsPrioritarias,
-        );
-      }
-
-      final faltantes = (cantidad - priorizadas.length).clamp(0, cantidad);
-      final aleatorias = await _servicioPreguntas.obtenerPreguntasAleatorias(
-        cantidad: faltantes,
-        categoria: _categoriaUsuario,
-        materia: materia,
-      );
-
-      final usados = <String>{};
-      for (final p in priorizadas) {
-        if (preguntas.length >= cantidad) break;
-        if (usados.add(p.id)) preguntas.add(p);
-      }
-      for (final p in aleatorias) {
-        if (preguntas.length >= cantidad) break;
-        if (usados.add(p.id)) preguntas.add(p);
-      }
+      preguntas.addAll(seleccionadas);
     } catch (e) {
       errorMessage = 'Error al iniciar practica: $e';
     } finally {
@@ -974,6 +1254,144 @@ class _PantallaPlanTutorIAPersonalState
 
     if (!mounted) return;
     _cargarDatos(forzarRecarga: true);
+  }
+
+  Future<List<Pregunta>> _seleccionarPreguntasDeterministicas({
+    required int cantidad,
+    String? materia,
+    List<String> materiasObjetivo = const <String>[],
+    List<String> preguntaIdsPrioritarias = const <String>[],
+  }) async {
+    final objetivoCantidad = cantidad <= 0 ? 1 : cantidad;
+    final seleccion = <Pregunta>[];
+    final usados = <String>{};
+
+    final objetivosMateria = <String>{
+      if (materia != null && materia.trim().isNotEmpty) materia.trim(),
+      ...materiasObjetivo.map((e) => e.trim()).where((e) => e.isNotEmpty),
+    };
+    final objetivosMateriaNorm = objetivosMateria
+        .map(_normalizarTextoSimple)
+        .where((e) => e.isNotEmpty)
+        .toSet();
+
+    bool coincideMateria(Pregunta pregunta) {
+      if (objetivosMateriaNorm.isEmpty) return true;
+      final actual = _normalizarTextoSimple(pregunta.materia);
+      if (actual.isEmpty) return false;
+      for (final objetivo in objetivosMateriaNorm) {
+        if (actual == objetivo ||
+            actual.contains(objetivo) ||
+            objetivo.contains(actual)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (preguntaIdsPrioritarias.isNotEmpty) {
+      var priorizadas = await _servicioPreguntas.obtenerPreguntasPorIds(
+        ids: preguntaIdsPrioritarias,
+        categoria: _categoriaUsuario,
+        materia: materia,
+      );
+      if (priorizadas.isEmpty) {
+        priorizadas = await _servicioPreguntas.obtenerPreguntasPorIds(
+          ids: preguntaIdsPrioritarias,
+          categoria: _categoriaUsuario,
+        );
+      }
+      if (objetivosMateriaNorm.isNotEmpty) {
+        final filtradas = priorizadas.where(coincideMateria).toList();
+        if (filtradas.isNotEmpty) {
+          priorizadas = filtradas;
+        }
+      }
+      for (final p in priorizadas) {
+        if (seleccion.length >= objetivoCantidad) break;
+        if (usados.add(p.id)) {
+          seleccion.add(p);
+        }
+      }
+    }
+
+    if (seleccion.length >= objetivoCantidad) {
+      return seleccion;
+    }
+
+    final idsDisponibles = await _servicioPreguntas.obtenerIdsDisponibles(
+      categoria: _categoriaUsuario,
+      materia: materia,
+      materias: objetivosMateria.toList(),
+    );
+    final candidatasIds = idsDisponibles
+        .where((id) => !usados.contains(id))
+        .toList();
+    if (candidatasIds.isEmpty) {
+      return seleccion;
+    }
+
+    final estadisticas = await _servicioProgreso.obtenerEstadisticasPreguntas();
+    final posicionOriginal = <String, int>{};
+    for (var i = 0; i < candidatasIds.length; i++) {
+      posicionOriginal[candidatasIds[i]] = i;
+    }
+
+    candidatasIds.sort((a, b) {
+      final sa = estadisticas[a];
+      final sb = estadisticas[b];
+      final fallosA = sa?.fallosVisibles ?? 0;
+      final fallosB = sb?.fallosVisibles ?? 0;
+      if (fallosA != fallosB) return fallosB.compareTo(fallosA);
+
+      final rachaFallosA = sa?.rachaFallos ?? 0;
+      final rachaFallosB = sb?.rachaFallos ?? 0;
+      if (rachaFallosA != rachaFallosB) {
+        return rachaFallosB.compareTo(rachaFallosA);
+      }
+
+      final aciertosA = sa?.aciertosVisibles ?? 0;
+      final aciertosB = sb?.aciertosVisibles ?? 0;
+      if (aciertosA != aciertosB) return aciertosA.compareTo(aciertosB);
+
+      final idxA = posicionOriginal[a] ?? 999999;
+      final idxB = posicionOriginal[b] ?? 999999;
+      return idxA.compareTo(idxB);
+    });
+
+    final faltantes = objetivoCantidad - seleccion.length;
+    final idsSeleccionados = candidatasIds.take(faltantes).toList();
+    if (idsSeleccionados.isEmpty) {
+      return seleccion;
+    }
+
+    var adicionales = await _servicioPreguntas.obtenerPreguntasPorIds(
+      ids: idsSeleccionados,
+      categoria: _categoriaUsuario,
+      materia: materia,
+    );
+    if (adicionales.isEmpty && materia != null && materia.trim().isNotEmpty) {
+      adicionales = await _servicioPreguntas.obtenerPreguntasPorIds(
+        ids: idsSeleccionados,
+        categoria: _categoriaUsuario,
+      );
+    }
+
+    if (objetivosMateriaNorm.isNotEmpty) {
+      final filtradas = adicionales.where(coincideMateria).toList();
+      if (filtradas.isNotEmpty) {
+        adicionales = filtradas;
+      }
+    }
+
+    for (final p in adicionales) {
+      if (seleccion.length >= objetivoCantidad) break;
+      if (usados.add(p.id)) {
+        seleccion.add(p);
+      }
+    }
+
+    return seleccion;
   }
 
   Color _colorFromHex(String hex, {Color fallback = const Color(0xFFCBD5E1)}) {
@@ -1301,9 +1719,15 @@ class _PantallaPlanTutorIAPersonalState
       return 'Aun no hay datos por materia. Los porcentajes mostrados representan tu porcentaje de dominio por materia.';
     }
 
-    final totalVerde = items.where((e) => e.semaforo == _SemaforoTema.verde).length;
-    final totalAmbar = items.where((e) => e.semaforo == _SemaforoTema.ambar).length;
-    final totalRojo = items.where((e) => e.semaforo == _SemaforoTema.rojo).length;
+    final totalVerde = items
+        .where((e) => e.semaforo == _SemaforoTema.verde)
+        .length;
+    final totalAmbar = items
+        .where((e) => e.semaforo == _SemaforoTema.ambar)
+        .length;
+    final totalRojo = items
+        .where((e) => e.semaforo == _SemaforoTema.rojo)
+        .length;
 
     final ordenadas = [...items]
       ..sort((a, b) => b.porcentaje.compareTo(a.porcentaje));
@@ -1467,7 +1891,12 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   Widget _buildInsightsGridV2(TutorDashboardInicio dashboard) {
-    final cards = dashboard.insights;
+    final cards = dashboard.insights.where((card) {
+      final id = card.id.toLowerCase().trim();
+      return id != 'debrief_sesion' &&
+          id != 'mensaje_personal' &&
+          id != 'materia_prioritaria';
+    }).toList();
     if (cards.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3149,6 +3578,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
       ],
     );
   }
+
   Widget _buildMiniStat({
     required String label,
     required String value,
@@ -3442,7 +3872,6 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
 
     final probActual = _doubleValue(pred['probabilidad_actual'], _porcentaje);
     final prob7 = _doubleValue(pred['proyeccion_7_dias'], _porcentaje);
-    final prob14 = _doubleValue(pred['proyeccion_14_dias'], _porcentaje);
     final prob30 = _doubleValue(pred['proyeccion_30_dias'], _porcentaje);
     final idsCorrectas = _toIdList(preguntasPorEstado['correctas_ids']);
     var idsIncorrectas = _toIdList(preguntasPorEstado['incorrectas_ids']);
@@ -3709,8 +4138,3 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     );
   }
 }
-
-
-
-
-

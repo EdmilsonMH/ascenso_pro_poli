@@ -607,6 +607,73 @@ class ServicioPreguntas {
     return _obtenerPreguntasDesdeFuente(categoria: categoria);
   }
 
+  /// Obtiene solo IDs disponibles segun categoria/materia.
+  /// Es mas rapido que cargar preguntas completas y luego filtrar.
+  Future<List<String>> obtenerIdsDisponibles({
+    String categoria = 'Ambos',
+    String? materia,
+    List<String> materias = const <String>[],
+  }) async {
+    Future<List<String>> resolverPorMateria(String? materiaActual) async {
+      if (_esInvitadoConSupabase) {
+        return _obtenerIdsFijosInvitado(
+          categoria: categoria,
+          materia: materiaActual,
+        );
+      }
+
+      if (await _esRegistradoNoActivoConSupabase()) {
+        return _obtenerIdsFijosRegistradoNoActivo(
+          categoria: categoria,
+          materia: materiaActual,
+        );
+      }
+
+      if (SupabaseService.isInitialized) {
+        return _obtenerIdsPreguntasDisponibles(
+          categoria: categoria,
+          materia: materiaActual,
+        );
+      }
+
+      final mock = _obtenerPreguntasMock(
+        categoria: categoria,
+        materia: materiaActual,
+      );
+      return mock.map((p) => p.id).toList();
+    }
+
+    try {
+      final materiasFiltradas = <String>{
+        if (materia != null && materia.trim().isNotEmpty) materia.trim(),
+        ...materias.map((e) => e.trim()).where((e) => e.isNotEmpty),
+      }.toList();
+
+      if (materiasFiltradas.isEmpty) {
+        return resolverPorMateria(null);
+      }
+
+      final combinadas = <String>[];
+      final vistos = <String>{};
+      for (final nombreMateria in materiasFiltradas) {
+        final ids = await resolverPorMateria(nombreMateria);
+        for (final id in ids) {
+          if (vistos.add(id)) {
+            combinadas.add(id);
+          }
+        }
+      }
+
+      if (combinadas.isNotEmpty) return combinadas;
+
+      // Si no hubo match de materia, cae a categoria completa.
+      return resolverPorMateria(null);
+    } catch (e) {
+      debugPrint('ServicioPreguntas.obtenerIdsDisponibles error: $e');
+      return const [];
+    }
+  }
+
   /// Obtiene preguntas de ranking desde el banco completo de la categoria,
   /// sin aplicar los limites de invitado/no activo por materia.
   /// Se usa para las practicas ranking limitadas (ej. 3 intentos no activos).
@@ -701,6 +768,117 @@ class ServicioPreguntas {
       categoria: categoria,
     );
     return todas.length;
+  }
+
+  Future<Map<String, int>> obtenerConteoPreguntasPorMateria({
+    String categoria = 'Ambos',
+  }) async {
+    if (_esInvitadoConSupabase) {
+      try {
+        final idsFijos = await _obtenerIdsFijosInvitado(categoria: categoria);
+        if (idsFijos.isEmpty) return const <String, int>{};
+        return _contarPorMateriaDesdeIds(idsFijos);
+      } catch (e) {
+        debugPrint(
+          'ServicioPreguntas.obtenerConteoPreguntasPorMateria invitado error: $e',
+        );
+        return const <String, int>{};
+      }
+    }
+
+    if (await _esRegistradoNoActivoConSupabase()) {
+      try {
+        final idsFijos = await _obtenerIdsFijosRegistradoNoActivo(
+          categoria: categoria,
+        );
+        if (idsFijos.isEmpty) return const <String, int>{};
+        return _contarPorMateriaDesdeIds(idsFijos);
+      } catch (e) {
+        debugPrint(
+          'ServicioPreguntas.obtenerConteoPreguntasPorMateria no-activo error: $e',
+        );
+        return const <String, int>{};
+      }
+    }
+
+    if (!SupabaseService.isInitialized) {
+      final mock = await _obtenerPreguntasDesdeFuente(categoria: categoria);
+      final conteo = <String, int>{};
+      for (final pregunta in mock) {
+        conteo[pregunta.materia] = (conteo[pregunta.materia] ?? 0) + 1;
+      }
+      return conteo;
+    }
+
+    try {
+      final categoriaNormalizada = _normalizar(categoria);
+      final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
+      String? materiaFiltrada;
+      if (_debeCategoriaActuarComoFiltroMateria(
+        categoriaNormalizada: categoriaNormalizada,
+        categoriaFiltraBanco: categoriaFiltraBanco,
+      )) {
+        materiaFiltrada = categoria;
+      }
+
+      final materiaIdsPermitidas = await _resolverMateriaIdsPermitidas(
+        materiaFiltrada,
+      );
+      if (materiaFiltrada != null &&
+          materiaFiltrada != 'Todas' &&
+          (materiaIdsPermitidas == null || materiaIdsPermitidas.isEmpty)) {
+        return const <String, int>{};
+      }
+
+      final bancoIds = await _resolverBancoIdsPorCategoria(categoria);
+      if (bancoIds != null && bancoIds.isEmpty) {
+        return const <String, int>{};
+      }
+
+      dynamic query = SupabaseService.client
+          .from('pregunta')
+          .select('materia_id')
+          .eq('activo', true);
+
+      if (bancoIds != null) {
+        query = query.inFilter('banco_id', bancoIds.toList());
+      }
+
+      if (materiaIdsPermitidas != null) {
+        query = query.inFilter('materia_id', materiaIdsPermitidas.toList());
+      }
+
+      const pageSize = 1000;
+      const maxPaginas = 80;
+      var offset = 0;
+      var paginasLeidas = 0;
+      final conteoPorMateriaId = <String, int>{};
+
+      while (true) {
+        final pageRaw = await query
+            .order('materia_id', ascending: true)
+            .range(offset, offset + pageSize - 1);
+
+        final page = (pageRaw as List<dynamic>).map(_toMap).toList();
+        if (page.isEmpty) break;
+
+        for (final row in page) {
+          final materiaId = row['materia_id']?.toString().trim() ?? '';
+          if (materiaId.isEmpty) continue;
+          conteoPorMateriaId[materiaId] =
+              (conteoPorMateriaId[materiaId] ?? 0) + 1;
+        }
+
+        paginasLeidas++;
+        if (page.length < pageSize || paginasLeidas >= maxPaginas) break;
+        offset += pageSize;
+      }
+
+      return _mapearConteoMateriaIdANombre(conteoPorMateriaId);
+    } catch (e) {
+      debugPrint('ServicioPreguntas.obtenerConteoPreguntasPorMateria error: $e');
+      return const <String, int>{};
+    }
   }
 
   Future<List<Pregunta>> obtenerPreguntasPorIds({
@@ -1311,6 +1489,48 @@ class ServicioPreguntas {
     ];
   }
 
+  Future<Map<String, int>> _contarPorMateriaDesdeIds(List<String> ids) async {
+    if (ids.isEmpty) return const <String, int>{};
+    if (!SupabaseService.isInitialized) return const <String, int>{};
+
+    final conteoPorMateriaId = <String, int>{};
+    for (final chunk in _chunkList(ids, 150)) {
+      final raw = await SupabaseService.client
+          .from('pregunta')
+          .select('id, materia_id')
+          .eq('activo', true)
+          .inFilter('id', chunk);
+
+      for (final item in (raw as List<dynamic>)) {
+        final row = _toMap(item);
+        final materiaId = row['materia_id']?.toString().trim() ?? '';
+        if (materiaId.isEmpty) continue;
+        conteoPorMateriaId[materiaId] = (conteoPorMateriaId[materiaId] ?? 0) + 1;
+      }
+    }
+
+    return _mapearConteoMateriaIdANombre(conteoPorMateriaId);
+  }
+
+  Future<Map<String, int>> _mapearConteoMateriaIdANombre(
+    Map<String, int> conteoPorMateriaId,
+  ) async {
+    if (conteoPorMateriaId.isEmpty) return const <String, int>{};
+    final materias = await _obtenerMateriasActivasCached();
+    final nombrePorId = <String, String>{
+      for (final m in materias)
+        (m['id']?.toString().trim() ?? ''): (m['nombre']?.toString().trim() ?? ''),
+    };
+
+    final conteoPorNombre = <String, int>{};
+    for (final entry in conteoPorMateriaId.entries) {
+      final nombre = nombrePorId[entry.key];
+      if (nombre == null || nombre.isEmpty) continue;
+      conteoPorNombre[nombre] = (conteoPorNombre[nombre] ?? 0) + entry.value;
+    }
+    return conteoPorNombre;
+  }
+
   Map<String, dynamic> _toMap(dynamic value) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
@@ -1394,3 +1614,4 @@ class ServicioPreguntas {
     return chunks;
   }
 }
+

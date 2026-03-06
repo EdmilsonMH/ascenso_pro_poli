@@ -9,6 +9,7 @@ import '../../servicios/servicio_preguntas.dart';
 import '../../servicios/servicio_progreso.dart';
 import '../../widgets/barra_superior.dart';
 import '../pantalla_login.dart';
+import '../pantalla_balotario_audio_materias.dart';
 import '../pantalla_perfil.dart';
 import '../pantalla_plan_tutor_ia_personal.dart';
 import '../pantalla_practica.dart';
@@ -43,6 +44,7 @@ class _PestanaInicioState extends State<PestanaInicio>
   StreamSubscription? _profileSubscription;
 
   String _codigoReferido = '';
+  String _gradoActual = '';
   int _metaDiariaMinutos = 30;
   bool _perfilCargado = false;
   bool _premiumActivo = false;
@@ -107,6 +109,65 @@ class _PestanaInicioState extends State<PestanaInicio>
     return 'No activa: ranking agotado.$detalle';
   }
 
+  String _normalizarTexto(String value) {
+    var text = value.toLowerCase().trim();
+    const reemplazos = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
+      'ñ': 'n',
+    };
+    reemplazos.forEach((origen, destino) {
+      text = text.replaceAll(origen, destino);
+    });
+    return text;
+  }
+
+  String _grupoPorGrado(String grado) {
+    final g = _normalizarTexto(grado);
+    if (g == 'so3' || g == 'so2' || g == 'so1') return 'Suboficiales';
+    if (g == 'sot3' || g == 'sot2' || g == 'sot1') {
+      return 'Suboficiales Tecnicos';
+    }
+    if (g == 'sob' || g == 'sos') return 'Suboficiales Superiores';
+    if (g == 'alferez' || g == 'teniente' || g == 'capitan') {
+      return 'Oficiales Subalternos';
+    }
+    if (g == 'mayor' || g == 'comandante' || g == 'coronel') {
+      return 'Oficiales Superiores';
+    }
+    if (g == 'general' || g == 'teniente general') {
+      return 'Oficiales Generales';
+    }
+    return '';
+  }
+
+  String _aliasNivelSuboficial(String grado) {
+    final g = _normalizarTexto(grado);
+    if (g == 'so3') return 'S3';
+    if (g == 'so2') return 'S2';
+    if (g == 'so1') return 'S1';
+    return grado.trim().toUpperCase();
+  }
+
+  String _construirTituloCabecera() {
+    final categoria = widget.categoriaUsuario.trim();
+    if (categoria.isEmpty) return 'CATEGORIA';
+    final categoriaUpper = categoria.toUpperCase();
+    final grado = _gradoActual.trim();
+    if (widget.esInvitado || grado.isEmpty) {
+      return categoriaUpper;
+    }
+
+    final nivel = _aliasNivelSuboficial(grado);
+    final grupo = _grupoPorGrado(grado);
+    if (grupo.isEmpty) return nivel.toUpperCase();
+    return '${nivel.toUpperCase()} (${grupo.toUpperCase()})';
+  }
+
   Future<void> _cargarDatosUsuario() async {
     if (widget.esInvitado) {
       await _servicioProgreso.obtenerEstadisticasPreguntas();
@@ -114,6 +175,7 @@ class _PestanaInicioState extends State<PestanaInicio>
       if (!mounted) return;
       setState(() {
         _codigoReferido = '';
+        _gradoActual = '';
         _metaDiariaMinutos = 30;
         _perfilCargado = true;
         _premiumActivo = false;
@@ -142,6 +204,7 @@ class _PestanaInicioState extends State<PestanaInicio>
       _codigoReferido = (perfil?['codigo_referido'] as String? ?? '')
           .trim()
           .toUpperCase();
+      _gradoActual = (perfil?['grado_actual'] as String? ?? '').trim();
       _metaDiariaMinutos = perfil?['meta_diaria_minutos'] as int? ?? 30;
       _premiumActivo = premiumActivo;
       _rankingPracticasUsadas = rankingUsadas;
@@ -302,6 +365,17 @@ class _PestanaInicioState extends State<PestanaInicio>
     _cargarDatosUsuario();
   }
 
+  Future<void> _abrirBalotarioAudio() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PantallaBalotarioAudioMaterias(
+          categoriaUsuario: widget.categoriaUsuario,
+        ),
+      ),
+    );
+  }
+
   void _copiarCodigoReferido() {
     if (_codigoReferido.isEmpty) return;
     Clipboard.setData(ClipboardData(text: _codigoReferido));
@@ -341,6 +415,13 @@ class _PestanaInicioState extends State<PestanaInicio>
         onTap: _abrirTutorIA,
       ),
       _TarjetaInicioItem(
+        titulo: 'Balotario en audio',
+        descripcion: 'Escucha el balotario mientras estudias.',
+        icono: Icons.headphones_rounded,
+        color: const Color(0xFF0F766E),
+        onTap: _abrirBalotarioAudio,
+      ),
+      _TarjetaInicioItem(
         titulo: 'Rutina diaria',
         descripcion: 'Cumple tu meta y sube nivel.',
         icono: Icons.play_circle_outline_rounded,
@@ -369,20 +450,22 @@ class _PestanaInicioState extends State<PestanaInicio>
     final colorPrimario = Theme.of(context).colorScheme.primary;
     final colorSecundario = Theme.of(context).colorScheme.secondary;
     final tarjetas = _tarjetasInicio();
-    final tituloCabecera = widget.categoriaUsuario.toUpperCase();
+    final tituloCabecera = _construirTituloCabecera();
     final subtituloCabecera = (!widget.esInvitado && _codigoReferido.isNotEmpty)
         ? 'CÓDIGO DE REFERIDO: $_codigoReferido'
         : 'CÓDIGO DE REFERIDO: SIN CÓDIGO';
 
+    final mostrarEstadoCuenta = widget.esInvitado || _esRegistradoNoActivo;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: const BarraSuperior(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -455,140 +538,163 @@ class _PestanaInicioState extends State<PestanaInicio>
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: widget.esInvitado
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _abrirLogin,
-                                icon: const Icon(Icons.login_rounded, size: 16),
-                                label: Text(
-                                  'Iniciar sesion',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
+            if (mostrarEstadoCuenta) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: widget.esInvitado
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _abrirLogin,
+                                  icon: const Icon(Icons.login_rounded, size: 16),
+                                  label: Text(
+                                    'Iniciar sesion',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF1D4ED8),
-                                  side: const BorderSide(
-                                    color: Color(0xFF93C5FD),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF1D4ED8),
+                                    side: const BorderSide(
+                                      color: Color(0xFF93C5FD),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _abrirRegistro,
-                                icon: const Icon(
-                                  Icons.person_add_alt_1_rounded,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  'Registrarse',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _abrirRegistro,
+                                  icon: const Icon(
+                                    Icons.person_add_alt_1_rounded,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    'Registrarse',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1D4ED8),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                 ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          const Icon(
+                            Icons.emoji_events_outlined,
+                            size: 16,
+                            color: Color(0xFF2563EB),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _mensajeEstadoCorto,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: const Color(0xFF1E3A8A),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (_esRegistradoNoActivo)
+                            SizedBox(
+                              height: 28,
+                              child: ElevatedButton(
+                                onPressed: _abrirActivacionCuenta,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF1D4ED8),
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
+                                    horizontal: 10,
                                   ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        const Icon(
-                          Icons.emoji_events_outlined,
-                          size: 16,
-                          color: Color(0xFF2563EB),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _mensajeEstadoCorto,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              color: const Color(0xFF1E3A8A),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (_esRegistradoNoActivo)
-                          SizedBox(
-                            height: 28,
-                            child: ElevatedButton(
-                              onPressed: _abrirActivacionCuenta,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1D4ED8),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Text(
-                                'Activar',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                                child: Text(
+                                  'Activar',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-            ),
-            const SizedBox(height: 8),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              itemCount: tarjetas.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1.22,
+                        ],
+                      ),
               ),
-              itemBuilder: (context, index) {
-                return _TarjetaInicioCuadricula(item: tarjetas[index]);
-              },
+            ],
+            const SizedBox(height: 6),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, gridConstraints) {
+                  const crossAxisCount = 2;
+                  const mainAxisSpacing = 8.0;
+                  const crossAxisSpacing = 8.0;
+                  final rows = (tarjetas.length / crossAxisCount).ceil();
+                  final itemWidth =
+                      (gridConstraints.maxWidth -
+                          (crossAxisCount - 1) * crossAxisSpacing) /
+                      crossAxisCount;
+                  final itemHeight =
+                      (gridConstraints.maxHeight -
+                          (rows - 1) * mainAxisSpacing) /
+                      rows;
+                  final ratio = (itemHeight > 0)
+                      ? (itemWidth / itemHeight)
+                      : 1.4;
+
+                  return GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: tarjetas.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      mainAxisSpacing: mainAxisSpacing,
+                      crossAxisSpacing: crossAxisSpacing,
+                      childAspectRatio: ratio,
+                    ),
+                    itemBuilder: (context, index) {
+                      return _TarjetaInicioCuadricula(item: tarjetas[index]);
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -636,38 +742,25 @@ class _TarjetaInicioCuadricula extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: item.color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(item.icono, color: item.color, size: 22),
+                child: Icon(item.icono, color: item.color, size: 20),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 7),
               Text(
                 item.titulo.toUpperCase(),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                  fontSize: 11.5,
+                  fontSize: 11.2,
                   fontWeight: FontWeight.w800,
-                  height: 1.1,
+                  height: 1.15,
                   color: const Color(0xFF111827),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.descripcion,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  height: 1.2,
-                  color: const Color(0xFF6B7280),
                 ),
               ),
             ],

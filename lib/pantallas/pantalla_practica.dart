@@ -66,7 +66,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
       !widget.esRanking &&
       widget.revisarRespuestaInmediata;
   bool get _sinLimiteTiempo =>
-      _practicaConRevisarInmediato && !widget.registrarSesionEnHistorial;
+      _practicaConRevisarInmediato;
 
   // Estado para Modo PrÃƒÂ¡ctica RÃƒÂ¡pida (Feedback inmediato)
   int? _indiceOpcionSeleccionadaPractica;

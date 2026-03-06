@@ -35,7 +35,10 @@ class _PantallaPracticaGuiadaConfigState
   List<String> _todasLasMateriasDisponibles = [];
   List<String> _materiasSeleccionadas = [];
   String? _materiaActiva;
-  List<Pregunta> _preguntasTotalesCache = [];
+  Map<String, int> _conteoPreguntasPorMateria = {};
+  final Map<String, List<String>> _idsCandidatosCachePorMateria = {};
+  List<String>? _idsCandidatosCacheTodasMaterias;
+  bool _iniciandoPractica = false;
   List<_PreguntaConFallos> _preguntasFalladasOrdenadas = [];
   bool _bancoFalladasCargado = false;
   bool _cargandoBancoFalladas = false;
@@ -61,29 +64,50 @@ class _PantallaPracticaGuiadaConfigState
   }
 
   Future<void> _cargarDatos() async {
-    final preguntas = await _servicioPreguntas.obtenerTodas(
-      categoria: widget.categoriaUsuario,
-    );
+    try {
+      final conteoPorMateria = await _servicioPreguntas
+          .obtenerConteoPreguntasPorMateria(categoria: widget.categoriaUsuario);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _preguntasTotalesCache = preguntas;
-      _todasLasMateriasDisponibles =
-          preguntas.map((p) => p.materia).toSet().toList()
+      final materiasDisponibles =
+          conteoPorMateria.entries
+              .where((entry) => entry.value > 0)
+              .map((entry) => entry.key)
+              .toList()
             ..sort((a, b) => a.compareTo(b));
-      _materiasSeleccionadas = List.from(_todasLasMateriasDisponibles);
-      _materiaActiva = null;
-      _cargando = false;
-    });
 
-    _actualizarPreguntasDisponibles();
+      setState(() {
+        _conteoPreguntasPorMateria = conteoPorMateria;
+        _todasLasMateriasDisponibles = materiasDisponibles;
+        _materiasSeleccionadas = List.from(_todasLasMateriasDisponibles);
+        _materiaActiva = null;
+        _idsCandidatosCachePorMateria.clear();
+        _idsCandidatosCacheTodasMaterias = null;
+        _cargando = false;
+      });
+
+      _actualizarPreguntasDisponibles();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _conteoPreguntasPorMateria = {};
+        _todasLasMateriasDisponibles = [];
+        _materiasSeleccionadas = [];
+        _materiaActiva = null;
+        _idsCandidatosCachePorMateria.clear();
+        _idsCandidatosCacheTodasMaterias = null;
+        _cargando = false;
+      });
+    }
   }
 
   void _actualizarPreguntasDisponibles() {
-    final disponibles = _preguntasTotalesCache
-        .where((p) => _materiasSeleccionadas.contains(p.materia))
-        .length;
+    final disponibles = _materiasSeleccionadas.fold<int>(
+      0,
+      (acumulado, materia) =>
+          acumulado + (_conteoPreguntasPorMateria[materia] ?? 0),
+    );
 
     var cantidadAjustada = _cantidadPreguntas;
     if (cantidadAjustada > disponibles) {
@@ -122,6 +146,14 @@ class _PantallaPracticaGuiadaConfigState
     _actualizarPreguntasDisponibles();
   }
 
+  Future<bool> _manejarRetrocesoSistema() async {
+    if (!_enVistaMaterias) {
+      _volverAMaterias();
+      return false;
+    }
+    return true;
+  }
+
   int _obtenerPrioridadFallo(EstadisticaPregunta? estadistica) {
     if (estadistica == null) return 0;
     // Regla: al completar 3 aciertos seguidos, contadores visibles vuelven a 0.
@@ -129,34 +161,60 @@ class _PantallaPracticaGuiadaConfigState
     return estadistica.fallosVisibles;
   }
 
-  Future<List<Pregunta>> _ordenarPorFallasActuales(
-    List<Pregunta> preguntas,
+  Future<List<String>> _ordenarIdsPorFallasActuales(
+    List<String> idsCandidatos,
   ) async {
-    if (preguntas.length <= 1) return List<Pregunta>.from(preguntas);
+    if (idsCandidatos.length <= 1) return List<String>.from(idsCandidatos);
 
     try {
       final estadisticas = await _servicioProgreso.obtenerEstadisticasPreguntas(
-        preguntaIds: preguntas.map((p) => p.id).toList(),
+        preguntaIds: idsCandidatos,
       );
 
-      final ordenadas = List<Pregunta>.from(preguntas);
+      final ordenadas = List<String>.from(idsCandidatos);
       ordenadas.sort((a, b) {
-        final prioridadA = _obtenerPrioridadFallo(estadisticas[a.id]);
-        final prioridadB = _obtenerPrioridadFallo(estadisticas[b.id]);
+        final prioridadA = _obtenerPrioridadFallo(estadisticas[a]);
+        final prioridadB = _obtenerPrioridadFallo(estadisticas[b]);
         final porPrioridad = prioridadB.compareTo(prioridadA);
         if (porPrioridad != 0) return porPrioridad;
-        return a.numero.compareTo(b.numero);
+        return a.compareTo(b);
       });
       return ordenadas;
     } catch (_) {
-      final fallback = List<Pregunta>.from(preguntas);
-      fallback.sort((a, b) => a.numero.compareTo(b.numero));
+      final fallback = List<String>.from(idsCandidatos);
+      fallback.sort((a, b) => a.compareTo(b));
       return fallback;
     }
   }
 
+  Future<List<String>> _obtenerIdsCandidatosSeleccionActual() async {
+    final materiaActiva = _materiaActiva;
+    if (materiaActiva == null) return const <String>[];
+
+    if (materiaActiva == _opcionTodasMaterias) {
+      final cache = _idsCandidatosCacheTodasMaterias;
+      if (cache != null) return cache;
+
+      final ids = await _servicioPreguntas.obtenerIdsDisponibles(
+        categoria: widget.categoriaUsuario,
+      );
+      _idsCandidatosCacheTodasMaterias = ids;
+      return ids;
+    }
+
+    final cacheMateria = _idsCandidatosCachePorMateria[materiaActiva];
+    if (cacheMateria != null) return cacheMateria;
+
+    final ids = await _servicioPreguntas.obtenerIdsDisponibles(
+      categoria: widget.categoriaUsuario,
+      materia: materiaActiva,
+    );
+    _idsCandidatosCachePorMateria[materiaActiva] = ids;
+    return ids;
+  }
+
   Future<void> _iniciarPracticaGuiada() async {
-    if (!_puedeIniciar) return;
+    if (!_puedeIniciar || _iniciandoPractica) return;
 
     if (_materiaActiva == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -189,30 +247,71 @@ class _PantallaPracticaGuiadaConfigState
       return;
     }
 
-    final candidatas = _preguntasTotalesCache
-        .where((p) => _materiasSeleccionadas.contains(p.materia))
-        .toList();
+    setState(() {
+      _iniciandoPractica = true;
+    });
 
-    final ordenadas = await _ordenarPorFallasActuales(candidatas);
-    var n = cantidadFinal;
-    if (n > ordenadas.length) n = ordenadas.length;
+    try {
+      final idsCandidatos = await _obtenerIdsCandidatosSeleccionActual();
+      if (idsCandidatos.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No hay preguntas disponibles para la selección actual.'),
+          ),
+        );
+        return;
+      }
 
-    final seleccionadas = ordenadas.take(n).toList();
-    if (!mounted) return;
+      final ordenadas = await _ordenarIdsPorFallasActuales(idsCandidatos);
+      var n = cantidadFinal;
+      if (n > ordenadas.length) n = ordenadas.length;
+      if (n <= 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No hay preguntas disponibles para iniciar la práctica.'),
+          ),
+        );
+        return;
+      }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PantallaPractica(
-          preguntas: seleccionadas,
-          tiempoLimiteSegundos: null,
-          esModoPractica: true,
-          esRanking: false,
-          revisarRespuestaInmediata: true,
-          registrarSesionEnHistorial: false,
+      final idsSeleccionadas = ordenadas.take(n).toList();
+      final seleccionadas = await _servicioPreguntas.obtenerPreguntasPorIds(
+        ids: idsSeleccionadas,
+        categoria: widget.categoriaUsuario,
+        materia: _materiaActiva == _opcionTodasMaterias ? null : _materiaActiva,
+      );
+      if (!mounted) return;
+      if (seleccionadas.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudieron cargar las preguntas de la práctica.'),
+          ),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PantallaPractica(
+            preguntas: seleccionadas,
+            tiempoLimiteSegundos: null,
+            esModoPractica: true,
+            esRanking: false,
+            revisarRespuestaInmediata: true,
+            registrarSesionEnHistorial: false,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _iniciandoPractica = false;
+        });
+      }
+    }
   }
 
   Future<void> _cargarBancoFalladas() async {
@@ -721,26 +820,24 @@ class _PantallaPracticaGuiadaConfigState
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F6FC),
-      appBar: const BarraSuperior(),
-      body: _enVistaMaterias
-          ? _buildVistaMaterias()
-          : _buildVistaConfiguracionMateria(),
+    return WillPopScope(
+      onWillPop: _manejarRetrocesoSistema,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF3F6FC),
+        appBar: const BarraSuperior(),
+        body: _enVistaMaterias
+            ? _buildVistaMaterias()
+            : _buildVistaConfiguracionMateria(),
+      ),
     );
   }
 
-  Map<String, int> _contarPreguntasPorMateria() {
-    final conteo = <String, int>{};
-    for (final pregunta in _preguntasTotalesCache) {
-      conteo[pregunta.materia] = (conteo[pregunta.materia] ?? 0) + 1;
-    }
-    return conteo;
-  }
-
   Widget _buildVistaMaterias() {
-    final conteoPorMateria = _contarPreguntasPorMateria();
-    final totalGeneral = _preguntasTotalesCache.length;
+    final conteoPorMateria = _conteoPreguntasPorMateria;
+    final totalGeneral = conteoPorMateria.values.fold<int>(
+      0,
+      (acumulado, total) => acumulado + total,
+    );
 
     return ListView(
       padding: EdgeInsets.fromLTRB(
@@ -753,7 +850,7 @@ class _PantallaPracticaGuiadaConfigState
         _buildTarjetaPreguntasFalladas(),
         const SizedBox(height: 16),
         Text(
-          'Elige una materia para practica guiada',
+          'Elige una materia para práctica guiada',
           style: GoogleFonts.inter(
             fontSize: 18,
             fontWeight: FontWeight.w800,
@@ -762,7 +859,7 @@ class _PantallaPracticaGuiadaConfigState
         ),
         const SizedBox(height: 6),
         Text(
-          'Selecciona una materia o todas, luego define cuantas preguntas practicar.',
+          'Selecciona una materia o todas, luego define cuántas preguntas practicar.',
           style: GoogleFonts.inter(
             fontSize: 13,
             color: const Color(0xFF64748B),
@@ -1173,7 +1270,7 @@ class _PantallaPracticaGuiadaConfigState
               onPressed: _volverAMaterias,
               icon: const Icon(Icons.swap_horiz_rounded, size: 18),
               label: Text(
-                'Cambiar seleccion',
+                'Cambiar selección',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600),
               ),
               style: TextButton.styleFrom(
@@ -1293,7 +1390,8 @@ class _PantallaPracticaGuiadaConfigState
   }
 
   Widget _buildBotonPrincipal() {
-    final fondoGradiente = _puedeIniciar
+    final puedeAccionar = _puedeIniciar && !_iniciandoPractica;
+    final fondoGradiente = puedeAccionar
         ? const [Color(0xFF0F172A), Color(0xFF1E293B)]
         : const [Color(0xFF94A3B8), Color(0xFF94A3B8)];
 
@@ -1308,7 +1406,7 @@ class _PantallaPracticaGuiadaConfigState
               colors: fondoGradiente,
             ),
             borderRadius: BorderRadius.circular(14),
-            boxShadow: _puedeIniciar
+            boxShadow: puedeAccionar
                 ? const [
                     BoxShadow(
                       color: Color(0x260F172A),
@@ -1319,7 +1417,7 @@ class _PantallaPracticaGuiadaConfigState
                 : const [],
           ),
           child: ElevatedButton(
-            onPressed: _puedeIniciar ? _iniciarPracticaGuiada : null,
+            onPressed: puedeAccionar ? _iniciarPracticaGuiada : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               disabledBackgroundColor: Colors.transparent,
@@ -1334,10 +1432,22 @@ class _PantallaPracticaGuiadaConfigState
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.play_arrow_rounded, size: 22),
+                if (_iniciandoPractica)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                else
+                  const Icon(Icons.play_arrow_rounded, size: 22),
                 const SizedBox(width: 8),
                 Text(
-                  'Comenzar práctica guiada',
+                  _iniciandoPractica
+                      ? 'Preparando práctica guiada...'
+                      : 'Comenzar práctica guiada',
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -1348,7 +1458,7 @@ class _PantallaPracticaGuiadaConfigState
             ),
           ),
         ),
-        if (!_puedeIniciar)
+        if (!_puedeIniciar && !_iniciandoPractica)
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(

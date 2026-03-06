@@ -702,9 +702,9 @@ class _PantallaPreguntasIncorrectasState
                                       indiceSeleccionadoIncorrecto:
                                           intento.indiceIncorrectoSeleccionado,
                                       aciertosCount:
-                                          estadistica?.aciertosVisibles ?? 0,
+                                          estadistica?.totalAciertos ?? 0,
                                       fallosCount:
-                                          estadistica?.fallosVisibles ?? 0,
+                                          estadistica?.totalFallos ?? 0,
                                     );
                                   },
                                 ),

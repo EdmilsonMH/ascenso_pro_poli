@@ -210,6 +210,10 @@ class TutorInsightCard {
   final int? cantidadPractica;
   final int? tiempoPractica;
   final String? materia;
+  final List<String> preguntaIds;
+  final List<String> preguntasNuevasIds;
+  final List<String> preguntasRepasoIds;
+  final List<String> materiasPrioritariasIds;
   final List<TutorRiskItem> riesgos;
 
   const TutorInsightCard({
@@ -225,6 +229,10 @@ class TutorInsightCard {
     this.cantidadPractica,
     this.tiempoPractica,
     this.materia,
+    this.preguntaIds = const <String>[],
+    this.preguntasNuevasIds = const <String>[],
+    this.preguntasRepasoIds = const <String>[],
+    this.materiasPrioritariasIds = const <String>[],
     this.riesgos = const <TutorRiskItem>[],
   });
 
@@ -234,6 +242,14 @@ class TutorInsightCard {
       if (value is num) return value.toInt();
       if (value is String) return int.tryParse(value);
       return null;
+    }
+
+    List<String> toStringList(dynamic value) {
+      if (value is! List) return const <String>[];
+      return value
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
 
     final riesgosRaw = map['riesgos'];
@@ -257,6 +273,10 @@ class TutorInsightCard {
       cantidadPractica: toOptionalInt(map['cantidad_practica']),
       tiempoPractica: toOptionalInt(map['tiempo_practica']),
       materia: map['materia']?.toString(),
+      preguntaIds: toStringList(map['pregunta_ids']),
+      preguntasNuevasIds: toStringList(map['preguntas_nuevas_ids']),
+      preguntasRepasoIds: toStringList(map['preguntas_repaso_ids']),
+      materiasPrioritariasIds: toStringList(map['materias_prioritarias_ids']),
       riesgos: riesgos,
     );
   }
@@ -275,6 +295,13 @@ class TutorInsightCard {
       if (cantidadPractica != null) 'cantidad_practica': cantidadPractica,
       if (tiempoPractica != null) 'tiempo_practica': tiempoPractica,
       if (materia != null && materia!.trim().isNotEmpty) 'materia': materia,
+      if (preguntaIds.isNotEmpty) 'pregunta_ids': preguntaIds,
+      if (preguntasNuevasIds.isNotEmpty)
+        'preguntas_nuevas_ids': preguntasNuevasIds,
+      if (preguntasRepasoIds.isNotEmpty)
+        'preguntas_repaso_ids': preguntasRepasoIds,
+      if (materiasPrioritariasIds.isNotEmpty)
+        'materias_prioritarias_ids': materiasPrioritariasIds,
       'riesgos': riesgos.map((e) => e.toMap()).toList(),
     };
   }

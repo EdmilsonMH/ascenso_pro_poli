@@ -44,8 +44,8 @@ class PantallaRevisionPractica extends StatelessWidget {
           preguntas: preguntasPractica,
           esModoPractica: true,
           esRanking: false,
-          avanzarSoloConBotonEnPractica: true,
-          tiempoLimiteSegundos: preguntasPractica.length * 72,
+          revisarRespuestaInmediata: true,
+          tiempoLimiteSegundos: null,
         ),
       ),
     );
@@ -57,10 +57,9 @@ class PantallaRevisionPractica extends StatelessWidget {
         !esCorrectas &&
         mostrarBotonPracticarFallos &&
         (intentosFallidos?.isNotEmpty ?? false);
-    final double paddingInferiorContenido =
-        mostrarBotonPracticar
-            ? 120 + MediaQuery.of(context).padding.bottom
-            : 24;
+    final double paddingInferiorContenido = mostrarBotonPracticar
+        ? 120 + MediaQuery.of(context).padding.bottom
+        : 24;
 
     final Color colorPrincipal = esCorrectas
         ? const Color(0xFF10B981) // Verde
@@ -264,14 +263,14 @@ class _PreguntaReviewCard extends StatelessWidget {
               if (estadistica != null) ...[
                 const SizedBox(width: 8),
                 _BadgeContador(
-                  valor: estadistica!.aciertosVisibles,
+                  valor: estadistica!.totalAciertos,
                   icono: Icons.check_circle_outline,
                   colorFondo: const Color(0xFFDCFCE7),
                   colorTexto: const Color(0xFF15803D),
                 ),
                 const SizedBox(width: 4),
                 _BadgeContador(
-                  valor: estadistica!.fallosVisibles,
+                  valor: estadistica!.totalFallos,
                   icono: Icons.cancel_outlined,
                   colorFondo: const Color(0xFFFEE2E2),
                   colorTexto: const Color(0xFFB91C1C),
@@ -457,14 +456,14 @@ class _PreguntaErrorCard extends StatelessWidget {
               if (estadistica != null) ...[
                 const SizedBox(width: 8),
                 _BadgeContador(
-                  valor: estadistica!.aciertosVisibles,
+                  valor: estadistica!.totalAciertos,
                   icono: Icons.check_circle_outline,
                   colorFondo: const Color(0xFFDCFCE7),
                   colorTexto: const Color(0xFF15803D),
                 ),
                 const SizedBox(width: 4),
                 _BadgeContador(
-                  valor: estadistica!.fallosVisibles,
+                  valor: estadistica!.totalFallos,
                   icono: Icons.cancel_outlined,
                   colorFondo: const Color(0xFFFEE2E2),
                   colorTexto: const Color(0xFFB91C1C),

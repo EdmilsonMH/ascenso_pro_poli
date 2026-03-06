@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../modelos/modelo_pregunta.dart' show IntentoFallido;
@@ -199,7 +199,6 @@ class _PestanaHistorialState extends State<PestanaHistorial> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: const BarraSuperior(),
@@ -210,246 +209,241 @@ class _PestanaHistorialState extends State<PestanaHistorial> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-                    // Title Header
-                    Center(
-                      child: Column(
-                        children: [
-                          Text(
-                            'Historial de Prácticas',
-                            style: GoogleFonts.inter(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.black87,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Revisa tu progreso y evolución',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
+              // Title Header
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      'Historial de Prácticas',
+                      style: GoogleFonts.inter(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black87,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    // Info Banner
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            color: Color(0xFF3B82F6),
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: widget.esInvitado
-                                ? Text(
-                                    'Las prácticas se dividen en Para Ranking y De Práctica. ¿Quieres ver tu historial completo y comparar tu posición en el Ranking? Regístrate ahora para desbloquear.',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: const Color(0xFF1E3A8A),
-                                      height: 1.4,
-                                    ),
-                                  )
-                                : RichText(
-                                    text: TextSpan(
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        color: const Color(0xFF1E3A8A),
-                                        height: 1.4,
-                                      ),
-                                      children: const [
-                                        TextSpan(
-                                          text:
-                                              'Las prácticas se dividen en dos tipos: ',
-                                        ),
-                                        TextSpan(
-                                          text: 'Para Ranking',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text:
-                                              ' (100 preguntas con todas las materias) y ',
-                                        ),
-                                        TextSpan(
-                                          text: 'De Práctica',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text:
-                                              ' (prácticas personalizadas). Ambas ayudan a tu aprendizaje, pero solo las primeras cuentan para el ranking.',
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                          ),
-                        ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Revisa tu progreso y evolución',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Filter Tabs
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _cambiarFiltro(0),
-                              child: _TabFiltro(
-                                texto:
-                                    'Todas (${_estadisticasGlobales.totalPracticas})',
-                                activo: _filtroSeleccionado == 0,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _cambiarFiltro(1),
-                              child: _TabFiltro(
-                                texto:
-                                    'Ranking (${_estadisticasGlobales.practicasRanking})',
-                                activo: _filtroSeleccionado == 1,
-                                icono: Icons.emoji_events_outlined,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _cambiarFiltro(2),
-                              child: _TabFiltro(
-                                texto:
-                                    'Práctica (${_estadisticasGlobales.practicasPersonalizadas})',
-                                activo: _filtroSeleccionado == 2,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Info Banner
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Color(0xFF3B82F6),
+                      size: 24,
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Stats Cards (orden 1)
-                    _TarjetaEstadistica(
-                      titulo: 'Total de Prácticas',
-                      valor: '${_estadisticas.totalPracticas}',
-                    ),
-                    const SizedBox(height: 16),
-                    _TarjetaEstadistica(
-                      titulo: 'Promedio General',
-                      valor:
-                          '${_estadisticas.promedioGeneral.toStringAsFixed(1)}%',
-                    ),
-                    const SizedBox(height: 16),
-                    _TarjetaEstadistica(
-                      titulo: 'Mejor Puntaje',
-                      valor:
-                          '${_estadisticas.mejorPuntaje.toStringAsFixed(1)}%',
-                      colorValor: const Color(0xFF10B981),
-                    ),
-                    const SizedBox(height: 16),
-                    _TarjetaEstadistica(
-                      titulo: 'Aprobadas',
-                      valor:
-                          '${_estadisticas.aprobadas}/${_estadisticas.totalSesiones}',
-                      colorValor: const Color(0xFF3B82F6),
-                    ),
-
-                    const SizedBox(height: 24),
-
-
-                    // Dynamic Content (List or Empty Message)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade200),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _tituloSeccion,
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _descripcionSeccion,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          if (_cargandoSeccion)
-                            const Center(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 24),
-                                child: CircularProgressIndicator(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: widget.esInvitado
+                          ? Text(
+                              'Las prácticas se dividen en Para Ranking y De Práctica. ¿Quieres ver tu historial completo y comparar tu posición en el Ranking? Regístrate ahora para desbloquear.',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: const Color(0xFF1E3A8A),
+                                height: 1.4,
                               ),
                             )
-                          else if (_sesiones.isEmpty)
-                            Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 24,
+                          : RichText(
+                              text: TextSpan(
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF1E3A8A),
+                                  height: 1.4,
                                 ),
-                                child: Text(
-                                  'No hay prácticas registradas',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade500,
+                                children: const [
+                                  TextSpan(
+                                    text:
+                                        'Las prácticas se dividen en dos tipos: ',
                                   ),
-                                ),
-                              ),
-                            )
-                          else
-                            ..._sesiones.map(
-                              (s) => _ItemSesion(
-                                sesion: s,
-                                onTap: widget.esInvitado
-                                    ? null
-                                    : () => _abrirRevisionFallosSesion(s),
+                                  TextSpan(
+                                    text: 'Para Ranking',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        ' (100 preguntas con todas las materias) y ',
+                                  ),
+                                  TextSpan(
+                                    text: 'De Práctica',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        ' (prácticas personalizadas). Ambas ayudan a tu aprendizaje, pero solo las primeras cuentan para el ranking.',
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Filter Tabs
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _cambiarFiltro(0),
+                        child: _TabFiltro(
+                          texto:
+                              'Todas (${_estadisticasGlobales.totalPracticas})',
+                          activo: _filtroSeleccionado == 0,
+                        ),
                       ),
                     ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _cambiarFiltro(1),
+                        child: _TabFiltro(
+                          texto:
+                              'Ranking (${_estadisticasGlobales.practicasRanking})',
+                          activo: _filtroSeleccionado == 1,
+                          icono: Icons.emoji_events_outlined,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _cambiarFiltro(2),
+                        child: _TabFiltro(
+                          texto:
+                              'Práctica (${_estadisticasGlobales.practicasPersonalizadas})',
+                          activo: _filtroSeleccionado == 2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Stats Cards (orden 1)
+              _TarjetaEstadistica(
+                titulo: 'Total de Prácticas',
+                valor: '${_estadisticas.totalPracticas}',
+              ),
+              const SizedBox(height: 16),
+              _TarjetaEstadistica(
+                titulo: 'Promedio General',
+                valor: '${_estadisticas.promedioGeneral.toStringAsFixed(1)}%',
+              ),
+              const SizedBox(height: 16),
+              _TarjetaEstadistica(
+                titulo: 'Mejor Puntaje',
+                valor: '${_estadisticas.mejorPuntaje.toStringAsFixed(1)}%',
+                colorValor: const Color(0xFF10B981),
+              ),
+              const SizedBox(height: 16),
+              _TarjetaEstadistica(
+                titulo: 'Aprobadas',
+                valor:
+                    '${_estadisticas.aprobadas}/${_estadisticas.totalSesiones}',
+                colorValor: const Color(0xFF3B82F6),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Dynamic Content (List or Empty Message)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _tituloSeccion,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _descripcionSeccion,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (_cargandoSeccion)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_sesiones.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Text(
+                            'No hay prácticas registradas',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      ..._sesiones.map(
+                        (s) => _ItemSesion(
+                          sesion: s,
+                          onTap: widget.esInvitado
+                              ? null
+                              : () => _abrirRevisionFallosSesion(s),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -510,7 +504,10 @@ class _ItemSesion extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           '${porcentaje.toStringAsFixed(1)}%',
@@ -571,6 +568,51 @@ class _ItemSesion extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: onTap != null ? 1 : 0.55,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: onTap != null
+                        ? const Color(0xFFEFF6FF)
+                        : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: onTap != null
+                          ? const Color(0xFFBFDBFE)
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Ver',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: onTap != null
+                              ? const Color(0xFF2563EB)
+                              : Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 11,
+                        color: onTap != null
+                            ? const Color(0xFF2563EB)
+                            : Colors.grey.shade500,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -683,4 +725,3 @@ class _TabFiltro extends StatelessWidget {
     );
   }
 }
-

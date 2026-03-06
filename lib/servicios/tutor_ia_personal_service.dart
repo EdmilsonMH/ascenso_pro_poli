@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -260,19 +260,13 @@ class TutorIAPersonalService {
       );
       final queEstudiar = await obtenerResumenQueEstudiarEstructurado(
         userId: usuario,
-      );
-      final ultimaSesion = await obtenerResumenUltimaSesionEstructurado(
-        userId: usuario,
+        perfilUsuario: perfilUsuario,
       );
       final velocidad = await obtenerAnalisisVelocidadEstructurado(
         userId: usuario,
       );
       final riesgos = await obtenerMateriasRiesgoEstructurado(userId: usuario);
       final olvido = await obtenerPrediccionOlvidoEstructurado(userId: usuario);
-      final motivacion = construirMensajeMotivacionalEstructurado(
-        progreso: progreso,
-        probabilidad: probabilidad,
-      );
 
       final preguntasObjetivo = _resolverPreguntasObjetivo(
         metaHoy: metaHoy,
@@ -358,9 +352,7 @@ class TutorIAPersonalService {
           riesgos,
           velocidad,
           proyeccionTiempo,
-          ultimaSesion,
           olvido,
-          motivacion,
         ],
         'atajos_chat': _atajosTutorInicio(),
       };
@@ -394,12 +386,10 @@ class TutorIAPersonalService {
     }
 
     final params = <String, dynamic>{'p_usuario_id': userId};
-    final plan =
-        planBase ??
-        await _rpcComoMapa(
-          functionName: 'fn_generar_plan_adaptativo',
-          params: params,
-        );
+    final plan = await _obtenerPlanAdaptativoSeguro(
+      userId: userId,
+      planBase: planBase,
+    );
     final progreso =
         progresoBase ??
         await _rpcComoMapa(
@@ -427,6 +417,17 @@ class TutorIAPersonalService {
     final total = _toInt(plan['total_preguntas_dia']);
     final nuevas = _toInt(plan['cantidad_nuevas']);
     final repaso = _toInt(plan['cantidad_repaso']);
+    final nuevasIds = _toStringList(plan['preguntas_nuevas']);
+    final repasoIds = _toStringList(plan['preguntas_repaso']);
+    final prioritariasRpc = _toStringList(plan['pregunta_ids_prioritarias']);
+    final prioritarias = _mergeIdsPreservandoOrden([
+      if (prioritariasRpc.isNotEmpty) prioritariasRpc,
+      repasoIds,
+      nuevasIds,
+    ]);
+    final materiasPrioritariasIds = _toStringList(
+      plan['materias_prioritarias'],
+    );
     final diasRestantes = _toInt(plan['dias_restantes']);
     final faltantes = _toInt(plan['preguntas_faltantes']);
     final prob = _toDouble(probabilidad?['probabilidad_aprobacion']) ?? 0;
@@ -447,11 +448,16 @@ class TutorIAPersonalService {
       'expandable': true,
       'cantidad_practica': total > 0 ? total : 20,
       'tiempo_practica': _minutosSugeridosDesdePlan(total),
+      'pregunta_ids': prioritarias,
+      'preguntas_nuevas_ids': nuevasIds,
+      'preguntas_repaso_ids': repasoIds,
+      'materias_prioritarias_ids': materiasPrioritariasIds,
     };
   }
 
   Future<Map<String, dynamic>> obtenerResumenQueEstudiarEstructurado({
     required String userId,
+    Map<String, dynamic>? perfilUsuario,
   }) async {
     if (_sesionInvalida(userId)) {
       return _cardFallback(
@@ -468,13 +474,17 @@ class TutorIAPersonalService {
       final List<dynamic> raw = await _supabase
           .from('dominio_materia')
           .select(
-            'tasa_dominio, dominio_hace_7_dias, tiempo_recomendado_minutos, temas_debiles, materia:materia_id(nombre)',
+            'tasa_dominio, dominio_hace_7_dias, tiempo_recomendado_minutos, temas_debiles, materia:materia_id(id, nombre, categoria)',
           )
           .eq('usuario_id', userId)
-          .order('tasa_dominio', ascending: true)
-          .limit(1);
+          .order('tasa_dominio', ascending: true);
 
-      if (raw.isEmpty || raw.first is! Map) {
+      final rows = raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      if (rows.isEmpty) {
         return _cardFallback(
           id: 'materia_prioritaria',
           titulo: 'Materia Prioritaria',
@@ -485,7 +495,36 @@ class TutorIAPersonalService {
         );
       }
 
-      final row = Map<String, dynamic>.from(raw.first as Map);
+      final especialidadRaw = (perfilUsuario?['especialidad'] ?? '').toString();
+      final especialidad = especialidadRaw.trim();
+      final especialidadNormalizada = _normalizarTextoEspecialidad(
+        especialidad,
+      );
+      final keywordsEspecialidad = _palabrasClaveEspecialidad(especialidad);
+
+      List<Map<String, dynamic>> candidatas = rows;
+      var filtroEspecialidadAplicado = false;
+      if (especialidadNormalizada.isNotEmpty) {
+        final filtradas = rows.where((row) {
+          return _esMateriaRelacionadaAEspecialidad(
+            row: row,
+            especialidadNormalizada: especialidadNormalizada,
+            keywordsEspecialidad: keywordsEspecialidad,
+          );
+        }).toList();
+        if (filtradas.isNotEmpty) {
+          candidatas = filtradas;
+          filtroEspecialidadAplicado = true;
+        }
+      }
+
+      candidatas.sort((a, b) {
+        final tasaA = _toDouble(a['tasa_dominio']) ?? 100.0;
+        final tasaB = _toDouble(b['tasa_dominio']) ?? 100.0;
+        return tasaA.compareTo(tasaB);
+      });
+
+      final row = candidatas.first;
       final materia = _asMap(row['materia']);
       final nombre = (materia['nombre'] ?? 'Materia').toString();
       final tasa = _toDouble(row['tasa_dominio']) ?? 0;
@@ -496,13 +535,23 @@ class TutorIAPersonalService {
           : (delta < -1.5 ? 'empeorando' : 'estable');
       final tiempo = _toInt(row['tiempo_recomendado_minutos']);
       final temas = _toStringList(row['temas_debiles']);
+      final resumenCard = filtroEspecialidadAplicado
+          ? 'Especialidad $especialidad: $nombre (${tasa.toStringAsFixed(1)}%) es tu foco de hoy.'
+          : (especialidad.isNotEmpty
+                ? 'Especialidad $especialidad: refuerzo transversal en $nombre (${tasa.toStringAsFixed(1)}%).'
+                : '$nombre (${tasa.toStringAsFixed(1)}%) es tu foco de hoy.');
+      final prefijoDetalle = filtroEspecialidadAplicado
+          ? 'Materias de especialidad detectadas para tu perfil. '
+          : (especialidad.isNotEmpty
+                ? 'No hubo cruce exacto por nombre; se priorizo la materia con menor dominio dentro de tu banco. '
+                : '');
 
       return {
         'id': 'materia_prioritaria',
         'titulo': 'Materia Prioritaria',
-        'resumen': '$nombre (${tasa.toStringAsFixed(1)}%) es tu foco de hoy.',
+        'resumen': resumenCard,
         'detalle':
-            'Tendencia: $tendencia. Tiempo sugerido: ${tiempo > 0 ? tiempo : 25} minutos. Temas: ${temas.isEmpty ? 'sin detalle' : temas.take(3).join(', ')}.',
+            '${prefijoDetalle}Tendencia: $tendencia. Tiempo sugerido: ${tiempo > 0 ? tiempo : 25} minutos. Temas: ${temas.isEmpty ? 'sin detalle' : temas.take(3).join(', ')}.',
         'prompt': 'que estudiar hoy',
         'cta': 'Ver materia prioritaria',
         'color': '#C7D2FE',
@@ -2642,9 +2691,63 @@ $instrucciones
         if (first is Map) return Map<String, dynamic>.from(first);
       }
       return null;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('TutorIA._rpcComoMapa($functionName) error: $e');
       return null;
     }
+  }
+
+  Future<Map<String, dynamic>?> _obtenerPlanAdaptativoSeguro({
+    required String userId,
+    Map<String, dynamic>? planBase,
+  }) async {
+    if (planBase != null && planBase.isNotEmpty) {
+      return planBase;
+    }
+
+    final paramsBase = <String, dynamic>{'p_usuario_id': userId};
+
+    final planAdaptativo = await _rpcComoMapa(
+      functionName: 'fn_generar_plan_adaptativo',
+      params: paramsBase,
+    );
+    if (planAdaptativo != null && planAdaptativo.isNotEmpty) {
+      return planAdaptativo;
+    }
+
+    // Compatibilidad con instalaciones que aun no tienen la funcion adaptativa.
+    final planLegacy = await _rpcComoMapa(
+      functionName: 'fn_generar_plan_dia_siguiente',
+      params: {'p_usuario_id': userId, 'p_dia_numero': 0},
+    );
+    if (planLegacy != null && planLegacy.isNotEmpty) {
+      return planLegacy;
+    }
+
+    final planLegacyDia1 = await _rpcComoMapa(
+      functionName: 'fn_generar_plan_dia_siguiente',
+      params: {'p_usuario_id': userId, 'p_dia_numero': 1},
+    );
+    if (planLegacyDia1 != null && planLegacyDia1.isNotEmpty) {
+      return planLegacyDia1;
+    }
+
+    return null;
+  }
+
+  List<String> _mergeIdsPreservandoOrden(List<List<String>> grupos) {
+    final salida = <String>[];
+    final vistos = <String>{};
+    for (final grupo in grupos) {
+      for (final raw in grupo) {
+        final id = raw.trim();
+        if (id.isEmpty) continue;
+        if (vistos.add(id)) {
+          salida.add(id);
+        }
+      }
+    }
+    return salida;
   }
 
   bool _esConsultaRanking(String mensaje) {
@@ -4164,6 +4267,117 @@ REGLAS:
     }
   }
 
+  String _normalizarTextoEspecialidad(String value) {
+    return _normalizarTexto(
+      value
+          .replaceAll('\u00e1', 'a')
+          .replaceAll('\u00e9', 'e')
+          .replaceAll('\u00ed', 'i')
+          .replaceAll('\u00f3', 'o')
+          .replaceAll('\u00fa', 'u')
+          .replaceAll('\u00f1', 'n'),
+    );
+  }
+
+  List<String> _palabrasClaveEspecialidad(String especialidad) {
+    final normalizada = _normalizarTextoEspecialidad(especialidad);
+    if (normalizada.isEmpty) return const <String>[];
+
+    if (normalizada.contains('investig')) {
+      return const <String>[
+        'investig',
+        'criminal',
+        'crimen',
+        'penal',
+        'procesal',
+        'lavado',
+        'extorsion',
+        'drog',
+        'organizado',
+      ];
+    }
+    if (normalizada.contains('intelig')) {
+      return const <String>[
+        'intelig',
+        'informacion',
+        'contraintelig',
+        'seguridad',
+      ];
+    }
+    if (normalizada.contains('criminalist')) {
+      return const <String>[
+        'criminalist',
+        'forens',
+        'perici',
+        'evidencia',
+        'laboratorio',
+      ];
+    }
+    if (normalizada.contains('administr')) {
+      return const <String>[
+        'administr',
+        'procedimiento',
+        'regimen',
+        'carrera',
+        'disciplina',
+        'gestion',
+        'ascenso',
+      ];
+    }
+    if (normalizada.contains('orden') || normalizada.contains('seguridad')) {
+      return const <String>[
+        'orden',
+        'seguridad',
+        'operativo',
+        'fuerza',
+        'patrull',
+      ];
+    }
+    if (normalizada.contains('servicio')) {
+      return const <String>[
+        'servicio',
+        'procedimiento',
+        'administr',
+        'regimen',
+      ];
+    }
+
+    return normalizada
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((e) => e.trim().length >= 4)
+        .toList();
+  }
+
+  bool _esMateriaRelacionadaAEspecialidad({
+    required Map<String, dynamic> row,
+    required String especialidadNormalizada,
+    required List<String> keywordsEspecialidad,
+  }) {
+    final materia = _asMap(row['materia']);
+    final nombre = _normalizarTextoEspecialidad(
+      (materia['nombre'] ?? '').toString(),
+    );
+    final categoria = _normalizarTextoEspecialidad(
+      (materia['categoria'] ?? '').toString(),
+    );
+    final temas = _toStringList(
+      row['temas_debiles'],
+    ).map(_normalizarTextoEspecialidad).join(' ');
+    final texto = '$nombre $categoria $temas'.trim();
+    if (texto.isEmpty) return false;
+
+    if (especialidadNormalizada.isNotEmpty &&
+        texto.contains(especialidadNormalizada)) {
+      return true;
+    }
+
+    for (final keyword in keywordsEspecialidad) {
+      if (keyword.trim().isEmpty) continue;
+      if (texto.contains(keyword)) return true;
+    }
+    return false;
+  }
+
   String _normalizarTexto(String value) {
     return value
         .toLowerCase()
@@ -4755,5 +4969,3 @@ REGLAS:
     };
   }
 }
-
-

@@ -504,9 +504,9 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                     numeroOrden: index + 1,
                                     mostrarRespuestaAlInicio: false,
                                     aciertosCount:
-                                        estadistica?.aciertosVisibles ?? 0,
+                                        estadistica?.totalAciertos ?? 0,
                                     fallosCount:
-                                        estadistica?.fallosVisibles ?? 0,
+                                        estadistica?.totalFallos ?? 0,
                                   );
                                 },
                               ),

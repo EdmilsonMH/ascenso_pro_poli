@@ -36,6 +36,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
   bool _premiumActivo = false;
   int _rankingPracticasUsadas = 0;
   bool _cargando = true;
+  bool _mostrarInstruccionesCompletas = false;
 
   @override
   void initState() {
@@ -324,6 +325,19 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
     return '${_materiasSeleccionadas.length} materias seleccionadas';
   }
 
+  List<String> _obtenerInstruccionesPractica() {
+    return [
+      _materiasSeleccionadas.length == _todasLasMateriasDisponibles.length
+          ? 'Se te presentaran $_cantidadPreguntas preguntas de todas las materias'
+          : 'Se te presentaran $_cantidadPreguntas preguntas de ${_materiasSeleccionadas.length} materias seleccionadas',
+      'Cada pregunta tiene 4 opciones de respuesta, solo una es correcta',
+      'Podras ver la respuesta correcta y una explicacion despues de responder',
+      'Tiempo estimado: $_tiempoEstimadoMinutos minutos (se registrara automaticamente)',
+      'Se requiere un 70% de aciertos para aprobar',
+      'Tus respuestas se guardaran para seguimiento de progreso',
+    ];
+  }
+
   // ... (skip until build)
   @override
   Widget build(BuildContext context) {
@@ -334,13 +348,19 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
       backgroundColor: Colors.white,
       appBar: const BarraSuperior(),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(
+          12,
+          10,
+          12,
+          12 + MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Configuration Card
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFF0F7FF),
                 borderRadius: BorderRadius.circular(12),
@@ -360,14 +380,14 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                       Text(
                         'Configuraci\u00F3n de Pr\u00E1ctica',
                         style: GoogleFonts.inter(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1E3A8A),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Inputs Row
                   Row(
@@ -389,7 +409,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                             ),
                             const SizedBox(height: 4),
                             SizedBox(
-                              height: 48,
+                              height: 44,
                               child: TextField(
                                 controller: _cantidadController,
                                 keyboardType: TextInputType.number,
@@ -451,7 +471,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 10),
                       // Subject Selector (Multi-select)
                       Expanded(
                         flex: 3,
@@ -470,7 +490,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                             InkWell(
                               onTap: _mostrarDialogoSeleccionMaterias,
                               child: Container(
-                                height: 48,
+                                height: 44,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
                                 ),
@@ -509,7 +529,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Aviso de ranking solo cuando la configuracion equivale
                   // a una practica ranking (100 preguntas, todas las materias).
@@ -517,7 +537,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                       _intentaRankingComoInvitado ||
                       _intentaRankingSinIntentosNoActivo)
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: _esEligibleParaRanking
                             ? const Color(0xFFFEFCE8)
@@ -546,7 +566,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                             child: RichText(
                               text: TextSpan(
                                 style: GoogleFonts.inter(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   color: _esEligibleParaRanking
                                       ? const Color(0xFF854D0E)
                                       : const Color(0xFF3730A3),
@@ -615,11 +635,11 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
             // Instructions Card
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFF0F7FF),
                 borderRadius: BorderRadius.circular(12),
@@ -631,38 +651,55 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                   Text(
                     'Instrucciones:',
                     style: GoogleFonts.inter(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w500,
                       color: const Color(0xFF1E3A8A),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildInstructionItem(
-                    _materiasSeleccionadas.length ==
-                            _todasLasMateriasDisponibles.length
-                        ? 'Se te presentaran $_cantidadPreguntas preguntas de todas las materias'
-                        : 'Se te presentaran $_cantidadPreguntas preguntas de ${_materiasSeleccionadas.length} materias seleccionadas',
-                  ),
-                  _buildInstructionItem(
-                    'Cada pregunta tiene 4 opciones de respuesta, solo una es correcta',
-                  ),
-                  _buildInstructionItem(
-                    'Podras ver la respuesta correcta y una explicacion despues de responder',
-                  ),
-                  _buildInstructionItem(
-                    'Tiempo estimado: $_tiempoEstimadoMinutos minutos (se registrara automaticamente)',
-                  ),
-                  _buildInstructionItem(
-                    'Se requiere un 70% de aciertos para aprobar',
-                  ),
-                  _buildInstructionItem(
-                    'Tus respuestas se guardaran para seguimiento de progreso',
+                  const SizedBox(height: 8),
+                  ...(() {
+                    final instrucciones = _obtenerInstruccionesPractica();
+                    final visibles = _mostrarInstruccionesCompletas
+                        ? instrucciones
+                        : instrucciones.take(2).toList();
+                    return visibles.map(_buildInstructionItem);
+                  })(),
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _mostrarInstruccionesCompletas =
+                            !_mostrarInstruccionesCompletas;
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: const Size(0, 0),
+                    ),
+                    icon: Icon(
+                      _mostrarInstruccionesCompletas
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      size: 18,
+                      color: const Color(0xFF2563EB),
+                    ),
+                    label: Text(
+                      _mostrarInstruccionesCompletas
+                          ? 'Leer menos'
+                          : 'Leer mas',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF2563EB),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 10),
 
             // Stats Row
             Row(
@@ -687,12 +724,12 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
 
             // Start Button
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: ElevatedButton(
                 onPressed: () async {
                   final navigator = Navigator.of(context);
@@ -887,7 +924,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
 
   Widget _buildInstructionItem(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -905,9 +942,9 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
             child: Text(
               text,
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: 12,
                 color: const Color(0xFF4B5563),
-                height: 1.4,
+                height: 1.3,
               ),
             ),
           ),
@@ -926,7 +963,7 @@ class _ResumenCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -936,13 +973,13 @@ class _ResumenCard extends StatelessWidget {
         children: [
           Text(
             titulo,
-            style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[600]),
+            style: GoogleFonts.inter(fontSize: 10, color: Colors.grey[600]),
           ),
           const SizedBox(height: 4),
           Text(
             valor,
             style: GoogleFonts.inter(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
               color: Colors.black,
             ),
