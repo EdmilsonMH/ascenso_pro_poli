@@ -34,17 +34,17 @@ class _PantallaPracticaGuiadaConfigState
   bool _cargando = true;
   List<String> _todasLasMateriasDisponibles = [];
   List<String> _materiasSeleccionadas = [];
-  String? _materiaActiva;
+  String?_materiaActiva;
   Map<String, int> _conteoPreguntasPorMateria = {};
   final Map<String, List<String>> _idsCandidatosCachePorMateria = {};
-  List<String>? _idsCandidatosCacheTodasMaterias;
+  List<String>?_idsCandidatosCacheTodasMaterias;
   bool _iniciandoPractica = false;
   List<_PreguntaConFallos> _preguntasFalladasOrdenadas = [];
   bool _bancoFalladasCargado = false;
   bool _cargandoBancoFalladas = false;
 
   bool get _enVistaMaterias => _materiaActiva == null;
-  String get _textoSeleccionActual => _materiaActiva ?? '';
+  String get _textoSeleccionActual => _materiaActiva ??'';
   bool get _puedeIniciar =>
       !_enVistaMaterias &&
       _cantidadPreguntas > 0 &&
@@ -106,12 +106,12 @@ class _PantallaPracticaGuiadaConfigState
     final disponibles = _materiasSeleccionadas.fold<int>(
       0,
       (acumulado, materia) =>
-          acumulado + (_conteoPreguntasPorMateria[materia] ?? 0),
+          acumulado + (_conteoPreguntasPorMateria[materia] ??0),
     );
 
     var cantidadAjustada = _cantidadPreguntas;
     if (cantidadAjustada > disponibles) {
-      cantidadAjustada = disponibles > 0 ? disponibles : 0;
+      cantidadAjustada = disponibles > 0 ?disponibles : 0;
       _cantidadController.text = cantidadAjustada.toString();
     }
 
@@ -154,7 +154,7 @@ class _PantallaPracticaGuiadaConfigState
     return true;
   }
 
-  int _obtenerPrioridadFallo(EstadisticaPregunta? estadistica) {
+  int _obtenerPrioridadFallo(EstadisticaPregunta?estadistica) {
     if (estadistica == null) return 0;
     // Regla: al completar 3 aciertos seguidos, contadores visibles vuelven a 0.
     if (estadistica.rachaAciertos >= 3) return 0;
@@ -229,7 +229,9 @@ class _PantallaPracticaGuiadaConfigState
       if (cantidadFinal > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Se ajustó a $cantidadFinal preguntas disponibles.'),
+            content: Text(
+              'Se ajustó a $cantidadFinal preguntas disponibles.',
+            ),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -257,7 +259,9 @@ class _PantallaPracticaGuiadaConfigState
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No hay preguntas disponibles para la selección actual.'),
+            content: Text(
+              'No hay preguntas disponibles para la selección actual.',
+            ),
           ),
         );
         return;
@@ -270,7 +274,9 @@ class _PantallaPracticaGuiadaConfigState
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No hay preguntas disponibles para iniciar la práctica.'),
+            content: Text(
+              'No hay preguntas disponibles para iniciar la práctica.',
+            ),
           ),
         );
         return;
@@ -280,13 +286,15 @@ class _PantallaPracticaGuiadaConfigState
       final seleccionadas = await _servicioPreguntas.obtenerPreguntasPorIds(
         ids: idsSeleccionadas,
         categoria: widget.categoriaUsuario,
-        materia: _materiaActiva == _opcionTodasMaterias ? null : _materiaActiva,
+        materia: _materiaActiva == _opcionTodasMaterias ?null : _materiaActiva,
       );
       if (!mounted) return;
       if (seleccionadas.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No se pudieron cargar las preguntas de la práctica.'),
+            content: Text(
+              'No se pudieron cargar las preguntas de la práctica.',
+            ),
           ),
         );
         return;
@@ -357,7 +365,7 @@ class _PantallaPracticaGuiadaConfigState
               .map(
                 (pregunta) => _PreguntaConFallos(
                   pregunta: pregunta,
-                  fallosActuales: fallosPorId[pregunta.id] ?? 0,
+                  fallosActuales: fallosPorId[pregunta.id] ??0,
                 ),
               )
               .toList()
@@ -475,7 +483,7 @@ class _PantallaPracticaGuiadaConfigState
               final controladorCantidad = TextEditingController(
                 text: tempCantidad.toString(),
               );
-              String? errorTexto;
+              String?errorTexto;
 
               final cantidadNueva = await showDialog<int>(
                 context: context,
@@ -488,7 +496,7 @@ class _PantallaPracticaGuiadaConfigState
                           style: GoogleFonts.inter(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF111827),
+                            color: const Color(0xFF1F2A1C),
                           ),
                         ),
                         content: Column(
@@ -530,7 +538,8 @@ class _PantallaPracticaGuiadaConfigState
                               );
                               if (valor == null) {
                                 setDialogState(() {
-                                  errorTexto = 'Ingresa un número válido.';
+                                  errorTexto =
+                                      'Ingresa un número válido.';
                                 });
                                 return;
                               }
@@ -590,7 +599,7 @@ class _PantallaPracticaGuiadaConfigState
                       children: [
                         const Icon(
                           Icons.error_outline_rounded,
-                          color: Color(0xFFB91C1C),
+                          color: Color(0xFF982D2D),
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -600,7 +609,7 @@ class _PantallaPracticaGuiadaConfigState
                             style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF111827),
+                              color: const Color(0xFF1F2A1C),
                             ),
                           ),
                         ),
@@ -631,7 +640,7 @@ class _PantallaPracticaGuiadaConfigState
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
+                        color: const Color(0xFF243223),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -641,7 +650,7 @@ class _PantallaPracticaGuiadaConfigState
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                        color: const Color(0xFFEEF2F4),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFD1D9E6)),
                       ),
@@ -674,7 +683,7 @@ class _PantallaPracticaGuiadaConfigState
                                       style: GoogleFonts.inter(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF111827),
+                                        color: const Color(0xFF1F2A1C),
                                       ),
                                     ),
                                     Text(
@@ -709,14 +718,14 @@ class _PantallaPracticaGuiadaConfigState
                       'Disponibles con tus filtros: $disponibles',
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: const Color(0xFF475569),
+                        color: const Color(0xFF4B5D67),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 12),
                     CheckboxListTile(
                       value: todasSeleccionadas,
-                      activeColor: const Color(0xFF1D4ED8),
+                      activeColor: const Color(0xFF0B2933),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                       title: Text(
@@ -724,7 +733,7 @@ class _PantallaPracticaGuiadaConfigState
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
+                          color: const Color(0xFF1F2A1C),
                         ),
                       ),
                       onChanged: (value) {
@@ -746,14 +755,14 @@ class _PantallaPracticaGuiadaConfigState
                           final materia = materiasDisponibles[index];
                           return CheckboxListTile(
                             value: tempMateriasSeleccionadas.contains(materia),
-                            activeColor: const Color(0xFF1D4ED8),
+                            activeColor: const Color(0xFF0B2933),
                             controlAffinity: ListTileControlAffinity.leading,
                             contentPadding: EdgeInsets.zero,
                             title: Text(
                               materia,
                               style: GoogleFonts.inter(
                                 fontSize: 14,
-                                color: const Color(0xFF334155),
+                                color: const Color(0xFF445744),
                               ),
                             ),
                             onChanged: (value) {
@@ -787,7 +796,7 @@ class _PantallaPracticaGuiadaConfigState
                                 );
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFB91C1C),
+                          backgroundColor: const Color(0xFF982D2D),
                           disabledBackgroundColor: const Color(0xFFCBD5E1),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -854,7 +863,7 @@ class _PantallaPracticaGuiadaConfigState
           style: GoogleFonts.inter(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
+            color: const Color(0xFF1F2A1C),
           ),
         ),
         const SizedBox(height: 6),
@@ -913,7 +922,7 @@ class _PantallaPracticaGuiadaConfigState
                         ),
                         child: const Icon(
                           Icons.apps_rounded,
-                          color: Color(0xFF4338CA),
+                          color: Color(0xFF0B2933),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -926,7 +935,7 @@ class _PantallaPracticaGuiadaConfigState
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: const Color(0xFF111827),
+                                color: const Color(0xFF1F2A1C),
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -935,7 +944,7 @@ class _PantallaPracticaGuiadaConfigState
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: const Color(0xFF6B7280),
+                                color: const Color(0xFF4B5D67),
                               ),
                             ),
                           ],
@@ -944,7 +953,7 @@ class _PantallaPracticaGuiadaConfigState
                       const Icon(
                         Icons.arrow_forward_ios_rounded,
                         size: 16,
-                        color: Color(0xFF6B7280),
+                        color: Color(0xFF4B5D67),
                       ),
                     ],
                   ),
@@ -953,7 +962,7 @@ class _PantallaPracticaGuiadaConfigState
             ),
           ),
           ..._todasLasMateriasDisponibles.map((materia) {
-            final total = conteoPorMateria[materia] ?? 0;
+            final total = conteoPorMateria[materia] ??0;
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Material(
@@ -977,12 +986,12 @@ class _PantallaPracticaGuiadaConfigState
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
+                            color: const Color(0xFFDEE6EA),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
                             Icons.menu_book_rounded,
-                            color: Color(0xFF1D4ED8),
+                            color: Color(0xFF0B2933),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -995,7 +1004,7 @@ class _PantallaPracticaGuiadaConfigState
                                 style: GoogleFonts.inter(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF111827),
+                                  color: const Color(0xFF1F2A1C),
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -1004,7 +1013,7 @@ class _PantallaPracticaGuiadaConfigState
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF6B7280),
+                                  color: const Color(0xFF4B5D67),
                                 ),
                               ),
                             ],
@@ -1013,7 +1022,7 @@ class _PantallaPracticaGuiadaConfigState
                         const Icon(
                           Icons.arrow_forward_ios_rounded,
                           size: 16,
-                          color: Color(0xFF6B7280),
+                          color: Color(0xFF4B5D67),
                         ),
                       ],
                     ),
@@ -1067,7 +1076,7 @@ class _PantallaPracticaGuiadaConfigState
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF111827),
+                color: const Color(0xFF1F2A1C),
               ),
             ),
           ),
@@ -1077,7 +1086,7 @@ class _PantallaPracticaGuiadaConfigState
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF6B7280),
+              color: const Color(0xFF4B5D67),
             ),
           ),
           const SizedBox(width: 6),
@@ -1092,7 +1101,7 @@ class _PantallaPracticaGuiadaConfigState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: const Color(0xFFB85B5B)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x120F172A),
@@ -1115,7 +1124,7 @@ class _PantallaPracticaGuiadaConfigState
                 ),
                 child: const Icon(
                   Icons.error_outline_rounded,
-                  color: Color(0xFFB91C1C),
+                  color: Color(0xFF982D2D),
                   size: 20,
                 ),
               ),
@@ -1126,7 +1135,7 @@ class _PantallaPracticaGuiadaConfigState
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF111827),
+                    color: const Color(0xFF1F2A1C),
                   ),
                 ),
               ),
@@ -1138,7 +1147,7 @@ class _PantallaPracticaGuiadaConfigState
             style: GoogleFonts.inter(
               fontSize: 13.2,
               height: 1.35,
-              color: const Color(0xFF4B5563),
+              color: const Color(0xFF4B5D67),
             ),
           ),
           const SizedBox(height: 12),
@@ -1154,7 +1163,7 @@ class _PantallaPracticaGuiadaConfigState
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Color(0xFFB91C1C),
+                        color: Color(0xFF982D2D),
                       ),
                     )
                   : const Icon(Icons.play_circle_outline_rounded, size: 18),
@@ -1166,7 +1175,7 @@ class _PantallaPracticaGuiadaConfigState
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFB91C1C),
+                foregroundColor: const Color(0xFF982D2D),
                 side: const BorderSide(color: Color(0xFFFCA5A5)),
                 backgroundColor: const Color(0xFFFFF1F2),
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1208,12 +1217,12 @@ class _PantallaPracticaGuiadaConfigState
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDBEAFE),
+                  color: const Color(0xFFD7E9DF),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.tune_rounded,
-                  color: Color(0xFF1E40AF),
+                  color: Color(0xFF0B2933),
                   size: 18,
                 ),
               ),
@@ -1224,7 +1233,7 @@ class _PantallaPracticaGuiadaConfigState
                   style: GoogleFonts.inter(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
+                    color: const Color(0xFF1F2A1C),
                   ),
                 ),
               ),
@@ -1237,7 +1246,7 @@ class _PantallaPracticaGuiadaConfigState
             height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFEEF2F4),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFD1D9E6)),
             ),
@@ -1256,7 +1265,7 @@ class _PantallaPracticaGuiadaConfigState
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF0F172A),
+                      color: const Color(0xFF1F2A1C),
                     ),
                   ),
                 ),
@@ -1274,7 +1283,7 @@ class _PantallaPracticaGuiadaConfigState
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600),
               ),
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF1D4ED8),
+                foregroundColor: const Color(0xFF0B2933),
                 padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
               ),
             ),
@@ -1284,7 +1293,7 @@ class _PantallaPracticaGuiadaConfigState
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFEEF2F4),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFD1D9E6)),
             ),
@@ -1294,7 +1303,7 @@ class _PantallaPracticaGuiadaConfigState
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF111827),
+                color: const Color(0xFF1F2A1C),
               ),
               decoration: InputDecoration(
                 isDense: true,
@@ -1326,7 +1335,7 @@ class _PantallaPracticaGuiadaConfigState
             'Disponibles: $_preguntasDisponibles',
             style: GoogleFonts.inter(
               fontSize: 12,
-              color: const Color(0xFF475569),
+              color: const Color(0xFF4B5D67),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1337,7 +1346,7 @@ class _PantallaPracticaGuiadaConfigState
                 'Se ajustará automáticamente al máximo disponible.',
                 style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: const Color(0xFFB91C1C),
+                  color: const Color(0xFF982D2D),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1355,7 +1364,7 @@ class _PantallaPracticaGuiadaConfigState
               children: [
                 const Icon(
                   Icons.info_outline_rounded,
-                  color: Color(0xFFEA580C),
+                  color: Color(0xFFB68B2E),
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -1392,7 +1401,7 @@ class _PantallaPracticaGuiadaConfigState
   Widget _buildBotonPrincipal() {
     final puedeAccionar = _puedeIniciar && !_iniciandoPractica;
     final fondoGradiente = puedeAccionar
-        ? const [Color(0xFF0F172A), Color(0xFF1E293B)]
+        ? const [Color(0xFF1F2A1C), Color(0xFF243223)]
         : const [Color(0xFF94A3B8), Color(0xFF94A3B8)];
 
     return Column(
@@ -1417,7 +1426,7 @@ class _PantallaPracticaGuiadaConfigState
                 : const [],
           ),
           child: ElevatedButton(
-            onPressed: puedeAccionar ? _iniciarPracticaGuiada : null,
+            onPressed: puedeAccionar ?_iniciarPracticaGuiada : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               disabledBackgroundColor: Colors.transparent,
@@ -1483,7 +1492,7 @@ class _PantallaPracticaGuiadaConfigState
       style: GoogleFonts.inter(
         fontSize: 13,
         fontWeight: FontWeight.w700,
-        color: const Color(0xFF1E293B),
+        color: const Color(0xFF243223),
       ),
     );
   }
@@ -1498,3 +1507,4 @@ class _PreguntaConFallos {
     required this.fallosActuales,
   });
 }
+

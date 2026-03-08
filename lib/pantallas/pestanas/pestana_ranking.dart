@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,13 +26,15 @@ class PestanaRanking extends StatefulWidget {
 
 class _PestanaRankingState extends State<PestanaRanking> {
   final ServicioRanking _servicioRanking = ServicioRanking();
-  final TextEditingController _diasController = TextEditingController(text: '7');
-  RealtimeChannel? _rankingRealtimeChannel;
-  Timer? _realtimeRefreshDebounce;
+  final TextEditingController _diasController = TextEditingController(
+    text: '7',
+  );
+  RealtimeChannel?_rankingRealtimeChannel;
+  Timer?_realtimeRefreshDebounce;
   bool _cargandoRanking = false;
 
   List<RankingUsuario> _topRanking = [];
-  RankingUsuario? _miPosicion;
+  RankingUsuario?_miPosicion;
   int _misPracticas = 0;
   bool _cargando = true;
 
@@ -184,7 +186,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
   Widget build(BuildContext context) {
     if (_cargando) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF3F4F6),
+        backgroundColor: const Color(0xFFEEF2F4),
         appBar: const BarraSuperior(),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -195,7 +197,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
     final periodoLabel = _periodoActualLabel();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFEEF2F4),
       appBar: const BarraSuperior(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -223,7 +225,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
                 child: const LinearProgressIndicator(
                   minHeight: 3,
                   backgroundColor: Color(0xFFE5E7EB),
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF103D4A)),
                 ),
               ),
             ],
@@ -302,11 +304,11 @@ class _PestanaRankingState extends State<PestanaRanking> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        border: Border.all(color: const Color(0xFF5A8F8A)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.lock_outline, color: Color(0xFF2563EB), size: 30),
+          const Icon(Icons.lock_outline, color: Color(0xFF103D4A), size: 30),
           const SizedBox(height: 12),
           Text(
             'Estás en modo invitado',
@@ -340,8 +342,8 @@ class _PestanaRankingState extends State<PestanaRanking> {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF1D4ED8),
-                    side: const BorderSide(color: Color(0xFF1D4ED8)),
+                    foregroundColor: const Color(0xFF0B2933),
+                    side: const BorderSide(color: Color(0xFF0B2933)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: const Text('Iniciar sesión'),
@@ -353,11 +355,13 @@ class _PestanaRankingState extends State<PestanaRanking> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const PantallaRegistro()),
+                      MaterialPageRoute(
+                        builder: (_) => const PantallaRegistro(),
+                      ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1D4ED8),
+                    backgroundColor: const Color(0xFF0B2933),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -463,7 +467,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
                 ElevatedButton(
                   onPressed: _aplicarDiasPersonalizados,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundColor: const Color(0xFF103D4A),
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Aplicar'),
@@ -502,7 +506,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
   }) {
     final selected = _periodoSeleccionado == periodo;
     return Material(
-      color: selected ? const Color(0xFFEEF5FF) : const Color(0xFFF8FAFC),
+      color: selected ?const Color(0xFFEEF5FF) : const Color(0xFFEEF2F4),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -512,8 +516,8 @@ class _PestanaRankingState extends State<PestanaRanking> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected ? const Color(0xFF93C5FD) : Colors.grey.shade300,
-              width: selected ? 1.4 : 1,
+              color: selected ?const Color(0xFF3D7571) : Colors.grey.shade300,
+              width: selected ?1.4 : 1,
             ),
           ),
           child: Column(
@@ -525,7 +529,9 @@ class _PestanaRankingState extends State<PestanaRanking> {
                   Icon(
                     icono,
                     size: 16,
-                    color: selected ? const Color(0xFF1D4ED8) : Colors.grey.shade600,
+                    color: selected
+                        ? const Color(0xFF0B2933)
+                        : Colors.grey.shade600,
                   ),
                   const SizedBox(width: 6),
                   Flexible(
@@ -536,7 +542,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: selected
-                            ? const Color(0xFF1D4ED8)
+                            ? const Color(0xFF0B2933)
                             : Colors.black87,
                       ),
                     ),
@@ -556,7 +562,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: const Color(0xFFEEF2F4),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
       ),
@@ -615,7 +621,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
       decoration: BoxDecoration(
         color: const Color(0xFFF0F9FF),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF3B82F6)),
+        border: Border.all(color: const Color(0xFF1E6B63)),
       ),
       child: Column(
         children: [
@@ -627,7 +633,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
                   children: [
                     const Icon(
                       Icons.verified_outlined,
-                      color: Color(0xFF2563EB),
+                      color: Color(0xFF103D4A),
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -635,7 +641,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
                       'Tu posición actual',
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: const Color(0xFF1E40AF),
+                        color: const Color(0xFF0B2933),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -658,7 +664,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
                   style: GoogleFonts.inter(
                     fontSize: 34,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2563EB),
+                    color: const Color(0xFF103D4A),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -745,15 +751,13 @@ class _PestanaRankingState extends State<PestanaRanking> {
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(15),
                 ),
-                border: Border(
-                  top: BorderSide(color: Colors.yellow.shade200),
-                ),
+                border: Border(top: BorderSide(color: Colors.yellow.shade200)),
               ),
               child: Text(
                 'Aún no tienes prácticas válidas en este período.',
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: const Color(0xFF854D0E),
+                  color: const Color(0xFF705823),
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
@@ -775,10 +779,7 @@ class _PestanaRankingState extends State<PestanaRanking> {
       ),
       child: Text(
         'No hay resultados para este periodo con las reglas de ranking.',
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          color: Colors.grey.shade700,
-        ),
+        style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade700),
       ),
     );
   }
@@ -790,15 +791,12 @@ class _PestanaRankingState extends State<PestanaRanking> {
       decoration: BoxDecoration(
         color: const Color(0xFFF0F9FF),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        border: Border.all(color: const Color(0xFF5A8F8A)),
       ),
       child: Text(
         'Aún no apareces en ranking para este período. '
         'Necesitas prácticas válidas de ranking para figurar.',
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          color: const Color(0xFF1E40AF),
-        ),
+        style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF0B2933)),
       ),
     );
   }
@@ -817,7 +815,7 @@ class _TarjetaTopUser extends StatelessWidget {
       case 2:
         return const Color(0xFF94A3B8);
       case 3:
-        return const Color(0xFFF97316);
+        return const Color(0xFFB68B2E);
       default:
         return Colors.grey;
     }
@@ -1028,5 +1026,4 @@ class _ItemRanking extends StatelessWidget {
     );
   }
 }
-
 

@@ -5,15 +5,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 class TutorIAPersonalService {
-  // Ya no inicializamos el cliente estÃƒÂ¡ticamente aquÃƒÂ­ para evitar el crash al cargar la clase
+  // Ya no inicializamos el cliente est?ticamente aqu?para evitar el crash al cargar la clase
   SupabaseClient get _supabase => SupabaseService.client;
   static const bool _habilitarSqlDirecto = false;
 
-  /// 1.1 Ã°Å¸â€œÅ  AnÃƒÂ¡lisis Completo del Perfil
-  /// Analiza el perfil completo del usuario y genera un diagnÃƒÂ³stico detallado.
+  /// 1.1 ??An?lisis Completo del Perfil
+  /// Analiza el perfil completo del usuario y genera un diagn?stico detallado.
   Future<Map<String, dynamic>> analizarPerfilCompleto(
     String userId, {
-    Map<String, dynamic>? perfilUsuario,
+    Map<String, dynamic>?perfilUsuario,
   }) async {
     if (!SupabaseService.isInitialized) {
       debugPrint(
@@ -78,7 +78,7 @@ class TutorIAPersonalService {
       if (inferidos.isNotEmpty) {
         dominios = _fusionarDominios(base: dominios, inferidos: inferidos);
       } else if (dominios.isEmpty ||
-          dominios.every((d) => (_obtenerTasaDominio(d) ?? 0) <= 0)) {
+          dominios.every((d) => (_obtenerTasaDominio(d) ??0) <= 0)) {
         dominios = const <Map<String, dynamic>>[];
       }
 
@@ -111,9 +111,9 @@ class TutorIAPersonalService {
       final tiempoTotalMinutos = _toInt(
         estadistica['tiempo_total_estudio_minutos'],
       );
-      final tasaAciertoPerfil = _toDouble(perfil['tasa_acierto_global']) ?? 0.0;
+      final tasaAciertoPerfil = _toDouble(perfil['tasa_acierto_global']) ??0.0;
       final velocidadPerfil =
-          _toDouble(perfil['velocidad_promedio_segundos']) ?? 0.0;
+          _toDouble(perfil['velocidad_promedio_segundos']) ??0.0;
       final tasaAcierto = tasaAciertoPerfil > 0
           ? tasaAciertoPerfil
           : tasaAciertoPorRespuestas;
@@ -139,11 +139,11 @@ class TutorIAPersonalService {
         preguntasDominadas: totalDominadas,
         tiempoTotalMinutos: tiempoTotalMinutos,
         categoria: perfilUsuario?['categoria'],
-        gradoActual: perfilUsuario?['grado_actual'] ?? perfilUsuario?['grado'],
+        gradoActual: perfilUsuario?['grado_actual'] ??perfilUsuario?['grado'],
         especialidad:
-            perfilUsuario?['especialidad'] ?? perfilUsuario?['arma_servicio'],
+            perfilUsuario?['especialidad'] ??perfilUsuario?['arma_servicio'],
         metaDiariaMinutos:
-            perfilUsuario?['meta_diaria_minutos'] ?? perfilUsuario?['meta'],
+            perfilUsuario?['meta_diaria_minutos'] ??perfilUsuario?['meta'],
       );
 
       final diagnostico =
@@ -187,7 +187,7 @@ class TutorIAPersonalService {
           final tasaAciertoPromedio = analisisMaterias.isEmpty
               ? 0.0
               : analisisMaterias
-                        .map((m) => _toDouble(m['porcentaje']) ?? 0.0)
+                        .map((m) => _toDouble(m['porcentaje']) ??0.0)
                         .reduce((a, b) => a + b) /
                     analisisMaterias.length;
           final nivel = _nivelMateria(tasaAciertoPromedio);
@@ -285,11 +285,11 @@ class TutorIAPersonalService {
           _toDouble(analisis['tasa_acierto']) ??
           0.0;
       final racha = _toInt(analisis['racha_dias']);
-      final nivel = (analisis['nivel_global'] ?? 'INICIAL').toString();
+      final nivel = (analisis['nivel_global'] ??'INICIAL').toString();
 
       final totalDominadas = _toInt(progreso?['preguntas_dominadas']);
       final faltantes = (3000 - totalDominadas).clamp(0, 3000);
-      final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
+      final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ??0;
       final diasEstimados = ritmoActual > 0
           ? (faltantes / ritmoActual).ceil()
           : 0;
@@ -338,9 +338,9 @@ class TutorIAPersonalService {
           {
             'id': 'analisis_perfil',
             'titulo': 'Analisis Completo de tu Perfil',
-            'resumen': (analisis['diagnostico'] ?? '').toString(),
+            'resumen': (analisis['diagnostico'] ??'').toString(),
             'detalle':
-                'Nivel: $nivel. Tasa acierto: ${(_toDouble(analisis['tasa_acierto']) ?? 0).toStringAsFixed(1)}%. Debilidades: ${_toStringList(analisis['debilidades']).join(', ')}.',
+                'Nivel: $nivel. Tasa acierto: ${(_toDouble(analisis['tasa_acierto']) ??0).toStringAsFixed(1)}%. Debilidades: ${_toStringList(analisis['debilidades']).join(', ')}.',
             'prompt': 'dame mi plan diario',
             'cta': 'Ver estrategia',
             'color': '#FDE68A',
@@ -370,9 +370,9 @@ class TutorIAPersonalService {
 
   Future<Map<String, dynamic>> obtenerResumenPlanDiarioEstructurado({
     required String userId,
-    Map<String, dynamic>? planBase,
-    Map<String, dynamic>? progresoBase,
-    Map<String, dynamic>? probabilidadBase,
+    Map<String, dynamic>?planBase,
+    Map<String, dynamic>?progresoBase,
+    Map<String, dynamic>?probabilidadBase,
   }) async {
     if (_sesionInvalida(userId)) {
       return _cardFallback(
@@ -430,9 +430,9 @@ class TutorIAPersonalService {
     );
     final diasRestantes = _toInt(plan['dias_restantes']);
     final faltantes = _toInt(plan['preguntas_faltantes']);
-    final prob = _toDouble(probabilidad?['probabilidad_aprobacion']) ?? 0;
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0;
+    final prob = _toDouble(probabilidad?['probabilidad_aprobacion']) ??0;
+    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ??0;
+    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ??0;
 
     return {
       'id': 'plan_hoy',
@@ -446,7 +446,7 @@ class TutorIAPersonalService {
       'color': '#BFDBFE',
       'icono': 'calendar_month',
       'expandable': true,
-      'cantidad_practica': total > 0 ? total : 20,
+      'cantidad_practica': total > 0 ?total : 20,
       'tiempo_practica': _minutosSugeridosDesdePlan(total),
       'pregunta_ids': prioritarias,
       'preguntas_nuevas_ids': nuevasIds,
@@ -457,7 +457,7 @@ class TutorIAPersonalService {
 
   Future<Map<String, dynamic>> obtenerResumenQueEstudiarEstructurado({
     required String userId,
-    Map<String, dynamic>? perfilUsuario,
+    Map<String, dynamic>?perfilUsuario,
   }) async {
     if (_sesionInvalida(userId)) {
       return _cardFallback(
@@ -495,7 +495,7 @@ class TutorIAPersonalService {
         );
       }
 
-      final especialidadRaw = (perfilUsuario?['especialidad'] ?? '').toString();
+      final especialidadRaw = (perfilUsuario?['especialidad'] ??'').toString();
       final especialidad = especialidadRaw.trim();
       final especialidadNormalizada = _normalizarTextoEspecialidad(
         especialidad,
@@ -519,26 +519,26 @@ class TutorIAPersonalService {
       }
 
       candidatas.sort((a, b) {
-        final tasaA = _toDouble(a['tasa_dominio']) ?? 100.0;
-        final tasaB = _toDouble(b['tasa_dominio']) ?? 100.0;
+        final tasaA = _toDouble(a['tasa_dominio']) ??100.0;
+        final tasaB = _toDouble(b['tasa_dominio']) ??100.0;
         return tasaA.compareTo(tasaB);
       });
 
       final row = candidatas.first;
       final materia = _asMap(row['materia']);
-      final nombre = (materia['nombre'] ?? 'Materia').toString();
-      final tasa = _toDouble(row['tasa_dominio']) ?? 0;
+      final nombre = (materia['nombre'] ??'Materia').toString();
+      final tasa = _toDouble(row['tasa_dominio']) ??0;
       final hace7 = _toDouble(row['dominio_hace_7_dias']);
-      final delta = hace7 == null ? 0.0 : (tasa - hace7);
+      final delta = hace7 == null ?0.0 : (tasa - hace7);
       final tendencia = delta > 1.5
           ? 'mejorando'
-          : (delta < -1.5 ? 'empeorando' : 'estable');
+          : (delta < -1.5 ?'empeorando' : 'estable');
       final tiempo = _toInt(row['tiempo_recomendado_minutos']);
       final temas = _toStringList(row['temas_debiles']);
       final resumenCard = filtroEspecialidadAplicado
-          ? 'Especialidad $especialidad: $nombre (${tasa.toStringAsFixed(1)}%) es tu foco de hoy.'
+          ?'Especialidad $especialidad: $nombre (${tasa.toStringAsFixed(1)}%) es tu foco de hoy.'
           : (especialidad.isNotEmpty
-                ? 'Especialidad $especialidad: refuerzo transversal en $nombre (${tasa.toStringAsFixed(1)}%).'
+                ?'Especialidad $especialidad: refuerzo transversal en $nombre (${tasa.toStringAsFixed(1)}%).'
                 : '$nombre (${tasa.toStringAsFixed(1)}%) es tu foco de hoy.');
       final prefijoDetalle = filtroEspecialidadAplicado
           ? 'Materias de especialidad detectadas para tu perfil. '
@@ -551,14 +551,14 @@ class TutorIAPersonalService {
         'titulo': 'Materia Prioritaria',
         'resumen': resumenCard,
         'detalle':
-            '${prefijoDetalle}Tendencia: $tendencia. Tiempo sugerido: ${tiempo > 0 ? tiempo : 25} minutos. Temas: ${temas.isEmpty ? 'sin detalle' : temas.take(3).join(', ')}.',
+            '${prefijoDetalle}Tendencia: $tendencia. Tiempo sugerido: ${tiempo > 0 ?tiempo : 25} minutos. Temas: ${temas.isEmpty ?'sin detalle' : temas.take(3).join(', ')}.',
         'prompt': 'que estudiar hoy',
         'cta': 'Ver materia prioritaria',
         'color': '#C7D2FE',
         'icono': 'menu_book',
         'expandable': true,
         'materia': nombre,
-        'tiempo_practica': tiempo > 0 ? tiempo : 25,
+        'tiempo_practica': tiempo > 0 ?tiempo : 25,
         'cantidad_practica': 20,
       };
     } catch (_) {
@@ -635,7 +635,7 @@ class TutorIAPersonalService {
         final tasas = previas.map((s) {
           final r = respondidasSesion(s);
           final c = _toInt(s['preguntas_correctas']);
-          return r > 0 ? (c * 100.0) / r : 0.0;
+          return r > 0 ?(c * 100.0) / r : 0.0;
         }).toList();
         promedioPrevio = tasas.reduce((a, b) => a + b) / tasas.length;
       }
@@ -647,7 +647,7 @@ class TutorIAPersonalService {
                 : 'bajaste ${delta.abs().toStringAsFixed(1)} puntos');
 
       final nombre =
-          (actual['nombre_sesion'] ?? actual['tipo_sesion'] ?? 'Sesion')
+          (actual['nombre_sesion'] ??actual['tipo_sesion'] ??'Sesion')
               .toString();
       final incorrectas = _toInt(actual['preguntas_incorrectas']);
 
@@ -716,7 +716,7 @@ class TutorIAPersonalService {
       }
 
       final tiempos = rows
-          .map((r) => _toDouble(r['tiempo_total_respuesta']) ?? 0)
+          .map((r) => _toDouble(r['tiempo_total_respuesta']) ??0)
           .where((t) => t > 0)
           .toList();
       if (tiempos.isEmpty) {
@@ -737,7 +737,7 @@ class TutorIAPersonalService {
           : (impulsiva * 100.0 / tiempos.length);
       final clasificacion = promedio < 8
           ? 'Impulsivo'
-          : (promedio <= 20 ? 'Optimo' : 'Lento');
+          : (promedio <= 20 ?'Optimo' : 'Lento');
       final recomendacion = promedio < 8
           ? 'Baja un poco la velocidad y relee palabras clave (NO/EXCEPTO).'
           : (promedio <= 20
@@ -746,12 +746,12 @@ class TutorIAPersonalService {
 
       final Map<String, List<double>> tiemposPorMateria = {};
       for (final row in rows) {
-        final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0;
+        final tiempo = _toDouble(row['tiempo_total_respuesta']) ??0;
         if (tiempo <= 0) continue;
 
         final pregunta = _asMap(row['pregunta']);
         final materia = _asMap(pregunta['materia']);
-        final nombre = (materia['nombre'] ?? '').toString().trim();
+        final nombre = (materia['nombre'] ??'').toString().trim();
         if (nombre.isEmpty) continue;
         tiemposPorMateria.putIfAbsent(nombre, () => <double>[]).add(tiempo);
       }
@@ -767,28 +767,28 @@ class TutorIAPersonalService {
               'preguntas': lista.length,
             };
           }).toList()..sort((a, b) {
-            final aProm = _toDouble(a['promedio_segundos']) ?? 0;
-            final bProm = _toDouble(b['promedio_segundos']) ?? 0;
+            final aProm = _toDouble(a['promedio_segundos']) ??0;
+            final bProm = _toDouble(b['promedio_segundos']) ??0;
             if (bProm != aProm) return bProm.compareTo(aProm);
-            final aTotal = _toDouble(a['total_segundos']) ?? 0;
-            final bTotal = _toDouble(b['total_segundos']) ?? 0;
+            final aTotal = _toDouble(a['total_segundos']) ??0;
+            final bTotal = _toDouble(b['total_segundos']) ??0;
             return bTotal.compareTo(aTotal);
           });
 
       final topMaterias = rankingMaterias.take(3).toList();
       final resumenMaterias = topMaterias
           .map((item) {
-            final nombre = (item['materia'] ?? 'Materia').toString();
-            final prom = _toDouble(item['promedio_segundos']) ?? 0;
+            final nombre = (item['materia'] ??'Materia').toString();
+            final prom = _toDouble(item['promedio_segundos']) ??0;
             return '$nombre ${prom.toStringAsFixed(1)}s';
           })
           .join(', ');
 
       final detalleMaterias = topMaterias
           .map((item) {
-            final nombre = (item['materia'] ?? 'Materia').toString();
-            final prom = _toDouble(item['promedio_segundos']) ?? 0;
-            final totalSeg = _toDouble(item['total_segundos']) ?? 0;
+            final nombre = (item['materia'] ??'Materia').toString();
+            final prom = _toDouble(item['promedio_segundos']) ??0;
+            final totalSeg = _toDouble(item['total_segundos']) ??0;
             final preguntas = _toInt(item['preguntas']);
             final totalMin = totalSeg / 60.0;
             return '$nombre: ${prom.toStringAsFixed(1)} seg/preg en $preguntas preg (${totalMin.toStringAsFixed(1)} min).';
@@ -799,10 +799,10 @@ class TutorIAPersonalService {
         'id': 'coach_velocidad',
         'titulo': 'Coach de Velocidad',
         'resumen': resumenMaterias.isNotEmpty
-            ? 'Mas tiempo por materia: $resumenMaterias.'
+            ?'Mas tiempo por materia: $resumenMaterias.'
             : 'Promedio ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion.',
         'detalle':
-            'Promedio general: ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion. Impulsividad (<8s): ${pctImpulsiva.toStringAsFixed(1)}%. ${detalleMaterias.isNotEmpty ? 'Materias mas lentas: $detalleMaterias ' : ''}Recomendacion: $recomendacion',
+            'Promedio general: ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion. Impulsividad (<8s): ${pctImpulsiva.toStringAsFixed(1)}%. ${detalleMaterias.isNotEmpty ?'Materias mas lentas: $detalleMaterias ' : ''}Recomendacion: $recomendacion',
         'prompt': 'analisis de velocidad',
         'cta': 'Ver analisis de velocidad',
         'color': '#BBF7D0',
@@ -869,13 +869,13 @@ class TutorIAPersonalService {
 
       final riesgos = rows.map((r) {
         final materia = _asMap(r['materia']);
-        final nombre = (materia['nombre'] ?? 'Materia').toString();
-        final tasa = _toDouble(r['tasa_dominio']) ?? 0;
+        final nombre = (materia['nombre'] ??'Materia').toString();
+        final tasa = _toDouble(r['tasa_dominio']) ??0;
         final hace7 = _toDouble(r['dominio_hace_7_dias']);
-        final delta = hace7 == null ? 0.0 : (tasa - hace7);
+        final delta = hace7 == null ?0.0 : (tasa - hace7);
         final tendencia = delta >= 1.5
             ? 'mejorando'
-            : (delta <= -1.5 ? 'empeorando' : 'estable');
+            : (delta <= -1.5 ?'empeorando' : 'estable');
         return {
           'materia': nombre,
           'tasa': tasa,
@@ -888,7 +888,7 @@ class TutorIAPersonalService {
           .take(3)
           .map(
             (e) =>
-                '${e['materia']} ${(_toDouble(e['tasa']) ?? 0).toStringAsFixed(1)}%',
+                '${e['materia']} ${(_toDouble(e['tasa']) ??0).toStringAsFixed(1)}%',
           )
           .join(', ');
 
@@ -962,12 +962,12 @@ class TutorIAPersonalService {
       }
 
       final urgentes = rows.where((r) {
-        final urg = _normalizarTexto((r['urgencia_revision'] ?? '').toString());
+        final urg = _normalizarTexto((r['urgencia_revision'] ??'').toString());
         return r['requiere_revision_inmediata'] == true ||
             urg.contains('alta') ||
             urg.contains('critica');
       }).length;
-      final topProb = _toDouble(rows.first['probabilidad_olvido']) ?? 0;
+      final topProb = _toDouble(rows.first['probabilidad_olvido']) ??0;
 
       return {
         'id': 'prediccion_olvido',
@@ -995,13 +995,13 @@ class TutorIAPersonalService {
   }
 
   Map<String, dynamic> construirMensajeMotivacionalEstructurado({
-    Map<String, dynamic>? progreso,
-    Map<String, dynamic>? probabilidad,
+    Map<String, dynamic>?progreso,
+    Map<String, dynamic>?probabilidad,
   }) {
     final dominadas = _toInt(progreso?['preguntas_dominadas']);
-    final porcentaje = _toDouble(progreso?['porcentaje_completado']) ?? 0;
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0;
+    final porcentaje = _toDouble(progreso?['porcentaje_completado']) ??0;
+    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ??0;
+    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ??0;
     final probAprobacion = _toDouble(probabilidad?['probabilidad_aprobacion']);
 
     late final String resumen;
@@ -1085,7 +1085,7 @@ Devuelve SOLO JSON valido (sin markdown):
       );
 
       final data = response.data;
-      String? raw;
+      String?raw;
       if (data is String && data.trim().isNotEmpty) {
         raw = data.trim();
       } else if (data is Map && data['text'] is String) {
@@ -1112,7 +1112,7 @@ Devuelve SOLO JSON valido (sin markdown):
           : <String>[];
 
       return {
-        'mensaje': (parsed['mensaje'] ?? '').toString().trim().isEmpty
+        'mensaje': (parsed['mensaje'] ??'').toString().trim().isEmpty
             ? 'Refuerza $materia con preguntas enfocadas en tus errores frecuentes.'
             : parsed['mensaje'].toString(),
         'focos': focos,
@@ -1130,7 +1130,7 @@ Devuelve SOLO JSON valido (sin markdown):
 
   Future<String> enviarMensajeTutor({
     required String mensaje,
-    Map<String, dynamic>? contexto,
+    Map<String, dynamic>?contexto,
   }) async {
     final mensajeLimpio = mensaje.trim();
     if (mensajeLimpio.isEmpty) {
@@ -1143,13 +1143,13 @@ Devuelve SOLO JSON valido (sin markdown):
 
     try {
       final contextoBase = Map<String, dynamic>.from(
-        contexto ?? const <String, dynamic>{},
+        contexto ??const <String, dynamic>{},
       );
       final userIdRaw =
-          (contextoBase['user_id'] ?? contextoBase['usuario_id'] ?? '')
+          (contextoBase['user_id'] ??contextoBase['usuario_id'] ??'')
               .toString()
               .trim();
-      final userId = userIdRaw.isEmpty ? null : userIdRaw;
+      final userId = userIdRaw.isEmpty ?null : userIdRaw;
 
       final sqlDirecta = _extraerConsultaSqlSegura(mensajeLimpio);
       if (sqlDirecta != null) {
@@ -1243,26 +1243,26 @@ Devuelve SOLO JSON valido (sin markdown):
     }
   }
 
-  String? _extraerConsultaSqlSegura(String mensaje) {
+  String?_extraerConsultaSqlSegura(String mensaje) {
     final txt = mensaje.trim();
     if (txt.isEmpty) return null;
 
     final lower = txt.toLowerCase();
     if (lower.startsWith('sql:')) {
       final sql = txt.substring(4).trim();
-      return sql.isEmpty ? null : sql;
+      return sql.isEmpty ?null : sql;
     }
 
     if (lower.startsWith('consulta sql:')) {
       final sql = txt.substring('consulta sql:'.length).trim();
-      return sql.isEmpty ? null : sql;
+      return sql.isEmpty ?null : sql;
     }
 
     return null;
   }
 
   Future<String> _resolverConsultaSqlDirecta({
-    required String? userId,
+    required String?userId,
     required String sql,
   }) async {
     if (userId == null || userId.isEmpty || userId == 'user_test_id') {
@@ -1277,7 +1277,7 @@ Devuelve SOLO JSON valido (sin markdown):
 
       final data = _asMap(raw);
       final rowsRaw = data['rows'];
-      final rows = rowsRaw is List ? rowsRaw : const <dynamic>[];
+      final rows = rowsRaw is List ?rowsRaw : const <dynamic>[];
       final count = _toInt(data['count']);
       final preview = rows.take(5).toList();
 
@@ -1435,13 +1435,13 @@ $instrucciones
     return false;
   }
 
-  String? _resolverConsultaConversacionalSimple({
+  String?_resolverConsultaConversacionalSimple({
     required String mensaje,
     required Map<String, dynamic> contexto,
   }) {
     final t = _normalizarTexto(mensaje);
     final nombre = _extraerNombrePreferido(contexto);
-    final saludo = nombre == null ? '' : '$nombre, ';
+    final saludo = nombre == null ?'' : '$nombre, ';
 
     final mencionaRobot =
         t.contains('robot') ||
@@ -1464,7 +1464,7 @@ $instrucciones
     return null;
   }
 
-  String? _extraerNombrePreferido(Map<String, dynamic> contexto) {
+  String?_extraerNombrePreferido(Map<String, dynamic> contexto) {
     final directos = [
       contexto['nombre_completo'],
       contexto['nombre'],
@@ -1489,7 +1489,7 @@ $instrucciones
 
   Future<String?> _resolverConsultaDeterministica({
     required String mensaje,
-    required String? userId,
+    required String?userId,
     required Map<String, dynamic> contexto,
   }) async {
     if (_esConsultaPlanDiario(mensaje)) {
@@ -1557,7 +1557,7 @@ $instrucciones
     return false;
   }
 
-  bool _sesionInvalida(String? userId) {
+  bool _sesionInvalida(String?userId) {
     return userId == null || userId.isEmpty || userId == 'user_test_id';
   }
 
@@ -1731,7 +1731,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaPreparacionExamen({
-    required String? userId,
+    required String?userId,
   }) async {
     if (userId == null || userId.isEmpty || userId == 'user_test_id') {
       return 'Para calcular cuando estaras listo necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -1762,9 +1762,9 @@ $instrucciones
     final preguntasDominadas = _toInt(progreso?['preguntas_dominadas']);
     final faltantes = (3000 - preguntasDominadas).clamp(0, 3000).toInt();
     final porcentajeCompletado =
-        _toDouble(progreso?['porcentaje_completado']) ?? 0.0;
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0.0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0.0;
+        _toDouble(progreso?['porcentaje_completado']) ??0.0;
+    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ??0.0;
+    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ??0.0;
     final diasRestantes = _toInt(progreso?['dias_restantes']);
     final recomendacionPreguntasDia = _toInt(
       progreso?['recomendacion_preguntas_dia'],
@@ -1772,7 +1772,7 @@ $instrucciones
 
     final probAprobacion = _toDouble(probabilidad?['probabilidad_aprobacion']);
     final puntajeEstimado = _toDouble(probabilidad?['puntaje_estimado']);
-    final nivelConfianza = (probabilidad?['nivel_confianza'] ?? '')
+    final nivelConfianza = (probabilidad?['nivel_confianza'] ??'')
         .toString()
         .trim()
         .replaceAll('_', ' ');
@@ -1781,7 +1781,7 @@ $instrucciones
         _parseFechaFlexible(progreso?['fecha_examen']) ??
         _parseFechaFlexible(dias?['fecha_examen']);
 
-    DateTime? fechaEstimadaListo;
+    DateTime?fechaEstimadaListo;
     if (faltantes <= 0) {
       fechaEstimadaListo = DateTime.now();
     } else if (ritmoActual > 0) {
@@ -1868,7 +1868,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaRanking({
-    required String? userId,
+    required String?userId,
     required Map<String, dynamic> contexto,
   }) async {
     if (_sesionInvalida(userId)) {
@@ -1905,7 +1905,7 @@ $instrucciones
     return '$semanalText $historicoText';
   }
 
-  Future<String?> _resolverConsultaPlanDiario({required String? userId}) async {
+  Future<String?> _resolverConsultaPlanDiario({required String?userId}) async {
     if (_sesionInvalida(userId)) {
       return 'Para generar tu plan diario necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
     }
@@ -1931,7 +1931,7 @@ $instrucciones
     final repaso = _toInt(plan['cantidad_repaso']);
     final diasRestantes = _toInt(plan['dias_restantes']);
     final faltantes = _toInt(plan['preguntas_faltantes']);
-    final mensajeIa = (plan['mensaje_ia'] ?? '').toString().trim();
+    final mensajeIa = (plan['mensaje_ia'] ??'').toString().trim();
 
     final idsMaterias = _toStringList(plan['materias_prioritarias']);
     final materiasPrioritarias = await _resolverNombresMateriasDesdeIds(
@@ -1942,8 +1942,8 @@ $instrucciones
         : materiasPrioritarias.take(3).join(', ');
 
     final prob = _toDouble(probabilidad?['probabilidad_aprobacion']);
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0;
+    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ??0;
+    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ??0;
 
     final partes = <String>[
       'Plan del dia: $totalDia preguntas ($nuevas nuevas y $repaso de repaso).',
@@ -1977,7 +1977,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaQueEstudiar({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para recomendarte que estudiar necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2004,8 +2004,8 @@ $instrucciones
       }
 
       rows.sort((a, b) {
-        final ta = _toDouble(a['tasa_dominio']) ?? 100;
-        final tb = _toDouble(b['tasa_dominio']) ?? 100;
+        final ta = _toDouble(a['tasa_dominio']) ??100;
+        final tb = _toDouble(b['tasa_dominio']) ??100;
         if (ta != tb) return ta.compareTo(tb);
         final pa = _toInt(a['prioridad_estudio']);
         final pb = _toInt(b['prioridad_estudio']);
@@ -2014,14 +2014,14 @@ $instrucciones
 
       final prioritaria = rows.first;
       final materiaMap = _asMap(prioritaria['materia']);
-      final materia = (materiaMap['nombre'] ?? 'Materia').toString();
-      final tasa = _toDouble(prioritaria['tasa_dominio']) ?? 0;
+      final materia = (materiaMap['nombre'] ??'Materia').toString();
+      final tasa = _toDouble(prioritaria['tasa_dominio']) ??0;
       final tiempo = _toInt(prioritaria['tiempo_recomendado_minutos']);
       final hace7 = _toDouble(prioritaria['dominio_hace_7_dias']);
-      final delta = hace7 == null ? 0.0 : (tasa - hace7);
+      final delta = hace7 == null ?0.0 : (tasa - hace7);
       final tendencia = delta >= 2
           ? 'mejorando'
-          : (delta <= -2 ? 'empeorando' : 'estable');
+          : (delta <= -2 ?'empeorando' : 'estable');
       final impactoPuntos = ((70 - tasa).clamp(0, 40) / 4).round();
 
       final temas = _toStringList(prioritaria['temas_debiles']);
@@ -2033,20 +2033,20 @@ $instrucciones
           .take(3)
           .map((r) {
             final m = _asMap(r['materia']);
-            final n = (m['nombre'] ?? 'Materia').toString();
-            final t = (_toDouble(r['tasa_dominio']) ?? 0).toStringAsFixed(1);
+            final n = (m['nombre'] ??'Materia').toString();
+            final t = (_toDouble(r['tasa_dominio']) ??0).toStringAsFixed(1);
             return '$n ($t%)';
           })
           .join(', ');
 
-      return 'Prioridad #1: $materia (${tasa.toStringAsFixed(1)}%). Tendencia: $tendencia. Temas a estudiar hoy: $temasTxt. Tiempo sugerido: ${tiempo > 0 ? tiempo : 25} minutos. Impacto estimado si mejoras esta materia: +$impactoPuntos puntos. Otras materias en riesgo: $topRiesgo.';
+      return 'Prioridad #1: $materia (${tasa.toStringAsFixed(1)}%). Tendencia: $tendencia. Temas a estudiar hoy: $temasTxt. Tiempo sugerido: ${tiempo > 0 ?tiempo : 25} minutos. Impacto estimado si mejoras esta materia: +$impactoPuntos puntos. Otras materias en riesgo: $topRiesgo.';
     } catch (_) {
       return null;
     }
   }
 
   Future<String?> _resolverConsultaHorarioEstudio({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para recomendar horario necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2076,45 +2076,45 @@ $instrucciones
         final momento = _normalizarMomentoDelDia(row['momento_del_dia']);
         if (!stats.containsKey(momento)) continue;
         final bucket = stats[momento]!;
-        bucket['total'] = (bucket['total'] ?? 0) + 1;
+        bucket['total'] = (bucket['total'] ??0) + 1;
         if (esCorrecta) {
-          bucket['correctas'] = (bucket['correctas'] ?? 0) + 1;
+          bucket['correctas'] = (bucket['correctas'] ??0) + 1;
         }
-        final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0;
-        if (tiempo > 0) bucket['tiempo'] = (bucket['tiempo'] ?? 0) + tiempo;
+        final tiempo = _toDouble(row['tiempo_total_respuesta']) ??0;
+        if (tiempo > 0) bucket['tiempo'] = (bucket['tiempo'] ??0) + tiempo;
       }
 
-      final validos = stats.entries.where((e) => (e.value['total'] ?? 0) > 0);
+      final validos = stats.entries.where((e) => (e.value['total'] ??0) > 0);
       if (validos.isEmpty) {
         return 'Aun no tengo datos de horario para recomendarte una franja ideal. Completa algunas practicas en distintos momentos del dia.';
       }
 
       final ordenados = validos.toList()
         ..sort((a, b) {
-          final ta = a.value['total'] ?? 0;
-          final tb = b.value['total'] ?? 0;
-          final aa = ta > 0 ? ((a.value['correctas'] ?? 0) * 100 / ta) : 0;
-          final ab = tb > 0 ? ((b.value['correctas'] ?? 0) * 100 / tb) : 0;
+          final ta = a.value['total'] ??0;
+          final tb = b.value['total'] ??0;
+          final aa = ta > 0 ?((a.value['correctas'] ??0) * 100 / ta) : 0;
+          final ab = tb > 0 ?((b.value['correctas'] ??0) * 100 / tb) : 0;
           if (aa != ab) return ab.compareTo(aa);
           return tb.compareTo(ta);
         });
 
       final mejor = ordenados.first;
-      final mejorTotal = mejor.value['total'] ?? 0;
+      final mejorTotal = mejor.value['total'] ??0;
       final mejorAcierto = mejorTotal > 0
-          ? ((mejor.value['correctas'] ?? 0) * 100 / mejorTotal)
+          ? ((mejor.value['correctas'] ??0) * 100 / mejorTotal)
           : 0;
       final mejorTiempo = mejorTotal > 0
-          ? (mejor.value['tiempo'] ?? 0) / mejorTotal
+          ? (mejor.value['tiempo'] ??0) / mejorTotal
           : 0;
 
       final detalle = <String>[];
       for (final key in const ['manana', 'tarde', 'noche']) {
         final bucket = stats[key]!;
-        final total = bucket['total'] ?? 0;
+        final total = bucket['total'] ??0;
         if (total <= 0) continue;
-        final acierto = ((bucket['correctas'] ?? 0) * 100) / total;
-        final tiempo = (bucket['tiempo'] ?? 0) / total;
+        final acierto = ((bucket['correctas'] ??0) * 100) / total;
+        final tiempo = (bucket['tiempo'] ??0) / total;
         detalle.add(
           '${_descripcionMomento(key)}: ${acierto.toStringAsFixed(1)}% en ${total.toStringAsFixed(0)} respuestas (${tiempo.toStringAsFixed(1)} seg/preg).',
         );
@@ -2127,7 +2127,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaAnalisisVelocidad({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para analizar tu velocidad necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2151,7 +2151,7 @@ $instrucciones
       }
 
       final tiempos = rows
-          .map((r) => _toDouble(r['tiempo_total_respuesta']) ?? 0.0)
+          .map((r) => _toDouble(r['tiempo_total_respuesta']) ??0.0)
           .where((t) => t > 0)
           .toList();
       if (tiempos.isEmpty) {
@@ -2160,15 +2160,15 @@ $instrucciones
 
       final promedio = _promedio(tiempos);
       final impulsivas = rows.where((r) {
-        final t = _toDouble(r['tiempo_total_respuesta']) ?? 0.0;
+        final t = _toDouble(r['tiempo_total_respuesta']) ??0.0;
         return t > 0 && t < 5;
       }).toList();
       final lentas = rows.where((r) {
-        final t = _toDouble(r['tiempo_total_respuesta']) ?? 0.0;
+        final t = _toDouble(r['tiempo_total_respuesta']) ??0.0;
         return t > 30;
       }).toList();
       final control = rows.where((r) {
-        final t = _toDouble(r['tiempo_total_respuesta']) ?? 0.0;
+        final t = _toDouble(r['tiempo_total_respuesta']) ??0.0;
         return t >= 8 && t <= 20;
       }).toList();
 
@@ -2210,7 +2210,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaAnalisisCognitivo({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para analizar tu perfil cognitivo necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2271,17 +2271,17 @@ $instrucciones
       final consejo = promedioRelecturas > 2.4
           ? 'Confia mas en la primera lectura y evita releer en exceso cuando el enunciado ya esta claro.'
           : (promedioCambios > 2.0
-                ? 'Reduce cambios de alternativa: decide una regla de descarte y confirma solo una vez.'
+                ?'Reduce cambios de alternativa: decide una regla de descarte y confirma solo una vez.'
                 : 'Tu patron cognitivo esta estable; enfocate en constancia diaria.');
 
-      return 'Perfil cognitivo: $perfil. Cambios promedio: ${promedioCambios.toStringAsFixed(2)}. Relecturas promedio: ${promedioRelecturas.toStringAsFixed(2)}. Confianza promedio: ${promedioConfianza.toStringAsFixed(2)}/5. Consejo: $consejo ${recomendacionHorario ?? ''}';
+      return 'Perfil cognitivo: $perfil. Cambios promedio: ${promedioCambios.toStringAsFixed(2)}. Relecturas promedio: ${promedioRelecturas.toStringAsFixed(2)}. Confianza promedio: ${promedioConfianza.toStringAsFixed(2)}/5. Consejo: $consejo ${recomendacionHorario ??''}';
     } catch (_) {
       return null;
     }
   }
 
   Future<String?> _resolverConsultaAnalisisSesion({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para analizar tu sesion necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2309,7 +2309,7 @@ $instrucciones
       }
 
       final actual = sesiones.first;
-      final idSesion = (actual['id'] ?? '').toString();
+      final idSesion = (actual['id'] ??'').toString();
       if (idSesion.isEmpty) return 'No pude identificar la sesion a analizar.';
 
       int respondidasSesion(Map<String, dynamic> s) {
@@ -2332,7 +2332,7 @@ $instrucciones
         final tasas = previas.map((s) {
           final r = respondidasSesion(s);
           final c = _toInt(s['preguntas_correctas']);
-          return r > 0 ? (c * 100.0) / r : 0.0;
+          return r > 0 ?(c * 100.0) / r : 0.0;
         }).toList();
         promedioPrevio = tasas.reduce((a, b) => a + b) / tasas.length;
       }
@@ -2353,8 +2353,8 @@ $instrucciones
         if (row['fue_omitida'] == true || row['es_correcta'] != false) continue;
         final pregunta = _asMap(row['pregunta']);
         final materia = _asMap(pregunta['materia']);
-        final nombre = (materia['nombre'] ?? 'Materia').toString();
-        fallosPorMateria[nombre] = (fallosPorMateria[nombre] ?? 0) + 1;
+        final nombre = (materia['nombre'] ??'Materia').toString();
+        fallosPorMateria[nombre] = (fallosPorMateria[nombre] ??0) + 1;
       }
       final materiaCritica = fallosPorMateria.entries.isEmpty
           ? 'Sin materia critica detectada'
@@ -2369,13 +2369,13 @@ $instrucciones
                 : 'Bajaste ${delta.abs().toStringAsFixed(1)} puntos frente a tus sesiones previas.');
 
       final nombreSesion =
-          (actual['nombre_sesion'] ?? actual['tipo_sesion'] ?? 'Sesion')
+          (actual['nombre_sesion'] ??actual['tipo_sesion'] ??'Sesion')
               .toString();
       final incorrectas = _toInt(actual['preguntas_incorrectas']);
       final omitidas = _toInt(actual['preguntas_omitidas']);
 
       final parteMateria = materiaCritica is MapEntry<String, int>
-          ? 'Materia con mayor error: ${materiaCritica.key} (${materiaCritica.value} fallos).'
+          ?'Materia con mayor error: ${materiaCritica.key} (${materiaCritica.value} fallos).'
           : '$materiaCritica.';
 
       return 'Analisis post-sesion ($nombreSesion): $correctasActual/$respondidasActual correctas (${tasaActual.toStringAsFixed(1)}%). Incorrectas: $incorrectas, omitidas: $omitidas. $tendenciaTxt $parteMateria';
@@ -2385,7 +2385,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaPatronesError({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para detectar tus patrones de error necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2416,8 +2416,8 @@ $instrucciones
         }
 
         patrones.sort((a, b) {
-          final sa = severidadScore((a['severidad'] ?? '').toString());
-          final sb = severidadScore((b['severidad'] ?? '').toString());
+          final sa = severidadScore((a['severidad'] ??'').toString());
+          final sb = severidadScore((b['severidad'] ??'').toString());
           if (sa != sb) return sb.compareTo(sa);
           return _toInt(
             b['veces_detectado'],
@@ -2427,16 +2427,16 @@ $instrucciones
         final top = patrones
             .take(3)
             .map((p) {
-              final tipo = (p['tipo_patron'] ?? 'patron').toString();
-              final sev = (p['severidad'] ?? 'sin_severidad').toString();
+              final tipo = (p['tipo_patron'] ??'patron').toString();
+              final sev = (p['severidad'] ??'sin_severidad').toString();
               final veces = _toInt(p['veces_detectado']);
-              final perdida = (_toDouble(p['puntos_perdidos_estimados']) ?? 0)
+              final perdida = (_toDouble(p['puntos_perdidos_estimados']) ??0)
                   .toStringAsFixed(1);
               return '$tipo (sev $sev, $veces veces, -$perdida pts)';
             })
             .join('; ');
 
-        final estrategia = (patrones.first['estrategia_correccion'] ?? '')
+        final estrategia = (patrones.first['estrategia_correccion'] ??'')
             .toString()
             .trim();
         final estrategiaTxt = estrategia.isEmpty
@@ -2460,9 +2460,9 @@ $instrucciones
         if (item is! Map) continue;
         final row = Map<String, dynamic>.from(item);
         if (row['fue_omitida'] == true || row['es_correcta'] != false) continue;
-        var tipo = (row['tipo_error'] ?? '').toString().trim();
+        var tipo = (row['tipo_error'] ??'').toString().trim();
         if (tipo.isEmpty) {
-          final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0;
+          final tiempo = _toDouble(row['tiempo_total_respuesta']) ??0;
           final cambios = _toInt(row['numero_cambios_respuesta']);
           if (tiempo > 0 && tiempo < 5) {
             tipo = 'impulsividad';
@@ -2474,7 +2474,7 @@ $instrucciones
             tipo = 'error_lectura';
           }
         }
-        conteo[tipo] = (conteo[tipo] ?? 0) + 1;
+        conteo[tipo] = (conteo[tipo] ??0) + 1;
       }
 
       if (conteo.isEmpty) {
@@ -2487,7 +2487,7 @@ $instrucciones
       final resumen = top
           .take(3)
           .map((e) {
-            final pct = total > 0 ? (e.value * 100.0 / total) : 0;
+            final pct = total > 0 ?(e.value * 100.0 / total) : 0;
             return '${e.key}: ${pct.toStringAsFixed(1)}%';
           })
           .join(', ');
@@ -2499,7 +2499,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaMateriasRiesgo({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para detectar materias en riesgo necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2530,20 +2530,20 @@ $instrucciones
           .take(3)
           .map((r) {
             final materia = _asMap(r['materia']);
-            final nombre = (materia['nombre'] ?? 'Materia').toString();
-            final tasa = _toDouble(r['tasa_dominio']) ?? 0;
+            final nombre = (materia['nombre'] ??'Materia').toString();
+            final tasa = _toDouble(r['tasa_dominio']) ??0;
             final hace7 = _toDouble(r['dominio_hace_7_dias']);
-            final delta = hace7 == null ? 0.0 : (tasa - hace7);
+            final delta = hace7 == null ?0.0 : (tasa - hace7);
             final tendencia = delta >= 1.5
                 ? 'mejorando'
-                : (delta <= -1.5 ? 'empeorando' : 'estable');
+                : (delta <= -1.5 ?'empeorando' : 'estable');
             final totalBanco = _toInt(materia['total_preguntas_banco']);
             final vistas = _toInt(r['total_preguntas_vistas']);
             final pendientes = totalBanco > 0
                 ? (totalBanco - vistas).clamp(0, totalBanco)
                 : 0;
             final tiempo = _toInt(r['tiempo_recomendado_minutos']);
-            return '$nombre ${tasa.toStringAsFixed(1)}% (tendencia $tendencia, pendientes $pendientes, sugerido ${tiempo > 0 ? tiempo : 25} min/dia)';
+            return '$nombre ${tasa.toStringAsFixed(1)}% (tendencia $tendencia, pendientes $pendientes, sugerido ${tiempo > 0 ?tiempo : 25} min/dia)';
           })
           .join('; ');
 
@@ -2554,7 +2554,7 @@ $instrucciones
   }
 
   Future<String?> _resolverConsultaPrediccionOlvido({
-    required String? userId,
+    required String?userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return 'Para predecir olvido necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
@@ -2581,19 +2581,19 @@ $instrucciones
       }
 
       final urgentes = rows.where((r) {
-        final urg = _normalizarTexto((r['urgencia_revision'] ?? '').toString());
+        final urg = _normalizarTexto((r['urgencia_revision'] ??'').toString());
         return r['requiere_revision_inmediata'] == true ||
             urg.contains('alta') ||
             urg.contains('critica');
       }).length;
 
       final porMateria = <String, int>{};
-      DateTime? proximaRevision;
+      DateTime?proximaRevision;
       for (final r in rows) {
         final pregunta = _asMap(r['pregunta']);
         final materia = _asMap(pregunta['materia']);
-        final nombre = (materia['nombre'] ?? 'Materia').toString();
-        porMateria[nombre] = (porMateria[nombre] ?? 0) + 1;
+        final nombre = (materia['nombre'] ??'Materia').toString();
+        porMateria[nombre] = (porMateria[nombre] ??0) + 1;
 
         final fecha = _parseFechaFlexible(r['fecha_revision_optima']);
         if (fecha != null &&
@@ -2618,7 +2618,7 @@ $instrucciones
     }
   }
 
-  Future<String?> _resolverConsultaMotivacion({required String? userId}) async {
+  Future<String?> _resolverConsultaMotivacion({required String?userId}) async {
     if (_sesionInvalida(userId)) {
       return 'Sigue avanzando. Inicia sesion para recibir un mensaje motivacional personalizado con tus datos reales.';
     }
@@ -2636,9 +2636,9 @@ $instrucciones
 
     final dominadas = _toInt(progreso['preguntas_dominadas']);
     final diasTranscurridos = _toInt(progreso['dias_transcurridos']);
-    final ritmoActual = _toDouble(progreso['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso['ritmo_necesario_dia']) ?? 0;
-    final porcentaje = _toDouble(progreso['porcentaje_completado']) ?? 0;
+    final ritmoActual = _toDouble(progreso['ritmo_actual_dia']) ??0;
+    final ritmoNecesario = _toDouble(progreso['ritmo_necesario_dia']) ??0;
+    final porcentaje = _toDouble(progreso['porcentaje_completado']) ??0;
     final probAprobacion = _toDouble(probabilidad?['probabilidad_aprobacion']);
 
     late final String mensaje;
@@ -2699,7 +2699,7 @@ $instrucciones
 
   Future<Map<String, dynamic>?> _obtenerPlanAdaptativoSeguro({
     required String userId,
-    Map<String, dynamic>? planBase,
+    Map<String, dynamic>?planBase,
   }) async {
     if (planBase != null && planBase.isNotEmpty) {
       return planBase;
@@ -2807,7 +2807,7 @@ $instrucciones
     }
   }
 
-  String? _extraerCategoriaDesdeMapa(Map<String, dynamic> data) {
+  String?_extraerCategoriaDesdeMapa(Map<String, dynamic> data) {
     final directos = [
       data['categoria_usuario'],
       data['categoria'],
@@ -2829,7 +2829,7 @@ $instrucciones
 
   Future<Map<String, dynamic>?> _obtenerResumenRankingUsuario({
     required String userId,
-    required String? categoriaUsuario,
+    required String?categoriaUsuario,
   }) async {
     final resultados = await Future.wait<Map<String, dynamic>?>([
       _obtenerFilaRankingUsuario(
@@ -2850,14 +2850,14 @@ $instrucciones
 
     if (semanal == null && historico == null) return null;
     return {
-      'semanal': semanal ?? const <String, dynamic>{},
-      'historico': historico ?? const <String, dynamic>{},
+      'semanal': semanal ??const <String, dynamic>{},
+      'historico': historico ??const <String, dynamic>{},
     };
   }
 
   Future<Map<String, dynamic>?> _obtenerFilaRankingUsuario({
     required String userId,
-    required String? categoriaUsuario,
+    required String?categoriaUsuario,
     required String modo,
     required String criterio,
   }) async {
@@ -2875,7 +2875,7 @@ $instrucciones
               .toList();
           final totalFast = rowsFast.length;
           final rowFast = rowsFast.firstWhere(
-            (r) => (r['usuario_id'] ?? r['id'])?.toString() == userId,
+            (r) => (r['usuario_id'] ??r['id'])?.toString() == userId,
             orElse: () => const <String, dynamic>{},
           );
 
@@ -2887,9 +2887,9 @@ $instrucciones
             'criterio': criterio,
             if (enRankingFast) ...{
               'posicion': _toInt(rowFast['posicion']),
-              'puntos_promedio': _toDouble(rowFast['puntos_promedio']) ?? 0.0,
+              'puntos_promedio': _toDouble(rowFast['puntos_promedio']) ??0.0,
               'puntaje_maximo': _toInt(rowFast['puntaje_maximo']),
-              'efectividad': _toDouble(rowFast['efectividad']) ?? 0.0,
+              'efectividad': _toDouble(rowFast['efectividad']) ??0.0,
               'practicas_para_ranking': _toInt(
                 rowFast['practicas_para_ranking'],
               ),
@@ -2932,7 +2932,7 @@ $instrucciones
           .toList();
       final total = rows.length;
       final row = rows.firstWhere(
-        (r) => (r['usuario_id'] ?? r['id'])?.toString() == userId,
+        (r) => (r['usuario_id'] ??r['id'])?.toString() == userId,
         orElse: () => const <String, dynamic>{},
       );
 
@@ -2944,9 +2944,9 @@ $instrucciones
         'criterio': criterio,
         if (enRanking) ...{
           'posicion': _toInt(row['posicion']),
-          'puntos_promedio': _toDouble(row['puntos_promedio']) ?? 0.0,
+          'puntos_promedio': _toDouble(row['puntos_promedio']) ??0.0,
           'puntaje_maximo': _toInt(row['puntaje_maximo']),
-          'efectividad': _toDouble(row['efectividad']) ?? 0.0,
+          'efectividad': _toDouble(row['efectividad']) ??0.0,
           'practicas_para_ranking': _toInt(row['practicas_para_ranking']),
         },
       };
@@ -2974,9 +2974,9 @@ $instrucciones
     }
 
     final posicion = _toInt(info['posicion']);
-    final promedio = _toDouble(info['puntos_promedio']) ?? 0.0;
+    final promedio = _toDouble(info['puntos_promedio']) ??0.0;
     final maximo = _toInt(info['puntaje_maximo']);
-    final efectividad = _toDouble(info['efectividad']) ?? 0.0;
+    final efectividad = _toDouble(info['efectividad']) ??0.0;
     final practicas = _toInt(info['practicas_para_ranking']);
 
     if (usarMaximoComoPrincipal) {
@@ -2993,7 +2993,7 @@ $instrucciones
   }
 
   Future<Map<String, dynamic>> _contextoUsuarioChatDesdeBD(
-    String? userId,
+    String?userId,
   ) async {
     if (userId == null || userId.isEmpty || userId == 'user_test_id') {
       return const <String, dynamic>{};
@@ -3042,24 +3042,24 @@ $instrucciones
         final materiaMap = d['materia'] is Map
             ? Map<String, dynamic>.from(d['materia'])
             : {};
-        final nombre = (materiaMap['nombre'] ?? 'Materia').toString();
-        final tasa = _toDouble(d['tasa_dominio']) ?? 0.0;
+        final nombre = (materiaMap['nombre'] ??'Materia').toString();
+        final tasa = _toDouble(d['tasa_dominio']) ??0.0;
         return {'materia': nombre, 'tasa': tasa};
       }).toList();
 
       analisis.sort((a, b) {
-        final aa = _toDouble(a['tasa']) ?? 0.0;
-        final bb = _toDouble(b['tasa']) ?? 0.0;
+        final aa = _toDouble(a['tasa']) ??0.0;
+        final bb = _toDouble(b['tasa']) ??0.0;
         return bb.compareTo(aa);
       });
 
       final fortalezas = analisis
-          .where((m) => (_toDouble(m['tasa']) ?? 0) >= 75)
+          .where((m) => (_toDouble(m['tasa']) ??0) >= 75)
           .take(3)
           .toList();
       final debilidades = [
         ...analisis.reversed,
-      ].where((m) => (_toDouble(m['tasa']) ?? 100) < 65).take(3).toList();
+      ].where((m) => (_toDouble(m['tasa']) ??100) < 65).take(3).toList();
 
       final List<dynamic> respuestasRaw = await _supabase
           .from('respuesta_usuario')
@@ -3083,7 +3083,7 @@ $instrucciones
           .where((r) => r['es_correcta'] == false)
           .length;
       final total = validas.length;
-      final efectividadReciente = total > 0 ? (correctas * 100.0) / total : 0.0;
+      final efectividadReciente = total > 0 ?(correctas * 100.0) / total : 0.0;
       final ranking = await _obtenerResumenRankingUsuario(
         userId: userId,
         categoriaUsuario: categoriaUsuario,
@@ -3093,13 +3093,13 @@ $instrucciones
         'usuario_id': userId,
         if (categoriaUsuario != null && categoriaUsuario.isNotEmpty)
           'categoria_usuario': categoriaUsuario,
-        if ((usuario['nombre_completo'] ?? '').toString().trim().isNotEmpty)
+        if ((usuario['nombre_completo'] ??'').toString().trim().isNotEmpty)
           'nombre_completo': usuario['nombre_completo'].toString().trim(),
         'resumen_global': {
           'tasa_acierto_global':
-              _toDouble(perfil['tasa_acierto_global']) ?? 0.0,
+              _toDouble(perfil['tasa_acierto_global']) ??0.0,
           'velocidad_promedio_segundos':
-              _toDouble(perfil['velocidad_promedio_segundos']) ?? 0.0,
+              _toDouble(perfil['velocidad_promedio_segundos']) ??0.0,
           'racha_dias': _toInt(perfil['dias_consecutivos_estudio']),
           'tiempo_total_estudio_minutos': _toInt(
             estadistica['tiempo_total_estudio_minutos'],
@@ -3124,7 +3124,7 @@ $instrucciones
 
   Future<FunctionResponse> _invocarTutorConReintento401({
     required String prompt,
-    String? userId,
+    String?userId,
     String mode = 'chat',
     bool usarContextoBd = true,
   }) async {
@@ -3223,7 +3223,7 @@ $instrucciones
 
         if (!_materiaCoincide(nombreMateria, objetivo)) continue;
 
-        final preguntaId = (row['pregunta_id'] ?? preguntaMap['id'])
+        final preguntaId = (row['pregunta_id'] ??preguntaMap['id'])
             ?.toString();
         if (preguntaId == null || preguntaId.isEmpty) continue;
 
@@ -3232,7 +3232,7 @@ $instrucciones
           () => {
             'pregunta_id': preguntaId,
             'numero': _toInt(preguntaMap['numero']),
-            'texto': (preguntaMap['texto'] ?? '').toString(),
+            'texto': (preguntaMap['texto'] ??'').toString(),
             'materia': nombreMateria,
             'intentos': 0,
             'fallos': 0,
@@ -3252,7 +3252,7 @@ $instrucciones
           .map((m) {
             final intentos = _toInt(m['intentos']);
             final fallos = _toInt(m['fallos']);
-            final tasaError = intentos > 0 ? (fallos * 100.0) / intentos : 0.0;
+            final tasaError = intentos > 0 ?(fallos * 100.0) / intentos : 0.0;
             return {...m, 'tasa_error': tasaError};
           })
           .where((m) {
@@ -3267,8 +3267,8 @@ $instrucciones
         final byFallos = fallosB.compareTo(fallosA);
         if (byFallos != 0) return byFallos;
 
-        final tasaA = _toDouble(a['tasa_error']) ?? 0;
-        final tasaB = _toDouble(b['tasa_error']) ?? 0;
+        final tasaA = _toDouble(a['tasa_error']) ??0;
+        final tasaB = _toDouble(b['tasa_error']) ??0;
         return tasaB.compareTo(tasaA);
       });
 
@@ -3282,13 +3282,13 @@ $instrucciones
   Future<Map<String, dynamic>> obtenerDetalleMateria({
     required String userId,
     required String materia,
-    double? porcentajeActual,
-    String? nivelActual,
+    double?porcentajeActual,
+    String?nivelActual,
   }) async {
     final fallback = _detalleMateriaFallback(
       materia: materia,
-      porcentajeActual: porcentajeActual ?? 0,
-      nivelActual: nivelActual ?? 'INTERMEDIO',
+      porcentajeActual: porcentajeActual ??0,
+      nivelActual: nivelActual ??'INTERMEDIO',
     );
 
     if (!SupabaseService.isInitialized) return fallback;
@@ -3312,11 +3312,11 @@ $instrucciones
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
 
-      Map<String, dynamic>? dominioMateria;
+      Map<String, dynamic>?dominioMateria;
       for (final d in dominios) {
         final materiaMap = d['materia'];
         final nombre = (materiaMap is Map)
-            ? (materiaMap['nombre'] ?? '').toString()
+            ? (materiaMap['nombre'] ??'').toString()
             : '';
         if (_materiaCoincide(nombre, objetivo)) {
           dominioMateria = d;
@@ -3330,20 +3330,20 @@ $instrucciones
 
       final totalPreguntasBanco = _toInt(materiaMap['total_preguntas_banco']);
       final tasaDominio =
-          _toDouble(dominioMateria?['tasa_dominio']) ?? porcentajeActual ?? 0.0;
+          _toDouble(dominioMateria?['tasa_dominio']) ??porcentajeActual ??0.0;
       final nivelDominio =
           (dominioMateria?['nivel_dominio'] ??
                   nivelActual ??
                   _nivelMateria(tasaDominio))
               .toString();
-      final codigoMateria = (materiaMap['codigo'] ?? 'SIN-COD').toString();
-      final areaMateria = (materiaMap['categoria'] ?? 'Area general')
+      final codigoMateria = (materiaMap['codigo'] ??'SIN-COD').toString();
+      final areaMateria = (materiaMap['categoria'] ??'Area general')
           .toString();
       final dificultad =
           (materiaMap['nivel_dificultad_promedio'] ??
                   (tasaDominio < 50
                       ? 'alta'
-                      : (tasaDominio < 75 ? 'media' : 'baja')))
+                      : (tasaDominio < 75 ?'media' : 'baja')))
               .toString();
 
       final List<dynamic> respuestasRaw = await _supabase
@@ -3366,7 +3366,7 @@ $instrucciones
         if (pregunta is! Map) return false;
         final materiaData = pregunta['materia'];
         final nombreMateria = (materiaData is Map)
-            ? (materiaData['nombre'] ?? '').toString()
+            ? (materiaData['nombre'] ??'').toString()
             : '';
         return _materiaCoincide(nombreMateria, objetivo);
       }).toList();
@@ -3389,23 +3389,23 @@ $instrucciones
           .length;
       final intentos = respuestasMateria.length;
 
-      var materiaId = (materiaMap['id'] ?? '').toString().trim();
+      var materiaId = (materiaMap['id'] ??'').toString().trim();
       if (materiaId.isEmpty) {
         final preguntaConMateriaId = respuestasMateria.firstWhere((r) {
           final pregunta = r['pregunta'];
           return pregunta is Map &&
-              (pregunta['materia_id'] ?? '').toString().trim().isNotEmpty;
+              (pregunta['materia_id'] ??'').toString().trim().isNotEmpty;
         }, orElse: () => <String, dynamic>{});
         final preguntaData = (preguntaConMateriaId['pregunta'] is Map)
             ? Map<String, dynamic>.from(preguntaConMateriaId['pregunta'])
             : const <String, dynamic>{};
-        materiaId = (preguntaData['materia_id'] ?? '').toString().trim();
+        materiaId = (preguntaData['materia_id'] ??'').toString().trim();
       }
 
       final respuestasMateriaOrdenadas = [...respuestasMateria]
         ..sort((a, b) {
-          final ta = DateTime.tryParse((a['respondida_at'] ?? '').toString());
-          final tb = DateTime.tryParse((b['respondida_at'] ?? '').toString());
+          final ta = DateTime.tryParse((a['respondida_at'] ??'').toString());
+          final tb = DateTime.tryParse((b['respondida_at'] ??'').toString());
           if (ta == null && tb == null) return 0;
           if (ta == null) return 1;
           if (tb == null) return -1;
@@ -3414,7 +3414,7 @@ $instrucciones
 
       final Map<String, Map<String, dynamic>> ultimoIntentoPorPregunta = {};
       for (final r in respuestasMateriaOrdenadas) {
-        final id = (r['pregunta_id'] ?? '').toString().trim();
+        final id = (r['pregunta_id'] ??'').toString().trim();
         if (id.isEmpty) continue;
         ultimoIntentoPorPregunta.putIfAbsent(id, () => r);
       }
@@ -3495,12 +3495,12 @@ $instrucciones
 
       final tiemposMateria = respuestasMateria
           .where((r) => r['fue_omitida'] != true)
-          .map((r) => _toDouble(r['tiempo_total_respuesta']) ?? 0.0)
+          .map((r) => _toDouble(r['tiempo_total_respuesta']) ??0.0)
           .where((t) => t > 0)
           .toList();
       final tiemposGlobal = respuestas
           .where((r) => r['fue_omitida'] != true)
-          .map((r) => _toDouble(r['tiempo_total_respuesta']) ?? 0.0)
+          .map((r) => _toDouble(r['tiempo_total_respuesta']) ??0.0)
           .where((t) => t > 0)
           .toList();
       final tiempoPromedioMateria = _promedio(tiemposMateria);
@@ -3517,13 +3517,13 @@ $instrucciones
       final limite14 = ahora.subtract(const Duration(days: 14));
       final recientes = respuestasMateria.where((r) {
         final t = DateTime.tryParse(
-          (r['respondida_at'] ?? '').toString(),
+          (r['respondida_at'] ??'').toString(),
         )?.toUtc();
         return t != null && t.isAfter(limite7);
       }).toList();
       final anteriores = respuestasMateria.where((r) {
         final t = DateTime.tryParse(
-          (r['respondida_at'] ?? '').toString(),
+          (r['respondida_at'] ??'').toString(),
         )?.toUtc();
         if (t == null) return false;
         return t.isAfter(limite14) && t.isBefore(limite7);
@@ -3536,30 +3536,30 @@ $instrucciones
         deltaTendencia = accReciente - accAnterior;
       } else {
         final dominio7 = _toDouble(dominioMateria?['dominio_hace_7_dias']);
-        deltaTendencia = dominio7 == null ? 0.0 : (tasaDominio - dominio7);
+        deltaTendencia = dominio7 == null ?0.0 : (tasaDominio - dominio7);
       }
 
       final tendencia = deltaTendencia >= 2.0
           ? 'mejorando'
-          : (deltaTendencia <= -2.0 ? 'empeorando' : 'estable');
+          : (deltaTendencia <= -2.0 ?'empeorando' : 'estable');
 
       final Map<String, int> fallosPorPregunta = {};
       final Map<String, int> fallosPorTema = {};
 
       for (final r in respuestasMateria) {
         if (r['es_correcta'] != false || r['fue_omitida'] == true) continue;
-        final preguntaId = (r['pregunta_id'] ?? '').toString();
+        final preguntaId = (r['pregunta_id'] ??'').toString();
         if (preguntaId.isNotEmpty) {
           fallosPorPregunta[preguntaId] =
-              (fallosPorPregunta[preguntaId] ?? 0) + 1;
+              (fallosPorPregunta[preguntaId] ??0) + 1;
         }
 
         final pregunta = r['pregunta'];
         final tema = (pregunta is Map)
-            ? (pregunta['tema_especifico'] ?? '').toString().trim()
+            ? (pregunta['tema_especifico'] ??'').toString().trim()
             : '';
-        final temaFinal = tema.isNotEmpty ? tema : 'Fundamentos de $materia';
-        fallosPorTema[temaFinal] = (fallosPorTema[temaFinal] ?? 0) + 1;
+        final temaFinal = tema.isNotEmpty ?tema : 'Fundamentos de $materia';
+        fallosPorTema[temaFinal] = (fallosPorTema[temaFinal] ??0) + 1;
       }
 
       final fallidasOrdenadas = fallosPorPregunta.entries.toList()
@@ -3579,14 +3579,14 @@ $instrucciones
       final Map<String, List<double>> tiemposPorMateria = {};
       for (final r in respuestas) {
         if (r['fue_omitida'] == true) continue;
-        final tiempo = _toDouble(r['tiempo_total_respuesta']) ?? 0;
+        final tiempo = _toDouble(r['tiempo_total_respuesta']) ??0;
         if (tiempo <= 0) continue;
 
         final pregunta = r['pregunta'];
         if (pregunta is! Map) continue;
         final materiaData = pregunta['materia'];
         final nombreMateria = (materiaData is Map)
-            ? (materiaData['nombre'] ?? '').toString().trim()
+            ? (materiaData['nombre'] ??'').toString().trim()
             : '';
         if (nombreMateria.isEmpty) continue;
         tiemposPorMateria.putIfAbsent(nombreMateria, () => []).add(tiempo);
@@ -3596,8 +3596,8 @@ $instrucciones
           tiemposPorMateria.entries.map((e) {
             return {'materia': e.key, 'promedio': _promedio(e.value)};
           }).toList()..sort((a, b) {
-            final av = _toDouble(a['promedio']) ?? 0;
-            final bv = _toDouble(b['promedio']) ?? 0;
+            final av = _toDouble(a['promedio']) ??0;
+            final bv = _toDouble(b['promedio']) ??0;
             return bv.compareTo(av);
           });
 
@@ -3605,7 +3605,7 @@ $instrucciones
           .take(3)
           .map(
             (m) =>
-                '${m['materia']} (${(_toDouble(m['promedio']) ?? 0).toStringAsFixed(1)} seg)',
+                '${m['materia']} (${(_toDouble(m['promedio']) ??0).toStringAsFixed(1)} seg)',
           )
           .toList();
 
@@ -3616,7 +3616,7 @@ $instrucciones
               .clamp(5.0, 99.0);
       var gananciaDiaria = tasaDominio < 50
           ? 0.9
-          : (tasaDominio < 75 ? 0.65 : 0.45);
+          : (tasaDominio < 75 ?0.65 : 0.45);
       if (tendencia == 'empeorando') gananciaDiaria -= 0.2;
       if (gananciaDiaria < 0.2) gananciaDiaria = 0.2;
 
@@ -3633,7 +3633,7 @@ $instrucciones
       final tiempoSugerido =
           _toInt(dominioMateria?['tiempo_recomendado_minutos']) > 0
           ? _toInt(dominioMateria?['tiempo_recomendado_minutos'])
-          : (tasaDominio < 50 ? 35 : (tasaDominio < 70 ? 25 : 18));
+          : (tasaDominio < 50 ?35 : (tasaDominio < 70 ?25 : 18));
       final objetivoPorcentaje = (tasaDominio + 12).clamp(75.0, 92.0).round();
 
       return {
@@ -3719,10 +3719,10 @@ $instrucciones
           .take(8)
           .map(
             (m) => {
-              'materia': (m['materia'] ?? '').toString(),
-              'porcentaje': _toDouble(m['porcentaje']) ?? 0.0,
-              'nivel': (m['nivel'] ?? '').toString(),
-              'tipo': (m['tipo'] ?? '').toString(),
+              'materia': (m['materia'] ??'').toString(),
+              'porcentaje': _toDouble(m['porcentaje']) ??0.0,
+              'nivel': (m['nivel'] ??'').toString(),
+              'tipo': (m['tipo'] ??'').toString(),
             },
           )
           .toList();
@@ -3755,7 +3755,7 @@ DATOS:
       );
 
       final data = response.data;
-      String? raw;
+      String?raw;
       if (data is String && data.trim().isNotEmpty) {
         raw = data.trim();
       } else if (data is Map && data['text'] is String) {
@@ -3771,7 +3771,7 @@ DATOS:
           .trim();
 
       if (cleaned.isEmpty) return fallback;
-      return cleaned.length <= 170 ? cleaned : cleaned.substring(0, 170).trim();
+      return cleaned.length <= 170 ?cleaned : cleaned.substring(0, 170).trim();
     } catch (_) {
       return fallback;
     }
@@ -3783,10 +3783,10 @@ DATOS:
     required List<String> debilidades,
   }) {
     final fortalezasCount = analisisMaterias
-        .where((m) => (m['tipo'] ?? '').toString() == 'fortaleza')
+        .where((m) => (m['tipo'] ??'').toString() == 'fortaleza')
         .length;
     final debilidadesCount = analisisMaterias
-        .where((m) => (m['tipo'] ?? '').toString() == 'debilidad')
+        .where((m) => (m['tipo'] ??'').toString() == 'debilidad')
         .length;
 
     if (fortalezasCount == 0 &&
@@ -3795,8 +3795,8 @@ DATOS:
       return 'Briefing inicial listo: aun no hay datos por materia. Ejecuta una practica y vuelve a Revisar.';
     }
 
-    final f = fortalezasCount > 0 ? fortalezasCount : fortalezas.length;
-    final d = debilidadesCount > 0 ? debilidadesCount : debilidades.length;
+    final f = fortalezasCount > 0 ?fortalezasCount : fortalezas.length;
+    final d = debilidadesCount > 0 ?debilidadesCount : debilidades.length;
     return 'Briefing IA: $f materias en control y $d en mejora. Entra a Revisar para ejecutar el plan por materia.';
   }
 
@@ -3809,10 +3809,10 @@ DATOS:
     required int rachaDias,
     required int preguntasDominadas,
     required int tiempoTotalMinutos,
-    String? categoria,
-    String? gradoActual,
-    String? especialidad,
-    int? metaDiariaMinutos,
+    String?categoria,
+    String?gradoActual,
+    String?especialidad,
+    int?metaDiariaMinutos,
   }) async {
     if (!SupabaseService.isInitialized) {
       return _panelBasico(nivel, debilidades);
@@ -3827,10 +3827,10 @@ DATOS:
         'racha_dias': rachaDias,
         'preguntas_dominadas': preguntasDominadas,
         'tiempo_total_minutos': tiempoTotalMinutos,
-        'categoria': categoria ?? 'No especificado',
-        'grado_actual': gradoActual ?? 'No especificado',
-        'especialidad': especialidad ?? 'No especificado',
-        'meta_diaria_minutos': metaDiariaMinutos ?? 30,
+        'categoria': categoria ??'No especificado',
+        'grado_actual': gradoActual ??'No especificado',
+        'especialidad': especialidad ??'No especificado',
+        'meta_diaria_minutos': metaDiariaMinutos ??30,
       };
 
       final prompt =
@@ -3881,7 +3881,7 @@ REGLAS:
       );
 
       final data = response.data;
-      String? raw;
+      String?raw;
       if (data is String && data.trim().isNotEmpty) {
         raw = data.trim();
       } else if (data is Map && data['text'] is String) {
@@ -3927,7 +3927,7 @@ REGLAS:
     };
   }
 
-  Map<String, dynamic>? _parsePanelJson(String raw) {
+  Map<String, dynamic>?_parsePanelJson(String raw) {
     try {
       final decoded = json.decode(raw);
       if (decoded is Map<String, dynamic>) return decoded;
@@ -3963,7 +3963,7 @@ REGLAS:
       for (final item in cardsRaw) {
         if (item is Map) {
           final map = Map<String, dynamic>.from(item);
-          final typeRaw = map['type']?.toString().toLowerCase().trim() ?? '';
+          final typeRaw = map['type']?.toString().toLowerCase().trim() ??'';
           final type = _mapType(typeRaw);
           final title = map['title']?.toString().trim();
           final message = map['message']?.toString().trim();
@@ -3979,12 +3979,12 @@ REGLAS:
                     .toList()
               : <String>[];
 
-          if ((title ?? '').isEmpty && (message ?? '').isEmpty) continue;
+          if ((title ??'').isEmpty && (message ??'').isEmpty) continue;
 
           cards.add({
             'type': type,
-            'title': (title ?? 'Recomendacion IA'),
-            'message': message ?? '',
+            'title': (title ??'Recomendacion IA'),
+            'message': message ??'',
             if (cta != null && cta.isNotEmpty) 'cta': cta,
             if (items.isNotEmpty) 'items': items,
             if (payload.isNotEmpty) 'payload': payload,
@@ -4032,28 +4032,28 @@ REGLAS:
   // Fallback en caso de que DeepSeek falle o no haya internet
   String _generarDiagnosticoBasico(String nivel, List<String> debilidades) {
     if (debilidades.isEmpty || debilidades.first.contains('proceso')) {
-      return "Ã‚Â¡Bienvenido! Empieza tus prÃƒÂ¡cticas para que pueda analizar tu rendimiento.";
+      return "?Bienvenido! Empieza tus pr?cticas para que pueda analizar tu rendimiento.";
     }
-    return "Nivel $nivel detectado. Debemos reforzar ${debilidades.first.split('(').first}. Ã‚Â¡Sigue asÃƒÂ­!";
+    return "Nivel $nivel detectado. Debemos reforzar ${debilidades.first.split('(').first}. ?Sigue as?!";
   }
 
-  // --- Funciones Auxiliares de LÃƒÂ³gica de Negocio ---
+  // --- Funciones Auxiliares de L?gica de Negocio ---
 
   String _calcularNivelGlobal(Map<String, dynamic> perfil) {
-    final tasa = (perfil['tasa_acierto_global'] as num?)?.toDouble() ?? 0.0;
+    final tasa = (perfil['tasa_acierto_global'] as num?)?.toDouble() ??0.0;
     if (tasa < 50) return 'PRINCIPIANTE';
     if (tasa < 75) return 'INTERMEDIO';
     if (tasa < 90) return 'AVANZADO';
     return 'EXPERTO';
   }
 
-  double? _toDouble(dynamic value) {
+  double?_toDouble(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value);
     return null;
   }
 
-  String? _extraerTextoDesdeInvoke(dynamic data) {
+  String?_extraerTextoDesdeInvoke(dynamic data) {
     if (data is String && data.trim().isNotEmpty) {
       return data.trim();
     }
@@ -4131,7 +4131,7 @@ REGLAS:
     }
 
     if (status == 400) {
-      final extra = detalle.isEmpty ? 'Solicitud invalida.' : detalle;
+      final extra = detalle.isEmpty ?'Solicitud invalida.' : detalle;
       return 'Error $status: $extra';
     }
 
@@ -4143,11 +4143,11 @@ REGLAS:
     }
 
     if (status == 502 || status == 503 || status == 504) {
-      final extra = detalle.isEmpty ? 'Fallo al consultar DeepSeek.' : detalle;
+      final extra = detalle.isEmpty ?'Fallo al consultar DeepSeek.' : detalle;
       return 'Error $status (DeepSeek): $extra';
     }
 
-    final extra = detalle.isEmpty ? (e.reasonPhrase ?? 'Sin detalle') : detalle;
+    final extra = detalle.isEmpty ?(e.reasonPhrase ??'Sin detalle') : detalle;
     return 'Error del tutor ($status): $extra';
   }
 
@@ -4184,7 +4184,7 @@ REGLAS:
     return '$limpio...';
   }
 
-  DateTime? _parseFechaFlexible(dynamic value) {
+  DateTime?_parseFechaFlexible(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
     final txt = value.toString().trim();
@@ -4203,14 +4203,14 @@ REGLAS:
   int _toInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? 0;
+    if (value is String) return int.tryParse(value) ??0;
     return 0;
   }
 
   List<String> _toStringList(dynamic value) {
     if (value is List) {
       return value
-          .map((e) => e?.toString().trim() ?? '')
+          .map((e) => e?.toString().trim() ??'')
           .where((e) => e.isNotEmpty)
           .toList();
     }
@@ -4218,7 +4218,7 @@ REGLAS:
   }
 
   String _normalizarMomentoDelDia(dynamic value) {
-    final txt = _normalizarTexto((value ?? '').toString());
+    final txt = _normalizarTexto((value ??'').toString());
     if (txt.contains('manana') || txt.contains('morning') || txt == 'am') {
       return 'manana';
     }
@@ -4258,7 +4258,7 @@ REGLAS:
       final nombres = rows
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
-          .map((m) => (m['nombre'] ?? '').toString().trim())
+          .map((m) => (m['nombre'] ??'').toString().trim())
           .where((n) => n.isNotEmpty)
           .toList();
       return nombres;
@@ -4355,10 +4355,10 @@ REGLAS:
   }) {
     final materia = _asMap(row['materia']);
     final nombre = _normalizarTextoEspecialidad(
-      (materia['nombre'] ?? '').toString(),
+      (materia['nombre'] ??'').toString(),
     );
     final categoria = _normalizarTextoEspecialidad(
-      (materia['categoria'] ?? '').toString(),
+      (materia['categoria'] ??'').toString(),
     );
     final temas = _toStringList(
       row['temas_debiles'],
@@ -4403,7 +4403,7 @@ REGLAS:
         objetivoNormalizado.contains(actual);
   }
 
-  double? _obtenerTasaDominio(Map<String, dynamic> dominio) {
+  double?_obtenerTasaDominio(Map<String, dynamic> dominio) {
     return _toDouble(dominio['tasa_dominio']) ??
         _toDouble(dominio['tasa_dominio_actual']);
   }
@@ -4429,7 +4429,7 @@ REGLAS:
   ) {
     final materias = dominios.map((d) {
       final nombre = _obtenerNombreMateria(d);
-      final score = _obtenerTasaDominio(d) ?? 0;
+      final score = _obtenerTasaDominio(d) ??0;
       final materia = d['materia'];
       final tiempoRecomendadoMin = _toInt(d['tiempo_recomendado_minutos']);
       final dominioPrevio = _toDouble(d['dominio_hace_7_dias']);
@@ -4453,7 +4453,7 @@ REGLAS:
         if (coberturaBanco != null) 'cobertura_banco': coberturaBanco,
         if (consistencia != null) 'consistencia': consistencia,
         'nivel': _nivelMateria(score),
-        'tipo': score >= 70 ? 'fortaleza' : 'debilidad',
+        'tipo': score >= 70 ?'fortaleza' : 'debilidad',
       };
     }).toList();
 
@@ -4470,7 +4470,7 @@ REGLAS:
     required List<Map<String, dynamic>> inferidos,
   }) {
     String keyOf(Map<String, dynamic> item) {
-      final materiaId = (item['materia_id'] ?? '').toString().trim();
+      final materiaId = (item['materia_id'] ??'').toString().trim();
       if (materiaId.isNotEmpty) return 'id:$materiaId';
       return 'nm:${_normalizarTexto(_obtenerNombreMateria(item))}';
     }
@@ -4490,8 +4490,8 @@ REGLAS:
       }
 
       final next = Map<String, dynamic>.from(current);
-      // El dominio calculado desde respuestas es el valor real mÃ¡s reciente.
-      next['tasa_dominio'] = _toDouble(inf['tasa_dominio']) ?? 0.0;
+      // El dominio calculado desde respuestas es el valor real m?s reciente.
+      next['tasa_dominio'] = _toDouble(inf['tasa_dominio']) ??0.0;
 
       final tiempoInf = _toInt(inf['tiempo_recomendado_minutos']);
       if (tiempoInf > 0) {
@@ -4501,8 +4501,8 @@ REGLAS:
       final materiaInf = _asMap(inf['materia']);
       final materiaCur = _asMap(next['materia']);
       next['materia'] = {...materiaCur, ...materiaInf};
-      if ((next['materia_id'] ?? '').toString().trim().isEmpty &&
-          (inf['materia_id'] ?? '').toString().trim().isNotEmpty) {
+      if ((next['materia_id'] ??'').toString().trim().isEmpty &&
+          (inf['materia_id'] ??'').toString().trim().isNotEmpty) {
         next['materia_id'] = inf['materia_id'];
       }
       merged[key] = next;
@@ -4535,11 +4535,11 @@ REGLAS:
         final row = Map<String, dynamic>.from(item);
         final pregunta = _asMap(row['pregunta']);
         final materia = _asMap(pregunta['materia']);
-        final nombre = (materia['nombre'] ?? '').toString().trim();
+        final nombre = (materia['nombre'] ??'').toString().trim();
         if (nombre.isEmpty) continue;
 
-        final idMateria = (materia['id'] ?? '').toString().trim();
-        final key = idMateria.isNotEmpty ? idMateria : _normalizarTexto(nombre);
+        final idMateria = (materia['id'] ??'').toString().trim();
+        final key = idMateria.isNotEmpty ?idMateria : _normalizarTexto(nombre);
         if (key.isEmpty) continue;
 
         final entry = acumulado.putIfAbsent(
@@ -4570,7 +4570,7 @@ REGLAS:
         }
 
         if (!omitida) {
-          final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0.0;
+          final tiempo = _toDouble(row['tiempo_total_respuesta']) ??0.0;
           if (tiempo > 0) {
             (entry['tiempos'] as List<double>).add(tiempo);
           }
@@ -4587,14 +4587,14 @@ REGLAS:
             ? List<double>.from(item['tiempos'] as List)
             : <double>[];
         final tiempoProm = _promedio(tiempos);
-        var tiempoRecomendado = tasa < 50 ? 35 : (tasa < 70 ? 25 : 18);
+        var tiempoRecomendado = tasa < 50 ?35 : (tasa < 70 ?25 : 18);
         if (tiempoProm > 20) {
           tiempoRecomendado += 5;
         }
 
         final materia = _asMap(item['materia']);
         dominios.add({
-          if ((materia['id'] ?? '').toString().trim().isNotEmpty)
+          if ((materia['id'] ??'').toString().trim().isNotEmpty)
             'materia_id': materia['id'],
           'tasa_dominio': tasa,
           'tiempo_recomendado_minutos': tiempoRecomendado,
@@ -4613,10 +4613,10 @@ REGLAS:
     if (dominios.isEmpty) return ['Sin datos suficientes'];
 
     final fortalezas = dominios
-        .where((d) => (_obtenerTasaDominio(d) ?? -1) >= 80)
+        .where((d) => (_obtenerTasaDominio(d) ??-1) >= 80)
         .map((d) {
           final nombreMateria = _obtenerNombreMateria(d);
-          final porcentaje = (_obtenerTasaDominio(d) ?? 0).toStringAsFixed(1);
+          final porcentaje = (_obtenerTasaDominio(d) ??0).toStringAsFixed(1);
           return '$nombreMateria ($porcentaje%)';
         })
         .toList();
@@ -4630,10 +4630,10 @@ REGLAS:
     if (dominios.isEmpty) return ['Necesitas empezar a estudiar'];
 
     return dominios
-        .where((d) => (_obtenerTasaDominio(d) ?? 101) < 60)
+        .where((d) => (_obtenerTasaDominio(d) ??101) < 60)
         .map((d) {
           final nombreMateria = _obtenerNombreMateria(d);
-          final porcentaje = (_obtenerTasaDominio(d) ?? 0).toStringAsFixed(1);
+          final porcentaje = (_obtenerTasaDominio(d) ??0).toStringAsFixed(1);
           return '$nombreMateria ($porcentaje%)';
         })
         .take(3)
@@ -4644,11 +4644,11 @@ REGLAS:
     List<Map<String, dynamic>> dominios,
   ) {
     return dominios
-        .where((d) => (_obtenerTasaDominio(d) ?? 101) < 50)
+        .where((d) => (_obtenerTasaDominio(d) ??101) < 50)
         .map(
           (d) => {
             'nombre': _obtenerNombreMateria(d),
-            'porcentaje': _obtenerTasaDominio(d) ?? 0,
+            'porcentaje': _obtenerTasaDominio(d) ??0,
             'estado': 'CRITICO',
           },
         )
@@ -4685,7 +4685,7 @@ REGLAS:
         'total_preguntas': 0,
         'dificultad': porcentaje < 50
             ? 'alta'
-            : (porcentaje < 75 ? 'media' : 'baja'),
+            : (porcentaje < 75 ?'media' : 'baja'),
       },
       'progreso_usuario': {
         'correctas': 0,
@@ -4728,7 +4728,7 @@ REGLAS:
         'nivel_usuario': nivelActual.toUpperCase(),
       },
       'recomendaciones': {
-        'tiempo_diario_sugerido': porcentaje < 50 ? 30 : 20,
+        'tiempo_diario_sugerido': porcentaje < 50 ?30 : 20,
         'tema_prioritario': 'Fundamentos de $materia',
         'objetivo': 'Alcanzar 80% en 10 dias',
       },
@@ -4836,7 +4836,7 @@ REGLAS:
           respondidas++;
           if (esCorrecta) correctas++;
         }
-        final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0.0;
+        final tiempo = _toDouble(row['tiempo_total_respuesta']) ??0.0;
         if (tiempo > 0) segundos += tiempo;
       }
 
@@ -4890,8 +4890,8 @@ REGLAS:
   }
 
   int _resolverPreguntasObjetivo({
-    required Map<String, dynamic>? metaHoy,
-    required Map<String, dynamic>? plan,
+    required Map<String, dynamic>?metaHoy,
+    required Map<String, dynamic>?plan,
   }) {
     final meta = _toInt(metaHoy?['preguntas_objetivo']);
     if (meta > 0) return meta;
@@ -4901,8 +4901,8 @@ REGLAS:
   }
 
   int _resolverMinutosObjetivo({
-    required Map<String, dynamic>? metaHoy,
-    required Map<String, dynamic>? plan,
+    required Map<String, dynamic>?metaHoy,
+    required Map<String, dynamic>?plan,
     required Map<String, dynamic> perfilUsuario,
   }) {
     final meta = _toInt(metaHoy?['minutos_objetivo']);
@@ -4954,8 +4954,8 @@ REGLAS:
     double porcentaje,
     String nivel,
   ) {
-    final cantidad = porcentaje < 50 ? 20 : 12;
-    final tiempo = porcentaje < 50 ? 25 : 15;
+    final cantidad = porcentaje < 50 ?20 : 12;
+    final tiempo = porcentaje < 50 ?25 : 15;
     return {
       'mensaje':
           '$materia esta en nivel $nivel (${porcentaje.toStringAsFixed(0)}%). Refuerza conceptos base y practica casos aplicados.',

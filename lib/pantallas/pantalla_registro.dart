@@ -10,7 +10,7 @@ import 'pantalla_principal.dart';
 
 class PantallaRegistro extends StatefulWidget {
   final bool completarPerfilGoogle;
-  final String? categoriaInicial;
+  final String?categoriaInicial;
 
   const PantallaRegistro({
     super.key,
@@ -31,6 +31,8 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
 
   // Controladores de Texto
   final _controladorNombres = TextEditingController();
+  final _controladorApellidoPaterno = TextEditingController();
+  final _controladorApellidoMaterno = TextEditingController();
   final _controladorEmail = TextEditingController();
   final _controladorPassword = TextEditingController();
   final _controladorConfirmPassword = TextEditingController();
@@ -72,13 +74,33 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                 metadata['nombre'])
             ?.toString()
             .trim();
-    final correoSugerido = (profile?['email'] ?? currentUser?.email)
+    final partesNombre = _separarNombreCompleto(nombreSugerido);
+    final nombresPerfil = profile?['nombres']?.toString().trim();
+    final apellidoPaternoPerfil = profile?['apellido_paterno']
+        ?.toString()
+        .trim();
+    final apellidoMaternoPerfil = profile?['apellido_materno']
+        ?.toString()
+        .trim();
+    final correoSugerido = (profile?['email'] ??currentUser?.email)
         ?.toString()
         .trim();
 
     setState(() {
-      if (nombreSugerido != null && nombreSugerido.isNotEmpty) {
-        _controladorNombres.text = nombreSugerido;
+      if (nombresPerfil != null && nombresPerfil.isNotEmpty) {
+        _controladorNombres.text = nombresPerfil;
+      } else if (partesNombre['nombres']!.isNotEmpty) {
+        _controladorNombres.text = partesNombre['nombres']!;
+      }
+      if (apellidoPaternoPerfil != null && apellidoPaternoPerfil.isNotEmpty) {
+        _controladorApellidoPaterno.text = apellidoPaternoPerfil;
+      } else if (partesNombre['apellido_paterno']!.isNotEmpty) {
+        _controladorApellidoPaterno.text = partesNombre['apellido_paterno']!;
+      }
+      if (apellidoMaternoPerfil != null && apellidoMaternoPerfil.isNotEmpty) {
+        _controladorApellidoMaterno.text = apellidoMaternoPerfil;
+      } else if (partesNombre['apellido_materno']!.isNotEmpty) {
+        _controladorApellidoMaterno.text = partesNombre['apellido_materno']!;
       }
       if (correoSugerido != null && correoSugerido.isNotEmpty) {
         _controladorEmail.text = correoSugerido;
@@ -106,7 +128,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       }
 
       final metaDiaria = int.tryParse(
-        (profile?['meta_diaria_minutos'] ?? '').toString(),
+        (profile?['meta_diaria_minutos'] ??'').toString(),
       );
       if (metaDiaria != null && metaDiaria >= 5) {
         _controladorMetaDiaria.text = metaDiaria.toString();
@@ -117,6 +139,8 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
   @override
   void dispose() {
     _controladorNombres.dispose();
+    _controladorApellidoPaterno.dispose();
+    _controladorApellidoMaterno.dispose();
     _controladorEmail.dispose();
     _controladorPassword.dispose();
     _controladorConfirmPassword.dispose();
@@ -149,8 +173,14 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       _cargando = true;
     });
 
-    final metaDiaria = int.tryParse(_controladorMetaDiaria.text) ?? 30;
+    final metaDiaria = int.tryParse(_controladorMetaDiaria.text) ??30;
     final codigoReferido = _controladorCodigoReferido.text.trim().toUpperCase();
+    final nombres = _controladorNombres.text.trim();
+    final apellidoPaterno = _controladorApellidoPaterno.text.trim();
+    final apellidoMaterno = _controladorApellidoMaterno.text.trim();
+    final nombreCompleto = [nombres, apellidoPaterno, apellidoMaterno]
+        .where((p) => p.isNotEmpty)
+        .join(' ');
 
     if (widget.completarPerfilGoogle) {
       final actualizacion = <String, dynamic>{
@@ -158,12 +188,11 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
         'grado_actual': _gradoSeleccionado,
         'especialidad': _especialidadSeleccionada,
         'meta_diaria_minutos': metaDiaria,
+        'nombres': nombres,
+        'apellido_paterno': apellidoPaterno,
+        'apellido_materno': apellidoMaterno,
+        'nombre_completo': nombreCompleto,
       };
-
-      final nombreCompleto = _controladorNombres.text.trim();
-      if (nombreCompleto.isNotEmpty) {
-        actualizacion['nombre_completo'] = nombreCompleto;
-      }
 
       final email = _controladorEmail.text.trim();
       if (email.isNotEmpty) {
@@ -206,12 +235,13 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       return;
     }
 
-    final nombreCompleto = _controladorNombres.text.trim();
-
     final resultado = await AuthService.register(
       email: _controladorEmail.text.trim(),
       password: _controladorPassword.text,
       nombreCompleto: nombreCompleto,
+      nombres: nombres,
+      apellidoPaterno: apellidoPaterno,
+      apellidoMaterno: apellidoMaterno,
       categoria: _categoriaSeleccionada,
       gradoActual: _gradoSeleccionado,
       especialidad: _especialidadSeleccionada,
@@ -240,7 +270,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(resultado.error ?? 'Error desconocido'),
+          content: Text(resultado.error ??'Error desconocido'),
           backgroundColor: Colors.red,
         ),
       );
@@ -257,7 +287,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            resultado.error ?? 'No se pudo aplicar el código referido.',
+            resultado.error ??'No se pudo aplicar el código referido.',
           ),
           backgroundColor: Colors.orange.shade700,
         ),
@@ -298,7 +328,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       } else {
         await _migrarProgresoInvitadoSiExiste();
         final profile = await AuthService.getCurrentUserProfile();
-        final categoria = profile?['categoria'] ?? _categoriaSeleccionada;
+        final categoria = profile?['categoria'] ??_categoriaSeleccionada;
         await _activarRecordatoriosMeta();
 
         if (!mounted) return;
@@ -318,7 +348,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       if (result.error != 'Cancelado') {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'Error con Google'),
+            content: Text(result.error ??'Error con Google'),
             backgroundColor: Colors.red,
           ),
         );
@@ -331,6 +361,40 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     if (lower.contains('oficiales')) return Icons.military_tech;
     if (lower.contains('servicios')) return Icons.settings;
     return Icons.shield;
+  }
+
+  Map<String, String> _separarNombreCompleto(String?nombreCompleto) {
+    final limpio = (nombreCompleto ??'').trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (limpio.isEmpty) {
+      return {
+        'nombres': '',
+        'apellido_paterno': '',
+        'apellido_materno': '',
+      };
+    }
+
+    final partes = limpio.split(' ').where((p) => p.isNotEmpty).toList();
+    if (partes.length >= 3) {
+      return {
+        'nombres': partes.sublist(0, partes.length - 2).join(' '),
+        'apellido_paterno': partes[partes.length - 2],
+        'apellido_materno': partes[partes.length - 1],
+      };
+    }
+
+    if (partes.length == 2) {
+      return {
+        'nombres': partes[0],
+        'apellido_paterno': partes[1],
+        'apellido_materno': '',
+      };
+    }
+
+    return {
+      'nombres': partes.first,
+      'apellido_paterno': '',
+      'apellido_materno': '',
+    };
   }
 
   Widget _buildSelectorCategoria() {
@@ -354,7 +418,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                     final grados = ConstantesPNP.obtenerGradosParaCategoria(
                       categoria,
                     );
-                    _gradoSeleccionado = grados.isNotEmpty ? grados.first : '';
+                    _gradoSeleccionado = grados.isNotEmpty ?grados.first : '';
                   });
                 },
               ),
@@ -433,7 +497,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(esFlujoGoogle ? 20.0 : 24.0),
+            padding: EdgeInsets.all(esFlujoGoogle ?20.0 : 24.0),
             child: Form(
               key: _claveFormulario,
               child: Column(
@@ -441,10 +505,10 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                 children: [
                   Icon(
                     Icons.local_police_rounded,
-                    size: esFlujoGoogle ? 68 : 80,
+                    size: esFlujoGoogle ?68 : 80,
                     color: TemaAplicacion.colorPrimario,
                   ),
-                  SizedBox(height: esFlujoGoogle ? 16 : 24),
+                  SizedBox(height: esFlujoGoogle ?16 : 24),
                   Text(
                     widget.completarPerfilGoogle
                         ? 'Completa tu Perfil'
@@ -467,7 +531,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: esFlujoGoogle ? 20 : 32),
+                  SizedBox(height: esFlujoGoogle ?20 : 32),
 
                   // PASO 1: CATEGORÍA (Diseño renovado)
                   Text(
@@ -479,10 +543,10 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       color: TemaAplicacion.colorPrimario,
                     ),
                   ),
-                  SizedBox(height: esFlujoGoogle ? 10 : 12),
+                  SizedBox(height: esFlujoGoogle ?10 : 12),
                   _buildSelectorCategoria(),
 
-                  SizedBox(height: esFlujoGoogle ? 16 : 24),
+                  SizedBox(height: esFlujoGoogle ?16 : 24),
 
                   // PASO 2: GRADO ACTUAL
                   Text(
@@ -494,10 +558,10 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       color: TemaAplicacion.colorPrimario,
                     ),
                   ),
-                  SizedBox(height: esFlujoGoogle ? 10 : 12),
+                  SizedBox(height: esFlujoGoogle ?10 : 12),
                   _buildDropdownGrado(),
 
-                  SizedBox(height: esFlujoGoogle ? 16 : 24),
+                  SizedBox(height: esFlujoGoogle ?16 : 24),
 
                   // PASO 3: ESPECIALIDAD
                   Text(
@@ -509,10 +573,10 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       color: TemaAplicacion.colorPrimario,
                     ),
                   ),
-                  SizedBox(height: esFlujoGoogle ? 10 : 12),
+                  SizedBox(height: esFlujoGoogle ?10 : 12),
                   _buildDropdownEspecialidad(),
 
-                  SizedBox(height: esFlujoGoogle ? 20 : 32),
+                  SizedBox(height: esFlujoGoogle ?20 : 32),
 
                   // Meta Diaria de Estudio
                   TextFormField(
@@ -534,7 +598,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       return null;
                     },
                   ),
-                  SizedBox(height: esFlujoGoogle ? 12 : 16),
+                  SizedBox(height: esFlujoGoogle ?12 : 16),
 
                   // Referido opcional
                   TextFormField(
@@ -546,25 +610,53 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       helperText: 'Si alguien te invitó, ingresa su código.',
                     ),
                   ),
-                  if (!widget.completarPerfilGoogle) ...[
-                    const SizedBox(height: 24),
-
-                    // Campos del Formulario - Nombres
-                    TextFormField(
-                      controller: _controladorNombres,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombres',
-                        prefixIcon: Icon(Icons.person_outline),
-                        hintText: 'Ej: Juan Carlos',
-                      ),
-                      validator: (valor) {
-                        if (valor == null || valor.isEmpty) {
-                          return 'Por favor ingresa tus nombres';
-                        }
-                        return null;
-                      },
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _controladorNombres,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombres',
+                      prefixIcon: Icon(Icons.person_outline),
+                      hintText: 'Ej: Juan Carlos',
                     ),
+                    validator: (valor) {
+                      if (valor == null || valor.isEmpty) {
+                        return 'Por favor ingresa tus nombres';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _controladorApellidoPaterno,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Apellido paterno',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                    validator: (valor) {
+                      if (valor == null || valor.isEmpty) {
+                        return 'Por favor ingresa tu apellido paterno';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _controladorApellidoMaterno,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Apellido materno',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                    validator: (valor) {
+                      if (valor == null || valor.isEmpty) {
+                        return 'Por favor ingresa tu apellido materno';
+                      }
+                      return null;
+                    },
+                  ),
+                  if (!widget.completarPerfilGoogle) ...[
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _controladorEmail,
@@ -576,7 +668,6 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                         if (valor == null || valor.isEmpty) {
                           return 'Por favor ingresa tu correo';
                         }
-                        // Validación mínima - solo verificar que contenga @
                         if (!valor.contains('@')) {
                           return 'Ingresa un correo con @';
                         }
@@ -622,11 +713,11 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       },
                     ),
                   ],
-                  SizedBox(height: esFlujoGoogle ? 20 : 32),
+                  SizedBox(height: esFlujoGoogle ?20 : 32),
 
                   // Botón de Registro
                   ElevatedButton(
-                    onPressed: _cargando ? null : _manejarRegistro,
+                    onPressed: _cargando ?null : _manejarRegistro,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       // Efecto de sombra
@@ -657,7 +748,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '¿Ya tienes cuenta? ',
+                          '¿Ya tienes cuenta?',
                           style: TextStyle(
                             color: TemaAplicacion.textoSecundario,
                           ),
@@ -704,7 +795,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                     SizedBox(
                       height: 52,
                       child: OutlinedButton(
-                        onPressed: _cargando ? null : _handleGoogleLogin,
+                        onPressed: _cargando ?null : _handleGoogleLogin,
                         style: OutlinedButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -737,7 +828,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '¿Ya tienes cuenta? ',
+                          '¿Ya tienes cuenta?',
                           style: TextStyle(
                             color: TemaAplicacion.textoSecundario,
                           ),
@@ -788,7 +879,7 @@ class _TarjetaCategoria extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: estaSeleccionado ? TemaAplicacion.colorPrimario : Colors.white,
+          color: estaSeleccionado ?TemaAplicacion.colorPrimario : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: estaSeleccionado

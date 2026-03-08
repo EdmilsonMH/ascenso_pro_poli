@@ -390,56 +390,56 @@ class _PestanaInicioState extends State<PestanaInicio>
         titulo: 'Banco de preguntas',
         descripcion: 'Refuerza lo que mas te cuesta.',
         icono: Icons.menu_book_rounded,
-        color: const Color(0xFF059669),
+        color: const Color(0xFF16A36D),
         onTap: () async => _irTab(1),
       ),
       _TarjetaInicioItem(
         titulo: 'Simulador de examen',
         descripcion: 'Entrena como en el examen real.',
         icono: Icons.fact_check_rounded,
-        color: const Color(0xFF2563EB),
+        color: const Color(0xFF2F6EE5),
         onTap: () async => _irTab(2),
       ),
       _TarjetaInicioItem(
         titulo: 'Practica guiada',
         descripcion: 'Aprende paso a paso con feedback.',
         icono: Icons.school_outlined,
-        color: const Color(0xFF9333EA),
+        color: const Color(0xFF8B46E8),
         onTap: _abrirPracticaGuiada,
       ),
       _TarjetaInicioItem(
         titulo: 'Tutor IA personal',
         descripcion: 'Resuelve dudas al instante.',
         icono: Icons.psychology_alt_outlined,
-        color: const Color(0xFFEA580C),
+        color: const Color(0xFFD98A1E),
         onTap: _abrirTutorIA,
       ),
       _TarjetaInicioItem(
         titulo: 'Balotario en audio',
         descripcion: 'Escucha el balotario mientras estudias.',
         icono: Icons.headphones_rounded,
-        color: const Color(0xFF0F766E),
+        color: const Color(0xFFE47A22),
         onTap: _abrirBalotarioAudio,
       ),
       _TarjetaInicioItem(
         titulo: 'Rutina diaria',
         descripcion: 'Cumple tu meta y sube nivel.',
         icono: Icons.play_circle_outline_rounded,
-        color: const Color(0xFF4F46E5),
+        color: const Color(0xFF5865F2),
         onTap: _iniciarRutinaDiaria,
       ),
       _TarjetaInicioItem(
         titulo: 'Preguntas no acertadas',
         descripcion: 'Corrige fallos y mejora rapido.',
         icono: Icons.cancel_outlined,
-        color: const Color(0xFFDC2626),
+        color: const Color(0xFFD44B6A),
         onTap: _abrirIncorrectas,
       ),
       _TarjetaInicioItem(
         titulo: 'Preguntas acertadas',
         descripcion: 'Refuerza tus fortalezas clave.',
         icono: Icons.check_circle_outline,
-        color: const Color(0xFF16A34A),
+        color: const Color(0xFF2CA27A),
         onTap: _abrirAcertadas,
       ),
     ];
@@ -449,16 +449,17 @@ class _PestanaInicioState extends State<PestanaInicio>
   Widget build(BuildContext context) {
     final colorPrimario = Theme.of(context).colorScheme.primary;
     final colorSecundario = Theme.of(context).colorScheme.secondary;
+    final scheme = Theme.of(context).colorScheme;
     final tarjetas = _tarjetasInicio();
     final tituloCabecera = _construirTituloCabecera();
     final subtituloCabecera = (!widget.esInvitado && _codigoReferido.isNotEmpty)
-        ? 'CÓDIGO DE REFERIDO: $_codigoReferido'
-        : 'CÓDIGO DE REFERIDO: SIN CÓDIGO';
+        ? 'CODIGO DE REFERIDO: $_codigoReferido'
+        : 'CODIGO DE REFERIDO: SIN CODIGO';
 
     final mostrarEstadoCuenta = widget.esInvitado || _esRegistradoNoActivo;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: const BarraSuperior(),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -470,7 +471,7 @@ class _PestanaInicioState extends State<PestanaInicio>
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [colorPrimario, colorSecundario],
+                  colors: [colorPrimario, const Color(0xFF15735A)],
                 ),
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -541,11 +542,14 @@ class _PestanaInicioState extends State<PestanaInicio>
             if (mostrarEstadoCuenta) ...[
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: scheme.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  border: Border.all(color: scheme.outlineVariant),
                 ),
                 child: widget.esInvitado
                     ? Column(
@@ -556,7 +560,10 @@ class _PestanaInicioState extends State<PestanaInicio>
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: _abrirLogin,
-                                  icon: const Icon(Icons.login_rounded, size: 16),
+                                  icon: const Icon(
+                                    Icons.login_rounded,
+                                    size: 16,
+                                  ),
                                   label: Text(
                                     'Iniciar sesion',
                                     style: GoogleFonts.inter(
@@ -565,10 +572,8 @@ class _PestanaInicioState extends State<PestanaInicio>
                                     ),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF1D4ED8),
-                                    side: const BorderSide(
-                                      color: Color(0xFF93C5FD),
-                                    ),
+                                    foregroundColor: colorPrimario,
+                                    side: BorderSide(color: colorSecundario),
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 8,
                                     ),
@@ -594,8 +599,8 @@ class _PestanaInicioState extends State<PestanaInicio>
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1D4ED8),
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: colorPrimario,
+                                    foregroundColor: scheme.onPrimary,
                                     elevation: 0,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 8,
@@ -612,10 +617,10 @@ class _PestanaInicioState extends State<PestanaInicio>
                       )
                     : Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.emoji_events_outlined,
                             size: 16,
-                            color: Color(0xFF2563EB),
+                            color: colorPrimario,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -625,7 +630,7 @@ class _PestanaInicioState extends State<PestanaInicio>
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
                                 fontSize: 11.5,
-                                color: const Color(0xFF1E3A8A),
+                                color: scheme.onSurface,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -636,8 +641,8 @@ class _PestanaInicioState extends State<PestanaInicio>
                               child: ElevatedButton(
                                 onPressed: _abrirActivacionCuenta,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1D4ED8),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: colorPrimario,
+                                  foregroundColor: scheme.onPrimary,
                                   elevation: 0,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -726,8 +731,10 @@ class _TarjetaInicioCuadricula extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: item.onTap,
@@ -736,7 +743,7 @@ class _TarjetaInicioCuadricula extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFD1D5DB)),
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.45)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -745,7 +752,7 @@ class _TarjetaInicioCuadricula extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.12),
+                  color: item.color.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(item.icono, color: item.color, size: 20),
@@ -760,7 +767,7 @@ class _TarjetaInicioCuadricula extends StatelessWidget {
                   fontSize: 11.2,
                   fontWeight: FontWeight.w800,
                   height: 1.15,
-                  color: const Color(0xFF111827),
+                  color: scheme.onSurface,
                 ),
               ),
             ],

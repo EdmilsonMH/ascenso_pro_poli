@@ -90,6 +90,8 @@ class MiAplicacion extends StatelessWidget {
       title: 'Ascenso PNP',
       debugShowCheckedModeBanner: false,
       theme: TemaAplicacion.temaClaro,
+      darkTheme: TemaAplicacion.temaOscuro,
+      themeMode: ThemeMode.system,
       // Gate de arranque: decide Login vs Inicio según sesión actual.
       home: const PantallaArranque(),
       routes: {
@@ -155,7 +157,9 @@ class _PantallaArranqueState extends State<PantallaArranque> {
       future: _pantallaInicialFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         return snapshot.data ??

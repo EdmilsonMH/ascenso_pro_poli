@@ -40,7 +40,7 @@ class PanelConfiguracionAudio extends StatelessWidget {
             'Escucha las preguntas, alternativas y respuestas correctas',
             style: GoogleFonts.inter(
               fontSize: 12,
-              color: const Color(0xFF7E22CE),
+              color: const Color(0xFF1A5F59),
             ),
             textAlign: TextAlign.center,
           ),
@@ -52,7 +52,7 @@ class PanelConfiguracionAudio extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF6B21A8),
+              color: const Color(0xFF164A55),
             ),
           ),
           const SizedBox(height: 8),
@@ -68,7 +68,7 @@ class PanelConfiguracionAudio extends StatelessWidget {
               'Todas las preguntas ($totalPreguntas)',
               style: GoogleFonts.inter(fontSize: 13),
             ),
-            fillColor: WidgetStateProperty.all(const Color(0xFFA855F7)),
+            fillColor: WidgetStateProperty.all(const Color(0xFF1E6B63)),
             contentPadding: EdgeInsets.zero,
             dense: true,
           ),
@@ -84,7 +84,7 @@ class PanelConfiguracionAudio extends StatelessWidget {
               'Rango personalizado',
               style: GoogleFonts.inter(fontSize: 13),
             ),
-            fillColor: WidgetStateProperty.all(const Color(0xFFA855F7)),
+            fillColor: WidgetStateProperty.all(const Color(0xFF1E6B63)),
             contentPadding: EdgeInsets.zero,
             dense: true,
           ),
@@ -109,7 +109,7 @@ class PanelConfiguracionAudio extends StatelessWidget {
                 rangoAudio == 'todo' ? 'Reproducir Todas' : 'Reproducir Rango',
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFA855F7),
+                backgroundColor: const Color(0xFF1E6B63),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -177,7 +177,7 @@ class PanelConfiguracionAudio extends StatelessWidget {
           etiqueta,
           style: GoogleFonts.inter(
             fontSize: 11,
-            color: const Color(0xFF6B21A8),
+            color: const Color(0xFF164A55),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -213,7 +213,7 @@ class PanelConfiguracionAudio extends StatelessWidget {
           'Se reproducirán $cantidadPreguntas preguntas',
           style: GoogleFonts.inter(
             fontSize: 11,
-            color: const Color(0xFF7E22CE),
+            color: const Color(0xFF1A5F59),
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -225,3 +225,4 @@ class PanelConfiguracionAudio extends StatelessWidget {
     );
   }
 }
+

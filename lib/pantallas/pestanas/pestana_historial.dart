@@ -200,7 +200,7 @@ class _PestanaHistorialState extends State<PestanaHistorial> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFEEF2F4),
       appBar: const BarraSuperior(),
       body: RefreshIndicator(
         onRefresh: _cargarDatos,
@@ -238,26 +238,26 @@ class _PestanaHistorialState extends State<PestanaHistorial> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: const Color(0xFFDEE6EA),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                  border: Border.all(color: const Color(0xFF5A8F8A)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
                       Icons.info_outline,
-                      color: Color(0xFF3B82F6),
+                      color: Color(0xFF1E6B63),
                       size: 24,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: widget.esInvitado
                           ? Text(
-                              'Las prácticas se dividen en Para Ranking y De Práctica. ¿Quieres ver tu historial completo y comparar tu posición en el Ranking? Regístrate ahora para desbloquear.',
+                              'Las prácticas se dividen en Para Ranking y De Práctica. ¿Quieres ver tu historial completo y comparar tu posición en el Ranking?Regístrate ahora para desbloquear.',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
-                                color: const Color(0xFF1E3A8A),
+                                color: const Color(0xFF0B2933),
                                 height: 1.4,
                               ),
                             )
@@ -265,7 +265,7 @@ class _PestanaHistorialState extends State<PestanaHistorial> {
                               text: TextSpan(
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
-                                  color: const Color(0xFF1E3A8A),
+                                  color: const Color(0xFF0B2933),
                                   height: 1.4,
                                 ),
                                 children: const [
@@ -363,14 +363,14 @@ class _PestanaHistorialState extends State<PestanaHistorial> {
               _TarjetaEstadistica(
                 titulo: 'Mejor Puntaje',
                 valor: '${_estadisticas.mejorPuntaje.toStringAsFixed(1)}%',
-                colorValor: const Color(0xFF10B981),
+                colorValor: const Color(0xFF237D57),
               ),
               const SizedBox(height: 16),
               _TarjetaEstadistica(
                 titulo: 'Aprobadas',
                 valor:
                     '${_estadisticas.aprobadas}/${_estadisticas.totalSesiones}',
-                colorValor: const Color(0xFF3B82F6),
+                colorValor: const Color(0xFF1E6B63),
               ),
 
               const SizedBox(height: 24),
@@ -454,7 +454,7 @@ class _PestanaHistorialState extends State<PestanaHistorial> {
 
 class _ItemSesion extends StatelessWidget {
   final SesionPractica sesion;
-  final VoidCallback? onTap;
+  final VoidCallback?onTap;
 
   const _ItemSesion({required this.sesion, this.onTap});
 
@@ -492,10 +492,10 @@ class _ItemSesion extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Icon(
-                  aprobado ? Icons.check : Icons.close,
+                  aprobado ?Icons.check : Icons.close,
                   color: aprobado
-                      ? const Color(0xFF059669)
-                      : const Color(0xFFDC2626),
+                      ? const Color(0xFF237D57)
+                      : const Color(0xFFAD3636),
                   size: 24,
                 ),
               ),
@@ -515,8 +515,8 @@ class _ItemSesion extends StatelessWidget {
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: aprobado
-                                ? const Color(0xFF059669)
-                                : const Color(0xFFDC2626),
+                                ? const Color(0xFF237D57)
+                                : const Color(0xFFAD3636),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -536,7 +536,7 @@ class _ItemSesion extends StatelessWidget {
                                 const Icon(
                                   Icons.emoji_events,
                                   size: 12,
-                                  color: Color(0xFFD97706),
+                                  color: Color(0xFF8B661E),
                                 ),
                                 const SizedBox(width: 2),
                                 Text(
@@ -544,7 +544,7 @@ class _ItemSesion extends StatelessWidget {
                                   style: GoogleFonts.inter(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFFD97706),
+                                    color: const Color(0xFF8B661E),
                                   ),
                                 ),
                               ],
@@ -573,7 +573,7 @@ class _ItemSesion extends StatelessWidget {
               const SizedBox(width: 8),
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 180),
-                opacity: onTap != null ? 1 : 0.55,
+                opacity: onTap != null ?1 : 0.55,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -581,12 +581,12 @@ class _ItemSesion extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: onTap != null
-                        ? const Color(0xFFEFF6FF)
+                        ? const Color(0xFFDEE6EA)
                         : Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: onTap != null
-                          ? const Color(0xFFBFDBFE)
+                          ? const Color(0xFF5A8F8A)
                           : Colors.grey.shade300,
                     ),
                   ),
@@ -599,7 +599,7 @@ class _ItemSesion extends StatelessWidget {
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                           color: onTap != null
-                              ? const Color(0xFF2563EB)
+                              ? const Color(0xFF103D4A)
                               : Colors.grey.shade500,
                         ),
                       ),
@@ -608,7 +608,7 @@ class _ItemSesion extends StatelessWidget {
                         Icons.arrow_forward_ios_rounded,
                         size: 11,
                         color: onTap != null
-                            ? const Color(0xFF2563EB)
+                            ? const Color(0xFF103D4A)
                             : Colors.grey.shade500,
                       ),
                     ],
@@ -626,7 +626,7 @@ class _ItemSesion extends StatelessWidget {
 class _TarjetaEstadistica extends StatelessWidget {
   final String titulo;
   final String valor;
-  final Color? colorValor;
+  final Color?colorValor;
 
   const _TarjetaEstadistica({
     required this.titulo,
@@ -663,7 +663,7 @@ class _TarjetaEstadistica extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 32,
               fontWeight: FontWeight.w400,
-              color: colorValor ?? Colors.black87,
+              color: colorValor ??Colors.black87,
             ),
           ),
         ],
@@ -675,7 +675,7 @@ class _TarjetaEstadistica extends StatelessWidget {
 class _TabFiltro extends StatelessWidget {
   final String texto;
   final bool activo;
-  final IconData? icono;
+  final IconData?icono;
 
   const _TabFiltro({required this.texto, required this.activo, this.icono});
 
@@ -684,7 +684,7 @@ class _TabFiltro extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: activo ? Colors.white : Colors.transparent,
+        color: activo ?Colors.white : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         boxShadow: activo
             ? [
@@ -704,7 +704,7 @@ class _TabFiltro extends StatelessWidget {
             Icon(
               icono,
               size: 14,
-              color: activo ? Colors.black87 : Colors.grey.shade600,
+              color: activo ?Colors.black87 : Colors.grey.shade600,
             ),
             const SizedBox(width: 4),
           ],
@@ -713,8 +713,8 @@ class _TabFiltro extends StatelessWidget {
               texto,
               style: GoogleFonts.inter(
                 fontSize: 12,
-                fontWeight: activo ? FontWeight.w600 : FontWeight.w500,
-                color: activo ? Colors.black87 : Colors.grey.shade600,
+                fontWeight: activo ?FontWeight.w600 : FontWeight.w500,
+                color: activo ?Colors.black87 : Colors.grey.shade600,
               ),
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
@@ -725,3 +725,4 @@ class _TabFiltro extends StatelessWidget {
     );
   }
 }
+

@@ -6,7 +6,7 @@ class BarraBusqueda extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final String hintText;
   final bool mostrarFiltroActivo;
-  final VoidCallback? onFiltroPressed;
+  final VoidCallback?onFiltroPressed;
 
   const BarraBusqueda({
     super.key,
@@ -46,7 +46,7 @@ class BarraBusqueda extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 color: mostrarFiltroActivo
-                    ? const Color(0xFF3B82F6)
+                    ? const Color(0xFF1E6B63)
                     : Colors.white,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade300),
@@ -54,7 +54,7 @@ class BarraBusqueda extends StatelessWidget {
               child: IconButton(
                 icon: Icon(
                   Icons.filter_list,
-                  color: mostrarFiltroActivo ? Colors.white : Colors.black,
+                  color: mostrarFiltroActivo ?Colors.white : Colors.black,
                 ),
                 onPressed: onFiltroPressed,
               ),
@@ -65,3 +65,4 @@ class BarraBusqueda extends StatelessWidget {
     );
   }
 }
+

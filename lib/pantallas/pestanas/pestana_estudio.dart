@@ -34,7 +34,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
   List<Pregunta> _preguntasFiltradas = [];
   List<String> _todasLasMaterias = [];
   List<String> _materiasSeleccionadas = [];
-  String? _materiaActiva;
+  String?_materiaActiva;
   bool _mostrarReproductor = false;
   bool _cargando = true;
 
@@ -74,7 +74,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
           _todasLasMaterias = materias;
           _materiasSeleccionadas = List.from(materias);
           _materiaActiva = null;
-          _preguntaHasta = preguntas.isNotEmpty ? preguntas.length : 1;
+          _preguntaHasta = preguntas.isNotEmpty ?preguntas.length : 1;
           _estadisticasPorPregunta = estadisticas;
           _cargando = false;
         });
@@ -208,7 +208,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
   Map<String, int> _contarPreguntasPorMateria() {
     final conteo = <String, int>{};
     for (final pregunta in _preguntasTotales) {
-      conteo[pregunta.materia] = (conteo[pregunta.materia] ?? 0) + 1;
+      conteo[pregunta.materia] = (conteo[pregunta.materia] ??0) + 1;
     }
     return conteo;
   }
@@ -229,7 +229,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: const Color(0xFFEEF2F4),
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextField(
@@ -270,7 +270,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                     'No se encontraron materias.',
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: const Color(0xFF6B7280),
+                      color: const Color(0xFF4B5D67),
                     ),
                   ),
                 )
@@ -280,7 +280,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final materia = materiasFiltradas[index];
-                    final total = conteoPorMateria[materia] ?? 0;
+                    final total = conteoPorMateria[materia] ??0;
 
                     return Material(
                       color: Colors.white,
@@ -303,12 +303,12 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF6FF),
+                                  color: const Color(0xFFDEE6EA),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Icon(
                                   Icons.menu_book_rounded,
-                                  color: Color(0xFF1D4ED8),
+                                  color: Color(0xFF0B2933),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -321,7 +321,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                       style: GoogleFonts.inter(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF111827),
+                                        color: const Color(0xFF1F2A1C),
                                       ),
                                     ),
                                     const SizedBox(height: 2),
@@ -330,7 +330,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: const Color(0xFF6B7280),
+                                        color: const Color(0xFF4B5D67),
                                       ),
                                     ),
                                   ],
@@ -339,7 +339,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                               const Icon(
                                 Icons.arrow_forward_ios_rounded,
                                 size: 16,
-                                color: Color(0xFF6B7280),
+                                color: Color(0xFF4B5D67),
                               ),
                             ],
                           ),
@@ -392,7 +392,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
       backgroundColor: TemaAplicacion.colorFondo,
       appBar: BarraSuperior(
         mostrarBotonAtras: !_enVistaMaterias,
-        onAtrasPressed: !_enVistaMaterias ? _volverAMaterias : null,
+        onAtrasPressed: !_enVistaMaterias ?_volverAMaterias : null,
         mostrarBotonAudio: !_enVistaMaterias,
         audioVisible: _mostrarReproductor,
         onToggleAudio: !_enVistaMaterias
@@ -409,14 +409,14 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
       body: _enVistaMaterias
           ? _buildVistaMaterias()
           : StreamBuilder<PlaybackState>(
-              stream: audioHandler?.playbackState ?? Stream.empty(),
+              stream: audioHandler?.playbackState ??Stream.empty(),
               builder: (context, snapshot) {
-                final playing = snapshot.data?.playing ?? false;
+                final playing = snapshot.data?.playing ??false;
                 final processingState =
-                    snapshot.data?.processingState ?? AudioProcessingState.idle;
+                    snapshot.data?.processingState ??AudioProcessingState.idle;
                 final isAudioActive =
                     playing || processingState == AudioProcessingState.ready;
-                final queueIndex = snapshot.data?.queueIndex ?? 0;
+                final queueIndex = snapshot.data?.queueIndex ??0;
 
                 // Guardar última pregunta si está reproduciendo
                 if (isAudioActive) {
@@ -461,7 +461,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                       child: BarraBusqueda(
                         controller: _controladorBusqueda,
                         onChanged: _filtrarPreguntas,
-                        hintText: 'Buscar en ${_materiaActiva ?? ''}...',
+                        hintText: 'Buscar en ${_materiaActiva ??''}...',
                         mostrarFiltroActivo:
                             _materiasSeleccionadas.length !=
                             _todasLasMaterias.length,
@@ -484,7 +484,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                   'No hay preguntas en esta materia.',
                                   style: GoogleFonts.inter(
                                     fontSize: 14,
-                                    color: const Color(0xFF6B7280),
+                                    color: const Color(0xFF4B5D67),
                                   ),
                                 ),
                               )
@@ -497,16 +497,15 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                   final pregunta = _preguntasFiltradas[index];
                                   final estadistica =
                                       _estadisticasPorPregunta[pregunta.id];
-                                  // Marcar visualmente la pregunta que se estaba escuchando? (Opcional)
+                                  // Marcar visualmente la pregunta que se estaba escuchando?(Opcional)
                                   return TarjetaPregunta(
                                     key: ValueKey('estudio_${pregunta.id}'),
                                     pregunta: pregunta,
                                     numeroOrden: index + 1,
                                     mostrarRespuestaAlInicio: false,
                                     aciertosCount:
-                                        estadistica?.totalAciertos ?? 0,
-                                    fallosCount:
-                                        estadistica?.totalFallos ?? 0,
+                                        estadistica?.totalAciertos ??0,
+                                    fallosCount: estadistica?.totalFallos ??0,
                                   );
                                 },
                               ),
@@ -589,7 +588,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                             style: GoogleFonts.inter(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: const Color(0xFF6B21A8),
+                              color: const Color(0xFF164A55),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -598,7 +597,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF6B21A8),
+                              color: const Color(0xFF164A55),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -618,7 +617,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                               style: GoogleFonts.inter(fontSize: 14),
                             ),
                             fillColor: WidgetStateProperty.all(
-                              const Color(0xFFA855F7),
+                              const Color(0xFF1E6B63),
                             ),
                             contentPadding: EdgeInsets.zero,
                           ),
@@ -638,7 +637,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                               style: GoogleFonts.inter(fontSize: 14),
                             ),
                             fillColor: WidgetStateProperty.all(
-                              const Color(0xFFA855F7),
+                              const Color(0xFF1E6B63),
                             ),
                             contentPadding: EdgeInsets.zero,
                           ),
@@ -655,7 +654,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                         'Desde:',
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
-                                          color: const Color(0xFF6B21A8),
+                                          color: const Color(0xFF164A55),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -703,7 +702,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                                         'Hasta:',
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
-                                          color: const Color(0xFF6B21A8),
+                                          color: const Color(0xFF164A55),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -745,7 +744,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                               'Se reproducirán ${_preguntaHasta - _preguntaDesde + 1} preguntas',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
-                                color: const Color(0xFF7E22CE),
+                                color: const Color(0xFF1A5F59),
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -756,7 +755,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
                             child: ElevatedButton(
                               onPressed: () => Navigator.pop(context),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFA855F7),
+                                backgroundColor: const Color(0xFF1E6B63),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
@@ -786,7 +785,7 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
       context: context,
       todasLasMaterias: _todasLasMaterias,
       materiasSeleccionadas: _materiasSeleccionadas,
-      colorPrimario: const Color(0xFF3B82F6),
+      colorPrimario: const Color(0xFF1E6B63),
       onAplicar: (nuevasMaterias) {
         if (nuevasMaterias.length != 1) {
           _detenerReproduccion();
@@ -805,3 +804,4 @@ class _PestanaEstudioState extends State<PestanaEstudio> {
     );
   }
 }
+

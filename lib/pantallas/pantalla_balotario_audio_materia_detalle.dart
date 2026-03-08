@@ -39,7 +39,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
   bool _conExplicacion = true;
   bool _pilotoAutomatico = true;
 
-  StreamSubscription<PlaybackState>? _playbackSub;
+  StreamSubscription<PlaybackState>?_playbackSub;
   int _baseIndiceAudio = 0;
   bool _audioActivoPantalla = false;
 
@@ -70,7 +70,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
     _playbackSub = audioHandler?.playbackState.listen((state) {
       if (!mounted || !_audioActivoPantalla || _preguntas.isEmpty) return;
 
-      final queueIndex = state.queueIndex ?? 0;
+      final queueIndex = state.queueIndex ??0;
       if (_pilotoAutomatico) {
         final indiceGlobal = (_baseIndiceAudio + queueIndex).clamp(
           0,
@@ -125,7 +125,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
       final estadisticas = (resultados[1] as Map<String, EstadisticaPregunta>)
           .map((key, value) => MapEntry(key.toString(), value));
 
-      int prioridadFallo(EstadisticaPregunta? estadistica) {
+      int prioridadFallo(EstadisticaPregunta?estadistica) {
         if (estadistica == null) return 0;
         if (estadistica.rachaAciertos >= 3) return 0;
         return estadistica.fallosVisibles;
@@ -138,13 +138,13 @@ class _PantallaBalotarioAudioMateriaDetalleState
         final byPrioridad = prioridadFallo(sb).compareTo(prioridadFallo(sa));
         if (byPrioridad != 0) return byPrioridad;
 
-        final byTotalFallos = (sb?.totalFallos ?? 0).compareTo(
-          sa?.totalFallos ?? 0,
+        final byTotalFallos = (sb?.totalFallos ??0).compareTo(
+          sa?.totalFallos ??0,
         );
         if (byTotalFallos != 0) return byTotalFallos;
 
-        final byAciertos = (sa?.aciertosVisibles ?? 0).compareTo(
-          sb?.aciertosVisibles ?? 0,
+        final byAciertos = (sa?.aciertosVisibles ??0).compareTo(
+          sb?.aciertosVisibles ??0,
         );
         if (byAciertos != 0) return byAciertos;
 
@@ -230,7 +230,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
 
     final state = audioHandler?.playbackState.value;
     final audioEstabaActivo =
-        (state?.playing ?? false) ||
+        (state?.playing ??false) ||
         (state?.processingState == AudioProcessingState.ready);
 
     if (audioEstabaActivo && _audioActivoPantalla) {
@@ -246,7 +246,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
 
     final state = audioHandler?.playbackState.value;
     final audioEstabaActivo =
-        (state?.playing ?? false) ||
+        (state?.playing ??false) ||
         (state?.processingState == AudioProcessingState.ready);
 
     if (audioEstabaActivo && _audioActivoPantalla) {
@@ -272,14 +272,17 @@ class _PantallaBalotarioAudioMateriaDetalleState
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF111827),
+                color: const Color(0xFF1F2A1C),
               ),
             ),
             dense: true,
             visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
             activeThumbColor: const Color(0xFF0F766E),
             activeTrackColor: const Color(0xFF99F6E4),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 0,
+            ),
           ),
           SwitchListTile.adaptive(
             value: _conExplicacion,
@@ -293,14 +296,17 @@ class _PantallaBalotarioAudioMateriaDetalleState
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF111827),
+                color: const Color(0xFF1F2A1C),
               ),
             ),
             dense: true,
             visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
             activeThumbColor: const Color(0xFF0F766E),
             activeTrackColor: const Color(0xFF99F6E4),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 0,
+            ),
           ),
           SwitchListTile.adaptive(
             value: _pilotoAutomatico,
@@ -317,14 +323,17 @@ class _PantallaBalotarioAudioMateriaDetalleState
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF111827),
+                color: const Color(0xFF1F2A1C),
               ),
             ),
             dense: true,
             visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
             activeThumbColor: const Color(0xFF0F766E),
             activeTrackColor: const Color(0xFF99F6E4),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 0,
+            ),
           ),
         ],
       ),
@@ -345,7 +354,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF111827),
+              color: const Color(0xFF1F2A1C),
             ),
           ),
           const SizedBox(height: 10),
@@ -372,7 +381,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
           'No hay preguntas disponibles en esta materia.',
           style: GoogleFonts.inter(
             fontSize: 14,
-            color: const Color(0xFF6B7280),
+            color: const Color(0xFF4B5D67),
           ),
           textAlign: TextAlign.center,
         ),
@@ -409,7 +418,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
                       fontSize: tamPregunta,
                       fontWeight: FontWeight.w700,
                       height: 1.25,
-                      color: const Color(0xFF111827),
+                      color: const Color(0xFF1F2A1C),
                     ),
                   ),
                 ),
@@ -420,14 +429,14 @@ class _PantallaBalotarioAudioMateriaDetalleState
               children: [
                 _buildChipMetrica(
                   etiqueta: 'Fallos',
-                  valor: estadistica?.totalFallos ?? 0,
-                  color: const Color(0xFFB91C1C),
+                  valor: estadistica?.totalFallos ??0,
+                  color: const Color(0xFF982D2D),
                   fondo: const Color(0xFFFEE2E2),
                 ),
                 const SizedBox(width: 8),
                 _buildChipMetrica(
                   etiqueta: 'Aciertos',
-                  valor: estadistica?.totalAciertos ?? 0,
+                  valor: estadistica?.totalAciertos ??0,
                   color: const Color(0xFF166534),
                   fondo: const Color(0xFFDCFCE7),
                 ),
@@ -448,11 +457,11 @@ class _PantallaBalotarioAudioMateriaDetalleState
                   '$letra) ${pregunta.opciones[index]}',
                   style: GoogleFonts.inter(
                     fontSize: tamAlternativa,
-                    fontWeight: esCorrecta ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: esCorrecta ?FontWeight.w700 : FontWeight.w500,
                     height: 1.22,
                     color: esCorrecta
                         ? const Color(0xFF047857)
-                        : const Color(0xFF111827),
+                        : const Color(0xFF1F2A1C),
                   ),
                 ),
               );
@@ -461,12 +470,12 @@ class _PantallaBalotarioAudioMateriaDetalleState
               const SizedBox(height: 6),
               Text(
                 explicacion.isNotEmpty
-                    ? 'Explicación: $explicacion'
+                    ?'Explicación: $explicacion'
                     : 'Explicación: no disponible para esta pregunta.',
                 style: GoogleFonts.inter(
                   fontSize: tamExplicacion,
                   height: 1.25,
-                  color: const Color(0xFF1D4ED8),
+                  color: const Color(0xFF0B2933),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -505,9 +514,9 @@ class _PantallaBalotarioAudioMateriaDetalleState
     final puedeSiguiente = _indiceActual < _preguntas.length - 1;
 
     return StreamBuilder<PlaybackState>(
-      stream: audioHandler?.playbackState ?? Stream.empty(),
+      stream: audioHandler?.playbackState ??Stream.empty(),
       builder: (context, snapshot) {
-        final reproduciendo = snapshot.data?.playing ?? false;
+        final reproduciendo = snapshot.data?.playing ??false;
 
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -521,7 +530,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                onPressed: puedeAnterior ? _irAnterior : null,
+                onPressed: puedeAnterior ?_irAnterior : null,
                 icon: Icon(
                   Icons.skip_previous_rounded,
                   size: 34,
@@ -531,7 +540,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
                 ),
               ),
               IconButton(
-                onPressed: _preguntas.isEmpty ? null : _togglePlayPause,
+                onPressed: _preguntas.isEmpty ?null : _togglePlayPause,
                 icon: Icon(
                   reproduciendo
                       ? Icons.pause_circle_filled_rounded
@@ -541,7 +550,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
                 ),
               ),
               IconButton(
-                onPressed: puedeSiguiente ? _irSiguiente : null,
+                onPressed: puedeSiguiente ?_irSiguiente : null,
                 icon: Icon(
                   Icons.skip_next_rounded,
                   size: 34,
@@ -560,7 +569,7 @@ class _PantallaBalotarioAudioMateriaDetalleState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFEEF2F4),
       appBar: AppBar(
         titleSpacing: 0,
         title: Text(
@@ -570,12 +579,12 @@ class _PantallaBalotarioAudioMateriaDetalleState
           style: GoogleFonts.inter(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF111827),
+            color: const Color(0xFF1F2A1C),
           ),
         ),
       ),
       body: _cargando
-          ? const Center(child: CircularProgressIndicator())
+          ?const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 _buildSwitches(),
@@ -587,3 +596,4 @@ class _PantallaBalotarioAudioMateriaDetalleState
     );
   }
 }
+

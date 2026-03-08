@@ -103,7 +103,7 @@ class _ConfiguracionAudioSheetState extends State<ConfiguracionAudioSheet> {
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: const Color(
-                0xFF6B21A8,
+                0xFF164A55,
               ), // Purple for title as in screenshots (or generic)
             ),
           ),
@@ -112,7 +112,7 @@ class _ConfiguracionAudioSheetState extends State<ConfiguracionAudioSheet> {
             'Rango de reproducción:',
             style: GoogleFonts.inter(
               fontSize: 14,
-              color: const Color(0xFF6B21A8),
+              color: const Color(0xFF164A55),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -236,7 +236,7 @@ class _ConfiguracionAudioSheetState extends State<ConfiguracionAudioSheet> {
             child: ElevatedButton(
               onPressed: _validarYAplicar,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFA855F7), // Primary Purple
+                backgroundColor: const Color(0xFF1E6B63), // Primary Purple
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -273,3 +273,4 @@ class _ConfiguracionAudioSheetState extends State<ConfiguracionAudioSheet> {
     return fin - inicio + 1;
   }
 }
+

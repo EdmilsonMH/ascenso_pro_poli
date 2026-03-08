@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 class BottomSheetFiltros extends StatefulWidget {
   final List<String> todasLasMaterias;
   final List<String> materiasSeleccionadasInicial;
-  final Color colorPrimario;
+  final Color?colorPrimario;
   final String textoBoton;
   final Function(List<String>) onAplicar;
 
@@ -15,7 +15,7 @@ class BottomSheetFiltros extends StatefulWidget {
     super.key,
     required this.todasLasMaterias,
     required this.materiasSeleccionadasInicial,
-    this.colorPrimario = const Color(0xFF3B82F6),
+    this.colorPrimario,
     this.textoBoton = 'Aplicar Filtros',
     required this.onAplicar,
   });
@@ -36,6 +36,8 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
   @override
   Widget build(BuildContext context) {
     final alturaMaxima = MediaQuery.of(context).size.height * 0.85;
+    final scheme = Theme.of(context).colorScheme;
+    final primary = widget.colorPrimario ??scheme.primary;
 
     return SafeArea(
       top: false,
@@ -43,35 +45,33 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
         height: alturaMaxima,
         child: Container(
           padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Indicador de arrastre.
               Center(
                 child: Container(
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: scheme.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-
               Text(
                 'Filtrar por Materias',
                 style: GoogleFonts.inter(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
+                  color: scheme.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
-
               Expanded(
                 child: ListView(
                   children: [
@@ -80,7 +80,7 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
                           widget.todasLasMaterias.isNotEmpty &&
                           _materiasSeleccionadas.length ==
                               widget.todasLasMaterias.length,
-                      onChanged: (bool? value) {
+                      onChanged: (bool?value) {
                         setState(() {
                           if (value == true) {
                             _materiasSeleccionadas = List.from(
@@ -96,11 +96,12 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
+                          color: scheme.onSurface,
                         ),
                       ),
                       fillColor: WidgetStateProperty.resolveWith(
                         (states) => states.contains(WidgetState.selected)
-                            ? widget.colorPrimario
+                            ? primary
                             : null,
                       ),
                       contentPadding: EdgeInsets.zero,
@@ -112,7 +113,7 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
                       );
                       return CheckboxListTile(
                         value: isSelected,
-                        onChanged: (bool? value) {
+                        onChanged: (bool?value) {
                           setState(() {
                             if (value == true) {
                               _materiasSeleccionadas.add(materia);
@@ -123,11 +124,14 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
                         },
                         title: Text(
                           materia,
-                          style: GoogleFonts.inter(fontSize: 14),
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: scheme.onSurface,
+                          ),
                         ),
                         fillColor: WidgetStateProperty.resolveWith(
                           (states) => states.contains(WidgetState.selected)
-                              ? widget.colorPrimario
+                              ? primary
                               : null,
                         ),
                         contentPadding: EdgeInsets.zero,
@@ -138,7 +142,6 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
                 ),
               ),
               const SizedBox(height: 12),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -155,8 +158,8 @@ class _BottomSheetFiltrosState extends State<BottomSheetFiltros> {
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.colorPrimario,
-                    foregroundColor: Colors.white,
+                    backgroundColor: primary,
+                    foregroundColor: scheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -186,7 +189,7 @@ void mostrarBottomSheetFiltros({
   required List<String> todasLasMaterias,
   required List<String> materiasSeleccionadas,
   required Function(List<String>) onAplicar,
-  Color colorPrimario = const Color(0xFF3B82F6),
+  Color?colorPrimario,
   String textoBoton = 'Aplicar Filtros',
 }) {
   showModalBottomSheet(

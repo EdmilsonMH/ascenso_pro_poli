@@ -28,7 +28,7 @@ class ToggleReproductor extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: const BoxDecoration(
-                color: Color(0xFFA855F7),
+                color: Color(0xFF1E6B63),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.volume_up, color: Colors.white, size: 20),
@@ -40,13 +40,13 @@ class ToggleReproductor extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF6B21A8),
+                  color: const Color(0xFF164A55),
                 ),
               ),
             ),
             Icon(
               expandido ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-              color: const Color(0xFF6B21A8),
+              color: const Color(0xFF164A55),
             ),
           ],
         ),
@@ -54,3 +54,4 @@ class ToggleReproductor extends StatelessWidget {
     );
   }
 }
+

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:ascenso_pro_poli/pantallas/pantalla_perfil.dart';
 import 'package:ascenso_pro_poli/pantallas/pantalla_notificaciones.dart';
+import 'package:ascenso_pro_poli/pantallas/pantalla_perfil.dart';
 
 class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
   final bool mostrarBotonAtras;
@@ -21,16 +21,18 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return AppBar(
       automaticallyImplyLeading: false,
       leading: mostrarBotonAtras && onAtrasPressed != null
           ? IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              icon: Icon(Icons.arrow_back, color: scheme.onPrimary),
               onPressed: onAtrasPressed,
               tooltip: 'Volver',
             )
           : null,
-      backgroundColor: Colors.white,
+      backgroundColor: scheme.primary,
       elevation: 0,
       titleSpacing: 0,
       title: Row(
@@ -39,10 +41,10 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6),
+              color: scheme.secondary,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.psychology, color: Colors.white, size: 20),
+            child: Icon(Icons.psychology, color: scheme.onSecondary, size: 20),
           ),
           const SizedBox(width: 8),
           Flexible(
@@ -55,8 +57,8 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: GoogleFonts.inter(
-                    color: Colors.black,
-                    fontSize: 13, // Reducido ligeramente de 14
+                    color: scheme.onPrimary,
+                    fontSize: 13,
                     height: 1.1,
                   ),
                 ),
@@ -65,8 +67,8 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: GoogleFonts.inter(
-                    color: Colors.black,
-                    fontSize: 13, // Reducido ligeramente de 14
+                    color: scheme.onPrimary,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     height: 1.1,
                   ),
@@ -81,7 +83,7 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
           IconButton(
             icon: Icon(
               audioVisible ? Icons.volume_up : Icons.volume_off,
-              color: audioVisible ? const Color(0xFFA855F7) : Colors.grey,
+              color: audioVisible ? scheme.secondary : scheme.onPrimary,
             ),
             onPressed: onToggleAudio,
             tooltip: audioVisible
@@ -89,7 +91,7 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
                 : 'Mostrar reproductor',
           ),
         IconButton(
-          icon: const Icon(Icons.person_outline, color: Colors.black),
+          icon: Icon(Icons.person_outline, color: scheme.onPrimary),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -104,7 +106,7 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.notifications_none, color: Colors.black),
+          icon: Icon(Icons.notifications_none, color: scheme.onPrimary),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

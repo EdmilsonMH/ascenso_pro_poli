@@ -6,8 +6,8 @@ import 'pantalla_practica.dart';
 
 class PantallaRevisionPractica extends StatelessWidget {
   final String titulo;
-  final List<Pregunta>? preguntas;
-  final List<IntentoFallido>? intentosFallidos;
+  final List<Pregunta>?preguntas;
+  final List<IntentoFallido>?intentosFallidos;
   final bool esCorrectas;
   final bool mostrarBotonPracticarFallos;
   final Map<String, EstadisticaPregunta> estadisticasPorPregunta;
@@ -25,7 +25,7 @@ class PantallaRevisionPractica extends StatelessWidget {
   List<Pregunta> get _preguntasParaPractica {
     final lista = <Pregunta>[];
     final vistos = <String>{};
-    for (final intento in intentosFallidos ?? const <IntentoFallido>[]) {
+    for (final intento in intentosFallidos ??const <IntentoFallido>[]) {
       final id = intento.pregunta.id;
       if (id.isEmpty) continue;
       if (vistos.add(id)) lista.add(intento.pregunta);
@@ -56,22 +56,22 @@ class PantallaRevisionPractica extends StatelessWidget {
     final bool mostrarBotonPracticar =
         !esCorrectas &&
         mostrarBotonPracticarFallos &&
-        (intentosFallidos?.isNotEmpty ?? false);
+        (intentosFallidos?.isNotEmpty ??false);
     final double paddingInferiorContenido = mostrarBotonPracticar
         ? 120 + MediaQuery.of(context).padding.bottom
         : 24;
 
     final Color colorPrincipal = esCorrectas
-        ? const Color(0xFF10B981) // Verde
-        : const Color(0xFFEF4444); // Rojo
+        ? const Color(0xFF237D57) // Verde
+        : const Color(0xFFAD3636); // Rojo
 
     final Color colorFondo = esCorrectas
-        ? const Color(0xFFF0FDF4) // Verde claro
-        : const Color(0xFFFEF2F2); // Rojo claro
+        ? const Color(0xFFD9EEE5) // Verde claro
+        : const Color(0xFFF6E0E0); // Rojo claro
 
     final int totalPreguntas = esCorrectas
-        ? (preguntas?.length ?? 0)
-        : (intentosFallidos?.length ?? 0);
+        ? (preguntas?.length ??0)
+        : (intentosFallidos?.length ??0);
 
     return Scaffold(
       backgroundColor: colorFondo,
@@ -122,8 +122,8 @@ class PantallaRevisionPractica extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     esCorrectas
-                        ? 'Respondiste correctamente $totalPreguntas ${totalPreguntas == 1 ? 'pregunta' : 'preguntas'} en esta práctica'
-                        : 'Fallaste $totalPreguntas ${totalPreguntas == 1 ? 'pregunta' : 'preguntas'} en esta práctica',
+                        ?'Respondiste correctamente $totalPreguntas ${totalPreguntas == 1 ?'pregunta' : 'preguntas'} en esta práctica'
+                        : 'Fallaste $totalPreguntas ${totalPreguntas == 1 ?'pregunta' : 'preguntas'} en esta práctica',
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -163,7 +163,7 @@ class PantallaRevisionPractica extends StatelessWidget {
                 'Practicar Fallos de esta sesion',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w700),
               ),
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: const Color(0xFFAD3636),
               foregroundColor: Colors.white,
             )
           : null,
@@ -175,7 +175,7 @@ class PantallaRevisionPractica extends StatelessWidget {
 class _PreguntaReviewCard extends StatelessWidget {
   final Pregunta pregunta;
   final bool esCorrecta;
-  final EstadisticaPregunta? estadistica;
+  final EstadisticaPregunta?estadistica;
 
   const _PreguntaReviewCard({
     required this.pregunta,
@@ -185,7 +185,7 @@ class _PreguntaReviewCard extends StatelessWidget {
 
   String _idCorto(String id) {
     if (id.isEmpty) return 'SIN-ID';
-    return id.length <= 8 ? id : id.substring(0, 8);
+    return id.length <= 8 ?id : id.substring(0, 8);
   }
 
   @override
@@ -198,8 +198,8 @@ class _PreguntaReviewCard extends StatelessWidget {
         border: Border(
           left: BorderSide(
             color: esCorrecta
-                ? const Color(0xFF10B981)
-                : const Color(0xFFEF4444),
+                ? const Color(0xFF237D57)
+                : const Color(0xFFAD3636),
             width: 4,
           ),
         ),
@@ -245,7 +245,7 @@ class _PreguntaReviewCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: const Color(0xFFEEF2F4),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -273,7 +273,7 @@ class _PreguntaReviewCard extends StatelessWidget {
                   valor: estadistica!.totalFallos,
                   icono: Icons.cancel_outlined,
                   colorFondo: const Color(0xFFFEE2E2),
-                  colorTexto: const Color(0xFFB91C1C),
+                  colorTexto: const Color(0xFF982D2D),
                 ),
               ],
             ],
@@ -304,7 +304,7 @@ class _PreguntaReviewCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: esRespuestaCorrecta
-                      ? const Color(0xFF10B981)
+                      ? const Color(0xFF237D57)
                       : Colors.grey.shade300,
                 ),
               ),
@@ -329,7 +329,7 @@ class _PreguntaReviewCard extends StatelessWidget {
                   if (esRespuestaCorrecta)
                     const Icon(
                       Icons.check_circle_outline,
-                      color: Color(0xFF10B981),
+                      color: Color(0xFF237D57),
                       size: 20,
                     ),
                 ],
@@ -344,9 +344,9 @@ class _PreguntaReviewCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: const Color(0xFFDEE6EA),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
+              border: Border.all(color: const Color(0xFF5A8F8A)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,7 +356,7 @@ class _PreguntaReviewCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1E40AF),
+                    color: const Color(0xFF0B2933),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -366,7 +366,7 @@ class _PreguntaReviewCard extends StatelessWidget {
                       : 'No hay explicacion disponible para esta pregunta.',
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: const Color(0xFF1E3A8A),
+                    color: const Color(0xFF0B2933),
                   ),
                 ),
               ],
@@ -380,13 +380,13 @@ class _PreguntaReviewCard extends StatelessWidget {
 
 class _PreguntaErrorCard extends StatelessWidget {
   final IntentoFallido intento;
-  final EstadisticaPregunta? estadistica;
+  final EstadisticaPregunta?estadistica;
 
   const _PreguntaErrorCard({required this.intento, this.estadistica});
 
   String _idCorto(String id) {
     if (id.isEmpty) return 'SIN-ID';
-    return id.length <= 8 ? id : id.substring(0, 8);
+    return id.length <= 8 ?id : id.substring(0, 8);
   }
 
   @override
@@ -398,7 +398,7 @@ class _PreguntaErrorCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: const Border(
-          left: BorderSide(color: Color(0xFFEF4444), width: 4),
+          left: BorderSide(color: Color(0xFFAD3636), width: 4),
         ),
         boxShadow: [
           BoxShadow(
@@ -438,7 +438,7 @@ class _PreguntaErrorCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: const Color(0xFFEEF2F4),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -466,7 +466,7 @@ class _PreguntaErrorCard extends StatelessWidget {
                   valor: estadistica!.totalFallos,
                   icono: Icons.cancel_outlined,
                   colorFondo: const Color(0xFFFEE2E2),
-                  colorTexto: const Color(0xFFB91C1C),
+                  colorTexto: const Color(0xFF982D2D),
                 ),
               ],
             ],
@@ -493,18 +493,18 @@ class _PreguntaErrorCard extends StatelessWidget {
 
             Color itemBorderColor = Colors.grey.shade300;
             Color itemBgColor = Colors.white;
-            IconData? itemIcon;
+            IconData?itemIcon;
             Color itemIconColor = Colors.transparent;
 
             if (esCorrecta) {
-              itemBorderColor = const Color(0xFF10B981);
+              itemBorderColor = const Color(0xFF237D57);
               itemIcon = Icons.check_circle_outline;
-              itemIconColor = const Color(0xFF10B981);
+              itemIconColor = const Color(0xFF237D57);
             } else if (fueSeleccionadaIncorrecta) {
-              itemBorderColor = const Color(0xFFEF4444);
-              itemBgColor = const Color(0xFFFEF2F2);
+              itemBorderColor = const Color(0xFFAD3636);
+              itemBgColor = const Color(0xFFF6E0E0);
               itemIcon = Icons.cancel_outlined;
-              itemIconColor = const Color(0xFFEF4444);
+              itemIconColor = const Color(0xFFAD3636);
             }
 
             return Container(
@@ -547,9 +547,9 @@ class _PreguntaErrorCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: const Color(0xFFDEE6EA),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
+              border: Border.all(color: const Color(0xFF5A8F8A)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,7 +559,7 @@ class _PreguntaErrorCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1E40AF),
+                    color: const Color(0xFF0B2933),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -569,7 +569,7 @@ class _PreguntaErrorCard extends StatelessWidget {
                       : 'No hay explicacion disponible para esta pregunta.',
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: const Color(0xFF1E3A8A),
+                    color: const Color(0xFF0B2933),
                   ),
                 ),
               ],
@@ -620,3 +620,4 @@ class _BadgeContador extends StatelessWidget {
     );
   }
 }
+

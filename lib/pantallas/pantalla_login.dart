@@ -21,7 +21,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  String? _errorMessage;
+  String?_errorMessage;
 
   @override
   void dispose() {
@@ -75,7 +75,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
       } else {
         await _migrarProgresoInvitadoSiExiste();
         final profile = await AuthService.getCurrentUserProfile();
-        final categoria = profile?['categoria'] ?? 'Oficiales PNP';
+        final categoria = profile?['categoria'] ??'Oficiales PNP';
         await _activarRecordatoriosMeta();
 
         if (!mounted) return;
@@ -116,7 +116,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
       } else {
         await _migrarProgresoInvitadoSiExiste();
         final profile = await AuthService.getCurrentUserProfile();
-        final categoria = profile?['categoria'] ?? 'Oficiales PNP';
+        final categoria = profile?['categoria'] ??'Oficiales PNP';
         await _activarRecordatoriosMeta();
 
         if (!mounted) return;
@@ -304,7 +304,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
+                        onPressed: _isLoading ?null : _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: TemaAplicacion.colorPrimario,
                           foregroundColor: Colors.white,
@@ -356,7 +356,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
                     SizedBox(
                       height: 52,
                       child: OutlinedButton(
-                        onPressed: _isLoading ? null : _handleGoogleLogin,
+                        onPressed: _isLoading ?null : _handleGoogleLogin,
                         style: OutlinedButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -390,7 +390,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '¿No tienes cuenta? ',
+                          '¿No tienes cuenta?',
                           style: TextStyle(
                             color: TemaAplicacion.textoSecundario,
                           ),

@@ -10,17 +10,17 @@ class TarjetaPregunta extends StatefulWidget {
   final Color colorBordeIzquierdo;
   final Color colorEtiquetaId;
   final Color colorTextoEtiquetaId;
-  final int? indiceSeleccionadoIncorrecto;
-  final int? numeroOrden;
-  final int? aciertosCount;
-  final int? fallosCount;
+  final int?indiceSeleccionadoIncorrecto;
+  final int?numeroOrden;
+  final int?aciertosCount;
+  final int?fallosCount;
   final bool mostrarRespuestaAlInicio;
 
   const TarjetaPregunta({
     super.key,
     required this.pregunta,
     this.colorBordeIzquierdo = Colors.transparent,
-    this.colorEtiquetaId = const Color(0xFFF3F4F6),
+    this.colorEtiquetaId = const Color(0xFFEEF2F4),
     this.colorTextoEtiquetaId = Colors.grey,
     this.indiceSeleccionadoIncorrecto,
     this.numeroOrden,
@@ -55,20 +55,22 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: widget.colorBordeIzquierdo != Colors.transparent
             ? Border(
                 left: BorderSide(color: widget.colorBordeIzquierdo, width: 4),
               )
-            : Border.all(color: Colors.grey.shade200),
+            : Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -105,6 +107,8 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
   }
 
   Widget _buildHeader() {
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
     final idCorto = widget.pregunta.id.length > 8
         ? widget.pregunta.id.substring(0, 8)
         : widget.pregunta.id;
@@ -139,14 +143,14 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: paleta.actionCyan.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 widget.pregunta.materia,
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: Colors.blue.shade700,
+                  color: paleta.actionCyan,
                   fontWeight: FontWeight.w500,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -156,17 +160,17 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
           if (widget.aciertosCount != null || widget.fallosCount != null) ...[
             const SizedBox(width: 8),
             _buildBadgeContador(
-              colorFondo: const Color(0xFFD1FAE5),
-              colorTexto: const Color(0xFF065F46),
+              colorFondo: paleta.feedbackCorrectBg,
+              colorTexto: paleta.success,
               icono: Icons.check_circle,
-              valor: widget.aciertosCount ?? 0,
+              valor: widget.aciertosCount ??0,
             ),
             const SizedBox(width: 6),
             _buildBadgeContador(
-              colorFondo: const Color(0xFFFEE2E2),
-              colorTexto: const Color(0xFF991B1B),
+              colorFondo: paleta.feedbackIncorrectBg,
+              colorTexto: scheme.error,
               icono: Icons.cancel,
-              valor: widget.fallosCount ?? 0,
+              valor: widget.fallosCount ??0,
             ),
           ],
         ],
@@ -205,6 +209,8 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
   }
 
   Widget _buildOpciones() {
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -212,7 +218,10 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
         children: [
           Text(
             'Alternativas:',
-            style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           ...List.generate(widget.pregunta.opciones.length, (index) {
@@ -221,20 +230,20 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
                 widget.indiceSeleccionadoIncorrecto != null &&
                 index == widget.indiceSeleccionadoIncorrecto;
 
-            Color colorBorde = Colors.grey.shade300;
-            Color colorFondo = Colors.white;
-            IconData? icono;
-            Color? colorIcono;
+            Color colorBorde = scheme.outlineVariant;
+            Color colorFondo = scheme.surface;
+            IconData?icono;
+            Color?colorIcono;
 
             if (_detallesVisibles && esCorrecta) {
-              colorBorde = const Color(0xFF10B981);
+              colorBorde = paleta.feedbackCorrectBorder;
               icono = Icons.check_circle_outline;
-              colorIcono = const Color(0xFF10B981);
+              colorIcono = paleta.feedbackCorrectBorder;
             } else if (_detallesVisibles && esSeleccionadaIncorrecta) {
-              colorBorde = const Color(0xFFEF4444);
-              colorFondo = const Color(0xFFFEF2F2);
+              colorBorde = paleta.feedbackIncorrectBorder;
+              colorFondo = paleta.feedbackIncorrectBg;
               icono = Icons.cancel_outlined;
-              colorIcono = const Color(0xFFEF4444);
+              colorIcono = paleta.feedbackIncorrectBorder;
             }
 
             return Container(
@@ -251,7 +260,7 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
                     '${String.fromCharCode(65 + index)}. ',
                     style: GoogleFonts.inter(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade600,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                   Expanded(
@@ -274,6 +283,7 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
   }
 
   Widget _buildBotonVerRespuesta() {
+    final paleta = TemaAplicacion.paleta(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Align(
@@ -284,9 +294,9 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
               _mostrarRespuesta = true;
             });
           },
-          icon: const Icon(
+          icon: Icon(
             Icons.visibility_outlined,
-            color: Color(0xFF16A34A),
+            color: paleta.success,
             size: 18,
           ),
           label: Text(
@@ -294,7 +304,7 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF16A34A),
+              color: paleta.success,
             ),
           ),
           style: TextButton.styleFrom(
@@ -308,42 +318,41 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
   }
 
   Widget _buildCajaRespuestaCorrecta() {
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
+        color: paleta.feedbackCorrectBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF86EFAC)),
+        border: Border.all(color: paleta.feedbackCorrectBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.check_circle_outline,
-            color: Color(0xFF16A34A),
+            color: paleta.feedbackCorrectBorder,
             size: 20,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF374151),
-                ),
+                style: GoogleFonts.inter(fontSize: 13, color: scheme.onSurface),
                 children: [
                   TextSpan(
                     text: 'Respuesta Correcta: ',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF16A34A),
+                      color: paleta.feedbackCorrectBorder,
                     ),
                   ),
                   TextSpan(
                     text:
                         '${String.fromCharCode(65 + widget.pregunta.indiceRespuestaCorrecta)}. ${widget.pregunta.opciones[widget.pregunta.indiceRespuestaCorrecta]}',
-                    style: const TextStyle(color: Color(0xFF374151)),
+                    style: TextStyle(color: scheme.onSurface),
                   ),
                 ],
               ),
@@ -355,13 +364,15 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
   }
 
   Widget _buildCajaExplicacion() {
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: paleta.surfaceSoft,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,7 +382,7 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E40AF),
+              color: scheme.onSurface,
             ),
           ),
           const SizedBox(height: 4),
@@ -379,7 +390,7 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
             widget.pregunta.explicacion,
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: const Color(0xFF1E3A8A),
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -387,3 +398,4 @@ class _TarjetaPreguntaState extends State<TarjetaPregunta> {
     );
   }
 }
+

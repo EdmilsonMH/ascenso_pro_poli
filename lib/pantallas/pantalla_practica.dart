@@ -10,14 +10,14 @@ import '../servicios/servicio_notificaciones_programadas.dart';
 
 class PantallaPractica extends StatefulWidget {
   final List<Pregunta> preguntas;
-  final bool esModoPractica; // True para prÃƒÂ¡ctica, False para examen
+  final bool esModoPractica; // True para práctica, False para examen
   final bool esRanking;
   final bool avanzarSoloConBotonEnPractica;
   final bool revisarRespuestaInmediata;
   final bool registrarSesionEnHistorial;
-  final Function(Pregunta, int)? onRespuestaIncorrecta;
-  final int? tiempoLimiteSegundos;
-  final List<String>? materiasIncluidasParaRegistro;
+  final Function(Pregunta, int)?onRespuestaIncorrecta;
+  final int?tiempoLimiteSegundos;
+  final List<String>?materiasIncluidasParaRegistro;
 
   const PantallaPractica({
     super.key,
@@ -42,7 +42,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _feedbackRevisionKey = GlobalKey();
 
-  // Estado de navegaciÃƒÂ³n
+  // Estado de navegación
   int _indiceActual = 0;
 
   // Estado para Modo Examen/Ranking (Respuestas guardadas temporalmente)
@@ -50,8 +50,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
       {}; // Map<PreguntaID, IndiceOpcion>
   final Map<String, int> _tiempoPorPreguntaSegundos = {};
   final Map<String, int> _cambiosAlternativaPorPregunta = {};
-  String? _preguntaVisibleId;
-  DateTime? _preguntaVisibleInicio;
+  String?_preguntaVisibleId;
+  DateTime?_preguntaVisibleInicio;
   bool _modoRevision =
       false; // Si es true, muestra la lista completa para revisar
 
@@ -65,11 +65,10 @@ class _PantallaPracticaState extends State<PantallaPractica> {
       widget.esModoPractica &&
       !widget.esRanking &&
       widget.revisarRespuestaInmediata;
-  bool get _sinLimiteTiempo =>
-      _practicaConRevisarInmediato;
+  bool get _sinLimiteTiempo => _practicaConRevisarInmediato;
 
-  // Estado para Modo PrÃƒÂ¡ctica RÃƒÂ¡pida (Feedback inmediato)
-  int? _indiceOpcionSeleccionadaPractica;
+  // Estado para Modo Práctica Rápida (Feedback inmediato)
+  int?_indiceOpcionSeleccionadaPractica;
   bool _respuestaRevisadaEnPregunta = false;
 
   // Estado general
@@ -78,7 +77,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   int _segundosRestantes = 120 * 60; // Default 2 horas
   int _segundosTranscurridos = 0;
 
-  // Rastrear resultados para estadÃƒÂ­sticas
+  // Rastrear resultados para estadísticas
   final List<Pregunta> _preguntasCorrectas = [];
   final List<IntentoFallido> _preguntasIncorrectas = [];
 
@@ -88,7 +87,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
     if (_sinLimiteTiempo) {
       _segundosTranscurridos = 0;
     } else {
-      _segundosRestantes = widget.tiempoLimiteSegundos ?? 120 * 60;
+      _segundosRestantes = widget.tiempoLimiteSegundos ??120 * 60;
     }
     _iniciarTemporizador();
     _iniciarTrackingPreguntaActual();
@@ -118,7 +117,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
         });
       } else {
         _timer.cancel();
-        // Si se acaba el tiempo en examen, finalizamos automÃƒÂ¡ticamente
+        // Si se acaba el tiempo en examen, finalizamos automáticamente
         if (widget.esRanking ||
             !widget.esModoPractica ||
             _practicaConAvanceManual) {
@@ -138,7 +137,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
 
   int _segundosUsados() {
     if (_sinLimiteTiempo) return _segundosTranscurridos;
-    final int tiempoTotalSegundos = widget.tiempoLimiteSegundos ?? 120 * 60;
+    final int tiempoTotalSegundos = widget.tiempoLimiteSegundos ??120 * 60;
     return tiempoTotalSegundos - _segundosRestantes;
   }
 
@@ -157,7 +156,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
     if (elapsedMs > 0) {
       final segundos = (elapsedMs / 1000).ceil();
       _tiempoPorPreguntaSegundos[preguntaId] =
-          (_tiempoPorPreguntaSegundos[preguntaId] ?? 0) + segundos;
+          (_tiempoPorPreguntaSegundos[preguntaId] ??0) + segundos;
     }
 
     _preguntaVisibleId = null;
@@ -165,21 +164,21 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   int _tiempoPreguntaSegundos(String preguntaId) {
-    return _tiempoPorPreguntaSegundos[preguntaId] ?? 0;
+    return _tiempoPorPreguntaSegundos[preguntaId] ??0;
   }
 
   int _cambiosPregunta(String preguntaId) {
-    return _cambiosAlternativaPorPregunta[preguntaId] ?? 0;
+    return _cambiosAlternativaPorPregunta[preguntaId] ??0;
   }
 
   void _registrarCambioAlternativa({
     required String preguntaId,
-    required int? indicePrevio,
+    required int?indicePrevio,
     required int nuevoIndice,
   }) {
     if (indicePrevio == null || indicePrevio == nuevoIndice) return;
     _cambiosAlternativaPorPregunta[preguntaId] =
-        (_cambiosAlternativaPorPregunta[preguntaId] ?? 0) + 1;
+        (_cambiosAlternativaPorPregunta[preguntaId] ??0) + 1;
   }
 
   List<String> _resolverMateriasParaRegistro() {
@@ -214,7 +213,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   // ==========================================
-  // LÃƒâ€œGICA MODO RANKING / EXAMEN
+  // LÓGICA MODO RANKING / EXAMEN
   // ==========================================
 
   void _seleccionarRespuestaManual(int indiceOpcion) {
@@ -319,7 +318,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
           numeroCambiosRespuesta: _cambiosPregunta(pregunta.id),
         );
       } else {
-        // Pregunta no respondida cuenta como incorrecta/vacÃƒÂ­a
+        // Pregunta no respondida cuenta como incorrecta/vacía
         // La agregamos a incorrectas o tracking de 'no respondidas'
       }
     }
@@ -327,7 +326,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
     _puntaje = respuestasCorrectas;
     final int segundosUsados = _segundosUsados();
 
-    // Guardar SesiÃƒÂ³n
+    // Guardar Sesión
     final materias = _resolverMateriasParaRegistro();
     try {
       await _servicioProgreso.registrarSesion(
@@ -350,7 +349,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   // ==========================================
-  // LÃƒâ€œGICA MODO PRÃƒÂCTICA RÃƒÂPIDA (Legacy)
+  // LÓGICA MODO PRÁCTICA RÁPIDA (Legacy)
   // ==========================================
 
   void _manejarSeleccionOpcionPractica(int indice) {
@@ -564,6 +563,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   Widget build(BuildContext context) {
     final bool esManual = _usaNavegacionManual;
     final bool permiteRevision = esManual || _practicaConAvanceManual;
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
 
     // Si estamos en modo manual y revision, mostramos la lista completa
     if (permiteRevision && _modoRevision) {
@@ -573,38 +574,39 @@ class _PantallaPracticaState extends State<PantallaPractica> {
     final pregunta = widget.preguntas[_indiceActual];
 
     return Scaffold(
-      backgroundColor: TemaAplicacion.colorFondo,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Column(
           children: [
             Text(
               'Pregunta ${_indiceActual + 1}/${widget.preguntas.length}',
               style: GoogleFonts.inter(
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
+                color: scheme.onSurface,
               ),
             ),
             Text(
               _sinLimiteTiempo
-                  ? 'Tiempo: ${_formatearTiempo(_segundosTranscurridos)}'
+                  ?'Tiempo: ${_formatearTiempo(_segundosTranscurridos)}'
                   : _formatearTiempo(_segundosRestantes),
               style: GoogleFonts.inter(
                 fontSize: 14,
                 color: _sinLimiteTiempo
-                    ? Colors.grey.shade700
+                    ? scheme.onSurface.withValues(alpha: 0.78)
                     : (_segundosRestantes < 300
-                          ? Colors.red
-                          : Colors.grey.shade700),
+                          ? scheme.error
+                          : scheme.onSurface.withValues(alpha: 0.78)),
                 fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
+          icon: Icon(Icons.close, color: scheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: permiteRevision
@@ -636,11 +638,11 @@ class _PantallaPracticaState extends State<PantallaPractica> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: scheme.surface,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -655,9 +657,9 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: paleta.surfaceSoft,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: scheme.outlineVariant),
                     ),
                     child: Text(
                       pregunta.materia,
@@ -691,7 +693,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
               final usaSeleccionSimple = esManual || _practicaConAvanceManual;
 
               if (esManual) {
-                // Modo Examen: Solo mostramos la selecciÃƒÂ³n, sin colores de cierto/falso
+                // Modo Examen: Solo mostramos la selección, sin colores de cierto/falso
                 estaSeleccionado = _respuestasRanking[pregunta.id] == indice;
               } else {
                 // En practica general se mantiene feedback inmediato.
@@ -709,8 +711,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                 }
               }
 
-              Color colorBorde = Colors.grey.shade300;
-              Color colorFondo = Colors.white;
+              Color colorBorde = scheme.outlineVariant;
+              Color colorFondo = scheme.surface;
               Color colorTexto = TemaAplicacion.textoPrimario;
 
               if (usaSeleccionSimple) {
@@ -724,15 +726,15 @@ class _PantallaPracticaState extends State<PantallaPractica> {
               } else {
                 if (mostrarFeedback) {
                   if (esCorrecta) {
-                    colorBorde = Colors.green;
-                    colorFondo = Colors.green.shade50;
+                    colorBorde = paleta.feedbackCorrectBorder;
+                    colorFondo = paleta.feedbackCorrectBg;
                   } else if (estaSeleccionado && !esCorrecta) {
-                    colorBorde = Colors.red;
-                    colorFondo = Colors.red.shade50;
+                    colorBorde = paleta.feedbackIncorrectBorder;
+                    colorFondo = paleta.feedbackIncorrectBg;
                   } else if (indice == pregunta.indiceRespuestaCorrecta &&
                       !esCorrecta) {
                     // Mostrar la correcta si fallaste.
-                    colorBorde = Colors.green;
+                    colorBorde = paleta.feedbackCorrectBorder;
                   }
                 } else if (estaSeleccionado) {
                   colorBorde = TemaAplicacion.colorPrimario;
@@ -757,7 +759,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                       border: Border.all(
                         color: colorBorde,
                         width: usaSeleccionSimple
-                            ? (estaSeleccionado ? 2 : 1)
+                            ?(estaSeleccionado ?2 : 1)
                             : (estaSeleccionado ||
                                       (mostrarFeedback && esCorrecta)
                                   ? 2
@@ -775,12 +777,12 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                             color: usaSeleccionSimple
                                 ? (estaSeleccionado
                                       ? TemaAplicacion.colorPrimario
-                                      : Colors.grey.shade100)
+                                      : paleta.surfaceSoft)
                                 : (mostrarFeedback && esCorrecta)
-                                ? Colors.green
+                                ? paleta.feedbackCorrectBorder
                                 : (mostrarFeedback && estaSeleccionado)
-                                ? Colors.red
-                                : Colors.grey.shade100,
+                                ? paleta.feedbackIncorrectBorder
+                                : paleta.surfaceSoft,
                           ),
                           child: Text(
                             String.fromCharCode(65 + indice),
@@ -835,6 +837,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   Widget _buildFeedbackRevisionInmediata(Pregunta pregunta) {
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
     final indiceSeleccionado = _indiceOpcionSeleccionadaPractica;
     if (indiceSeleccionado == null) return const SizedBox.shrink();
 
@@ -853,40 +857,39 @@ class _PantallaPracticaState extends State<PantallaPractica> {
       key: _feedbackRevisionKey,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: esCorrecta ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+        color: esCorrecta
+            ? paleta.feedbackCorrectBg
+            : paleta.feedbackIncorrectBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: esCorrecta ? const Color(0xFF86EFAC) : const Color(0xFFFECACA),
+          color: esCorrecta
+              ? paleta.feedbackCorrectBorder
+              : paleta.feedbackIncorrectBorder,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            esCorrecta ? 'Correcto' : 'Incorrecto',
+            esCorrecta ?'Correcto' : 'Incorrecto',
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
-              color: esCorrecta
-                  ? const Color(0xFF15803D)
-                  : const Color(0xFFB91C1C),
+              color: esCorrecta ?paleta.success : scheme.error,
             ),
           ),
           const SizedBox(height: 6),
           if (!esCorrecta)
             Text(
               'Tu respuesta: opcion $letraSeleccionada',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: const Color(0xFF7F1D1D),
-              ),
+              style: GoogleFonts.inter(fontSize: 13, color: scheme.error),
             ),
           Text(
             textoCorrecto.trim().isEmpty
-                ? 'Respuesta correcta: opcion $letraCorrecta'
+                ?'Respuesta correcta: opcion $letraCorrecta'
                 : 'Respuesta correcta: opcion $letraCorrecta - $textoCorrecto',
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: const Color(0xFF1E3A8A),
+              color: scheme.onSurface,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -896,7 +899,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
               'Explicacion: ${pregunta.explicacion}',
               style: GoogleFonts.inter(
                 fontSize: 13,
-                color: Colors.grey.shade700,
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -906,19 +909,20 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   Widget _buildNavegacionPracticaInmediataBottomBar() {
+    final scheme = Theme.of(context).colorScheme;
     final esUltimaPregunta = _indiceActual == widget.preguntas.length - 1;
     final tieneSeleccion = _indiceOpcionSeleccionadaPractica != null;
 
     final String etiquetaPrincipal = !_respuestaRevisadaEnPregunta
         ? 'Revisar'
-        : (esUltimaPregunta ? 'Finalizar' : 'Siguiente');
+        : (esUltimaPregunta ?'Finalizar' : 'Siguiente');
 
     return SafeArea(
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -931,13 +935,13 @@ class _PantallaPracticaState extends State<PantallaPractica> {
           width: double.infinity,
           child: ElevatedButton(
             onPressed: !_respuestaRevisadaEnPregunta
-                ? (tieneSeleccion ? _revisarRespuestaPracticaActual : null)
+                ?(tieneSeleccion ?_revisarRespuestaPracticaActual : null)
                 : (esUltimaPregunta
                       ? _mostrarDialogoResultados
                       : _siguientePreguntaPractica),
             style: ElevatedButton.styleFrom(
               backgroundColor: TemaAplicacion.colorPrimario,
-              foregroundColor: Colors.white,
+              foregroundColor: scheme.onPrimary,
               disabledBackgroundColor: Colors.grey.shade300,
               disabledForegroundColor: Colors.grey.shade600,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -956,6 +960,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   Widget _buildNavegacionPracticaBottomBar() {
+    final scheme = Theme.of(context).colorScheme;
     final esUltimaPregunta = _indiceActual == widget.preguntas.length - 1;
     final preguntaActual = widget.preguntas[_indiceActual];
     final tieneSeleccion = _respuestasRanking[preguntaActual.id] != null;
@@ -965,7 +970,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -994,7 +999,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
             const Spacer(),
             if (esUltimaPregunta) ...[
               OutlinedButton(
-                onPressed: tieneSeleccion ? _finalizarExamenRanking : null,
+                onPressed: tieneSeleccion ?_finalizarExamenRanking : null,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: TemaAplicacion.colorPrimario,
                   side: BorderSide(
@@ -1019,7 +1024,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TemaAplicacion.colorPrimario,
-                  foregroundColor: Colors.white,
+                  foregroundColor: scheme.onPrimary,
                   disabledBackgroundColor: Colors.grey.shade300,
                   disabledForegroundColor: Colors.grey.shade600,
                   padding: const EdgeInsets.symmetric(
@@ -1039,7 +1044,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TemaAplicacion.colorPrimario,
-                  foregroundColor: Colors.white,
+                  foregroundColor: scheme.onPrimary,
                   disabledBackgroundColor: Colors.grey.shade300,
                   disabledForegroundColor: Colors.grey.shade600,
                   padding: const EdgeInsets.symmetric(
@@ -1065,12 +1070,13 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   Widget _buildNavegacionManualBottomBar() {
+    final scheme = Theme.of(context).colorScheme;
     return SafeArea(
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -1114,7 +1120,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                 onPressed: _finalizarExamenRanking,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TemaAplicacion.colorPrimario,
-                  foregroundColor: Colors.white,
+                  foregroundColor: scheme.onPrimary,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -1130,7 +1136,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                 onPressed: _navegarSiguiente,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TemaAplicacion.colorPrimario,
-                  foregroundColor: Colors.white,
+                  foregroundColor: scheme.onPrimary,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -1139,13 +1145,13 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Text('Siguiente'),
+                    const Text('Siguiente'),
                     Icon(
                       Icons.arrow_forward_ios,
                       size: 16,
-                      color: Colors.white,
+                      color: scheme.onPrimary,
                     ),
                   ],
                 ),
@@ -1158,14 +1164,16 @@ class _PantallaPracticaState extends State<PantallaPractica> {
 
   // Vista de Revision Ajustada
   Widget _buildVistaRevision() {
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Revision de Practica'),
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: scheme.onSurface),
           onPressed: _alternarModoRevision,
         ),
       ),
@@ -1174,24 +1182,24 @@ class _PantallaPracticaState extends State<PantallaPractica> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: Colors.blue.shade50,
+              color: paleta.actionCyan.withValues(alpha: 0.12),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.timer_outlined,
-                    color: Colors.blue,
+                    color: paleta.actionCyan,
                     size: 20,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       _sinLimiteTiempo
-                          ? 'Tiempo transcurrido: ${_formatearTiempo(_segundosTranscurridos)}'
+                          ?'Tiempo transcurrido: ${_formatearTiempo(_segundosTranscurridos)}'
                           : 'Tiempo restante: ${_formatearTiempo(_segundosRestantes)}',
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade800,
+                        color: scheme.onSurface,
                       ),
                     ),
                   ),
@@ -1211,7 +1219,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                   final opcionIndex = _respuestasRanking[preg.id];
 
                   String textRespuesta = "Sin responder";
-                  Color colorEstado = Colors.red.shade400;
+                  Color colorEstado = paleta.feedbackIncorrectBorder;
                   IconData iconoEstado = Icons.warning_amber_rounded;
 
                   if (respondida && opcionIndex != null) {
@@ -1223,17 +1231,17 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                     textRespuesta = textoOpcion.trim().isEmpty
                         ? "Opcion $letra"
                         : "Opcion $letra: $textoOpcion";
-                    colorEstado = Colors.green.shade600;
+                    colorEstado = paleta.feedbackCorrectBorder;
                     iconoEstado = Icons.check_circle_outline;
                   }
 
                   return Card(
                     elevation: 0,
-                    color: Colors.white,
+                    color: scheme.surface,
                     margin: const EdgeInsets.only(bottom: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey.shade200),
+                      side: BorderSide(color: scheme.outlineVariant),
                     ),
                     child: InkWell(
                       onTap: () => _irAPregunta(index),
@@ -1251,7 +1259,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                                   style: GoogleFonts.inter(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
-                                    color: Colors.grey.shade600,
+                                    color: scheme.onSurfaceVariant,
                                   ),
                                 ),
                                 Container(
@@ -1261,8 +1269,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: respondida
-                                        ? Colors.green.shade50
-                                        : Colors.red.shade50,
+                                        ? paleta.feedbackCorrectBg
+                                        : paleta.feedbackIncorrectBg,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
@@ -1274,7 +1282,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        respondida ? 'Respondida' : 'Pendiente',
+                                        respondida ?'Respondida' : 'Pendiente',
                                         style: TextStyle(
                                           color: colorEstado,
                                           fontSize: 11,
@@ -1294,7 +1302,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                               style: GoogleFonts.inter(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.grey.shade900,
+                                color: scheme.onSurface,
                               ),
                             ),
                             if (respondida) ...[
@@ -1303,14 +1311,14 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                                 text: TextSpan(
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
-                                    color: Colors.grey.shade600,
+                                    color: scheme.onSurfaceVariant,
                                   ),
                                   children: [
                                     const TextSpan(text: 'Tu seleccion: '),
                                     TextSpan(
                                       text: textRespuesta,
-                                      style: const TextStyle(
-                                        color: Color(0xFF1D4ED8),
+                                      style: TextStyle(
+                                        color: scheme.primary,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -1329,7 +1337,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: scheme.surface,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.1),
@@ -1344,8 +1352,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                 child: ElevatedButton(
                   onPressed: _finalizarExamenRanking,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
+                    backgroundColor: scheme.error,
+                    foregroundColor: scheme.onError,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

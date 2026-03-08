@@ -14,8 +14,8 @@ import 'supabase_service.dart';
 /// Clase User simulada para reemplazar supabase_flutter User
 class User {
   final String id;
-  final String? email;
-  final Map<String, dynamic>? userMetadata;
+  final String?email;
+  final Map<String, dynamic>?userMetadata;
 
   User({required this.id, this.email, this.userMetadata});
 }
@@ -23,8 +23,8 @@ class User {
 /// Resultado de operaciones de autenticacion
 class AuthResult {
   final bool success;
-  final String? error;
-  final User? user;
+  final String?error;
+  final User?user;
   final bool requiresCompletion;
 
   AuthResult({
@@ -41,7 +41,7 @@ class AuthResult {
 
 class AuthService {
   // Estado local del usuario (solo para modo mock)
-  static User? _currentUser;
+  static User?_currentUser;
 
   static const String _defaultCategoria = 'Oficiales PNP';
   static const int _defaultMetaDiaria = 30;
@@ -59,9 +59,9 @@ class AuthService {
   static sb.SupabaseClient get _client => SupabaseService.client;
 
   // Getter publico
-  static User? get currentUser {
+  static User?get currentUser {
     if (!_useSupabase) return _currentUser;
-    final sb.User? user = _client.auth.currentUser;
+    final sb.User?user = _client.auth.currentUser;
     if (user == null) return null;
     return User(
       id: user.id,
@@ -92,8 +92,8 @@ class AuthService {
   // Stream para cambios en el perfil
   static final _profileUpdateController = StreamController<void>.broadcast();
   static Stream<void> get onProfileUpdated => _profileUpdateController.stream;
-  static String? _lastProfileError;
-  static String? get lastProfileError => _lastProfileError;
+  static String?_lastProfileError;
+  static String?get lastProfileError => _lastProfileError;
 
   static void notifyProfileUpdated() {
     _profileUpdateController.add(null);
@@ -104,6 +104,9 @@ class AuthService {
     'id': 'mock-user-123',
     'email': 'demo@ascensopoli.pe',
     'nombre_completo': 'Oficial Demo',
+    'nombres': 'Oficial',
+    'apellido_paterno': 'Demo',
+    'apellido_materno': '',
     'categoria': _defaultCategoria,
     'codigo_referido': 'DEMO1234',
     'referido_por_usuario_id': null,
@@ -130,27 +133,35 @@ class AuthService {
       return _mockProfile;
     }
 
-    final sb.User? user = _client.auth.currentUser;
+    final sb.User?user = _client.auth.currentUser;
     if (user == null) return null;
 
     try {
-      Map<String, dynamic>? usuario;
+      Map<String, dynamic>?usuario;
       try {
         usuario = await _selectUsuarioByIdOrUserId(
           select:
-              'id, nombre_completo, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, premium, fecha_registro, metadata',
+              'id, nombre_completo, nombres, apellido_paterno, apellido_materno, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, premium, fecha_registro, metadata',
           authUserId: user.id,
         );
       } catch (_) {
         // Compatibilidad con esquemas antiguos donde aun no existen columnas nuevas.
-        usuario = await _selectUsuarioByIdOrUserId(
+            usuario = await _selectUsuarioByIdOrUserId(
           select:
               'id, nombre_completo, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, metadata',
           authUserId: user.id,
         );
       }
 
-      final usuarioId = (usuario?['id'] ?? user.id).toString();
+      final partesNombre = _normalizarPartesNombre(
+        nombreCompleto:
+            usuario?['nombre_completo']?.toString() ??_nombreDesdeAuth(user),
+        nombres: usuario?['nombres']?.toString(),
+        apellidoPaterno: usuario?['apellido_paterno']?.toString(),
+        apellidoMaterno: usuario?['apellido_materno']?.toString(),
+      );
+
+      final usuarioId = (usuario?['id'] ??user.id).toString();
 
       final perfil = await _client
           .from('perfil_usuario')
@@ -180,11 +191,14 @@ class AuthService {
       return {
         'id': usuarioId,
         'usuario_id': usuarioId,
-        'email': user.email ?? usuario?['email'],
+        'email': user.email ??usuario?['email'],
         'nombre_completo':
-            usuario?['nombre_completo'] ?? _nombreDesdeAuth(user),
-        'categoria': metadata['categoria'] ?? _defaultCategoria,
-        'grado_actual': usuario?['grado_actual'] ?? _defaultGrado,
+            partesNombre['nombre_completo'] ??_nombreDesdeAuth(user),
+        'nombres': partesNombre['nombres'],
+        'apellido_paterno': partesNombre['apellido_paterno'],
+        'apellido_materno': partesNombre['apellido_materno'],
+        'categoria': metadata['categoria'] ??_defaultCategoria,
+        'grado_actual': usuario?['grado_actual'] ??_defaultGrado,
         'codigo_referido': usuario?['codigo_referido'],
         'referido_por_usuario_id': usuario?['referido_por_usuario_id'],
         'creditos': _intValue(usuario?['creditos'], 0),
@@ -218,18 +232,28 @@ class AuthService {
     required String email,
     required String password,
     required String nombreCompleto,
+    String?nombres,
+    String?apellidoPaterno,
+    String?apellidoMaterno,
     required String categoria,
     required String gradoActual,
     required String especialidad,
     required int metaDiaria,
   }) async {
+    final partesNombre = _normalizarPartesNombre(
+      nombreCompleto: nombreCompleto,
+      nombres: nombres,
+      apellidoPaterno: apellidoPaterno,
+      apellidoMaterno: apellidoMaterno,
+    );
+
     if (!_useSupabase) {
       await Future.delayed(const Duration(seconds: 1));
       _currentUser = User(
         id: 'mock-user-123',
         email: email,
         userMetadata: {
-          'nombre_completo': nombreCompleto,
+          'nombre_completo': partesNombre['nombre_completo'],
           'categoria': categoria,
           'grado_actual': gradoActual,
           'especialidad': especialidad,
@@ -237,7 +261,10 @@ class AuthService {
       );
 
       _mockProfile['email'] = email;
-      _mockProfile['nombre_completo'] = nombreCompleto;
+      _mockProfile['nombre_completo'] = partesNombre['nombre_completo'];
+      _mockProfile['nombres'] = partesNombre['nombres'];
+      _mockProfile['apellido_paterno'] = partesNombre['apellido_paterno'];
+      _mockProfile['apellido_materno'] = partesNombre['apellido_materno'];
       _mockProfile['categoria'] = categoria;
       _mockProfile['grado_actual'] = gradoActual;
       _mockProfile['especialidad'] = especialidad;
@@ -259,10 +286,10 @@ class AuthService {
       final response = await _client.auth.signUp(
         email: email,
         password: password,
-        data: {'full_name': nombreCompleto},
+        data: {'full_name': partesNombre['nombre_completo']},
       );
 
-      final sb.User? user = response.user;
+      final sb.User?user = response.user;
       if (user == null) {
         return AuthResult(
           success: false,
@@ -279,10 +306,10 @@ class AuthService {
         );
       }
 
-      await _client.from('usuario').insert({
+      final payloadBase = {
         'id': user.id,
         'user_id': user.id,
-        'nombre_completo': nombreCompleto,
+        'nombre_completo': partesNombre['nombre_completo'],
         'email': email,
         'grado_actual': gradoActual,
         'auth_provider': 'supabase',
@@ -295,7 +322,19 @@ class AuthService {
           'notificar_sesiones': true,
           'horarios_sesiones': _defaultHorariosSesiones,
         },
-      });
+      };
+
+      try {
+        await _client.from('usuario').insert({
+          ...payloadBase,
+          'nombres': partesNombre['nombres'],
+          'apellido_paterno': partesNombre['apellido_paterno'],
+          'apellido_materno': partesNombre['apellido_materno'],
+        });
+      } catch (_) {
+        // Compatibilidad temporal: permite registrar aunque aun no se migren columnas.
+        await _client.from('usuario').insert(payloadBase);
+      }
 
       return AuthResult(success: true, user: _wrapUser(user));
     } catch (e) {
@@ -335,7 +374,7 @@ class AuthService {
         password: password,
       );
 
-      final sb.User? user = response.user;
+      final sb.User?user = response.user;
       if (user == null) {
         return AuthResult(success: false, error: 'Credenciales invalidas.');
       }
@@ -374,12 +413,13 @@ class AuthService {
       return true;
     }
 
-    final sb.User? user = _client.auth.currentUser;
+    final sb.User?user = _client.auth.currentUser;
     if (user == null) return false;
 
     try {
       final existing = await _selectUsuarioByIdOrUserId(
-        select: 'id, nombre_completo, grado_actual, email, metadata',
+        select:
+            'id, nombre_completo, nombres, apellido_paterno, apellido_materno, grado_actual, email, metadata',
         authUserId: user.id,
       );
 
@@ -388,9 +428,43 @@ class AuthService {
         metadata['grado_actual'] = updates['grado_actual'];
       }
 
+      final baseNombre = _normalizarPartesNombre(
+        nombreCompleto: existing?['nombre_completo']?.toString(),
+        nombres: existing?['nombres']?.toString(),
+        apellidoPaterno: existing?['apellido_paterno']?.toString(),
+        apellidoMaterno: existing?['apellido_materno']?.toString(),
+      );
+
+      final incomingNombre = _normalizarPartesNombre(
+        nombreCompleto: updates['nombre_completo']?.toString(),
+        nombres: updates['nombres']?.toString(),
+        apellidoPaterno: updates['apellido_paterno']?.toString(),
+        apellidoMaterno: updates['apellido_materno']?.toString(),
+      );
+      final shouldUpdateNombre = updates.containsKey('nombre_completo') ||
+          updates.containsKey('nombres') ||
+          updates.containsKey('apellido_paterno') ||
+          updates.containsKey('apellido_materno');
+
+      final nombreFinal = shouldUpdateNombre
+          ? _normalizarPartesNombre(
+              nombreCompleto: incomingNombre['nombre_completo'],
+              nombres: incomingNombre['nombres'] ??baseNombre['nombres'],
+              apellidoPaterno:
+                  incomingNombre['apellido_paterno'] ??
+                  baseNombre['apellido_paterno'],
+              apellidoMaterno:
+                  incomingNombre['apellido_materno'] ??
+                  baseNombre['apellido_materno'],
+            )
+          : baseNombre;
+
       final columnUpdates = <String, dynamic>{};
-      if (updates.containsKey('nombre_completo')) {
-        columnUpdates['nombre_completo'] = updates['nombre_completo'];
+      if (shouldUpdateNombre) {
+        columnUpdates['nombre_completo'] = nombreFinal['nombre_completo'];
+        columnUpdates['nombres'] = nombreFinal['nombres'];
+        columnUpdates['apellido_paterno'] = nombreFinal['apellido_paterno'];
+        columnUpdates['apellido_materno'] = nombreFinal['apellido_materno'];
       }
       if (updates.containsKey('email')) {
         columnUpdates['email'] = updates['email'];
@@ -406,23 +480,53 @@ class AuthService {
       });
 
       if (existing == null) {
-        await _client.from('usuario').insert({
+        final payloadBase = {
           'id': user.id,
           'user_id': user.id,
           'nombre_completo':
-              columnUpdates['nombre_completo'] ?? _nombreDesdeAuth(user),
-          'email': columnUpdates['email'] ?? user.email,
-          'grado_actual': columnUpdates['grado_actual'] ?? _defaultGrado,
+              (columnUpdates['nombre_completo'] ??
+                      _nombreDesdeAuth(user))
+                  .toString(),
+          'email': columnUpdates['email'] ??user.email,
+          'grado_actual': columnUpdates['grado_actual'] ??_defaultGrado,
           'auth_provider': _authProvider(user),
           'metadata': metadata,
-        });
+        };
+        try {
+          await _client.from('usuario').insert({
+            ...payloadBase,
+            'nombres':
+                columnUpdates['nombres'] ??
+                baseNombre['nombres'] ??
+                _nombreDesdeAuth(user),
+            'apellido_paterno':
+                columnUpdates['apellido_paterno'] ??
+                baseNombre['apellido_paterno'] ??
+                '',
+            'apellido_materno':
+                columnUpdates['apellido_materno'] ??
+                baseNombre['apellido_materno'] ??
+                '',
+          });
+        } catch (_) {
+          await _client.from('usuario').insert(payloadBase);
+        }
       } else {
-        final targetId = existing['id']?.toString() ?? user.id;
+        final targetId = existing['id']?.toString() ??user.id;
         final updateMap = <String, dynamic>{
           ...columnUpdates,
           'metadata': metadata,
         };
-        await _client.from('usuario').update(updateMap).eq('id', targetId);
+        try {
+          await _client.from('usuario').update(updateMap).eq('id', targetId);
+        } catch (_) {
+          // Compatibilidad temporal: actualiza sin columnas nuevas si aun no existen.
+          final fallback = Map<String, dynamic>.from(updateMap)
+            ..remove('nombres')
+            ..remove('apellido_paterno')
+            ..remove('apellido_materno');
+          await _client.from('usuario').update(fallback).eq('id', targetId);
+        }
       }
 
       _profileUpdateController.add(null);
@@ -444,7 +548,7 @@ class AuthService {
       return AuthResult(success: true);
     }
 
-    final sb.User? user = _client.auth.currentUser;
+    final sb.User?user = _client.auth.currentUser;
     if (user == null || user.email == null) {
       return AuthResult(success: false, error: 'No hay sesion activa.');
     }
@@ -480,7 +584,7 @@ class AuthService {
         final hasClientId = _googleWebClientId.trim().isNotEmpty;
         final googleSignIn = GoogleSignIn(
           scopes: const ['email', 'profile', 'openid'],
-          serverClientId: hasClientId ? _googleWebClientId : null,
+          serverClientId: hasClientId ?_googleWebClientId : null,
         );
 
         // Forzar selector de cuentas en cada intento para permitir cambiar de correo.
@@ -516,7 +620,7 @@ class AuthService {
           accessToken: googleAuth.accessToken,
         );
 
-        final sb.User? user = response.user;
+        final sb.User?user = response.user;
         if (user == null) {
           return AuthResult(
             success: false,
@@ -540,7 +644,7 @@ class AuthService {
 
       await _client.auth.signInWithOAuth(
         sb.OAuthProvider.google,
-        redirectTo: kIsWeb ? null : _oauthRedirectTo,
+        redirectTo: kIsWeb ?null : _oauthRedirectTo,
       );
 
       final session = await _client.auth.onAuthStateChange
@@ -579,7 +683,7 @@ class AuthService {
       return AuthResult(success: true);
     }
 
-    final sb.User? user = _client.auth.currentUser;
+    final sb.User?user = _client.auth.currentUser;
     if (user == null) {
       return AuthResult(success: false, error: 'No hay sesión activa.');
     }
@@ -598,7 +702,7 @@ class AuthService {
         }
         return AuthResult(
           success: false,
-          error: (data['error'] ?? 'No se pudo aplicar el referido.')
+          error: (data['error'] ??'No se pudo aplicar el referido.')
               .toString(),
         );
       }
@@ -615,7 +719,7 @@ class AuthService {
   /// Verifica si el perfil esta completo
   static Future<bool> isProfileComplete() async {
     if (!_useSupabase) return true;
-    final sb.User? user = _client.auth.currentUser;
+    final sb.User?user = _client.auth.currentUser;
     if (user == null) return false;
 
     try {
@@ -691,16 +795,75 @@ class AuthService {
   }
 
   static String _nombreDesdeAuth(sb.User user) {
-    final meta = user.userMetadata ?? {};
+    final meta = user.userMetadata ??{};
     final dynamic fullName =
-        meta['full_name'] ?? meta['name'] ?? meta['nombre'];
+        meta['full_name'] ??meta['name'] ??meta['nombre'];
     if (fullName is String && fullName.trim().isNotEmpty) {
       return fullName.trim();
     }
     return 'Usuario';
   }
 
-  static bool _needsCompletion(Map<String, dynamic>? usuarioRow) {
+  static Map<String, String> _normalizarPartesNombre({
+    String?nombreCompleto,
+    String?nombres,
+    String?apellidoPaterno,
+    String?apellidoMaterno,
+  }) {
+    String clean(String?value) =>
+        value == null ? '' : value.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+    var nombresFinal = clean(nombres);
+    var apellidoPaternoFinal = clean(apellidoPaterno);
+    var apellidoMaternoFinal = clean(apellidoMaterno);
+    var nombreCompletoFinal = clean(nombreCompleto);
+
+    if (nombreCompletoFinal.isEmpty) {
+      nombreCompletoFinal = [
+        nombresFinal,
+        apellidoPaternoFinal,
+        apellidoMaternoFinal,
+      ].where((p) => p.isNotEmpty).join(' ');
+    }
+
+    if (nombreCompletoFinal.isNotEmpty &&
+        (nombresFinal.isEmpty ||
+            apellidoPaternoFinal.isEmpty ||
+            apellidoMaternoFinal.isEmpty)) {
+      final parts = nombreCompletoFinal.split(' ').where((p) => p.isNotEmpty).toList();
+      if (parts.length >= 3) {
+        final maybeNombres = parts.sublist(0, parts.length - 2).join(' ');
+        if (nombresFinal.isEmpty) nombresFinal = maybeNombres;
+        if (apellidoPaternoFinal.isEmpty) {
+          apellidoPaternoFinal = parts[parts.length - 2];
+        }
+        if (apellidoMaternoFinal.isEmpty) {
+          apellidoMaternoFinal = parts[parts.length - 1];
+        }
+      } else if (parts.length == 2) {
+        if (nombresFinal.isEmpty) nombresFinal = parts[0];
+        if (apellidoPaternoFinal.isEmpty) apellidoPaternoFinal = parts[1];
+      } else if (parts.length == 1) {
+        if (nombresFinal.isEmpty) nombresFinal = parts[0];
+      }
+    }
+
+    nombreCompletoFinal = [
+      nombresFinal,
+      apellidoPaternoFinal,
+      apellidoMaternoFinal,
+    ].where((p) => p.isNotEmpty).join(' ');
+    if (nombreCompletoFinal.isEmpty) nombreCompletoFinal = 'Usuario';
+
+    return {
+      'nombre_completo': nombreCompletoFinal,
+      'nombres': nombresFinal,
+      'apellido_paterno': apellidoPaternoFinal,
+      'apellido_materno': apellidoMaternoFinal,
+    };
+  }
+
+  static bool _needsCompletion(Map<String, dynamic>?usuarioRow) {
     if (usuarioRow == null) return true;
     final metadata = _metadataMap(usuarioRow['metadata']);
 
@@ -708,7 +871,7 @@ class AuthService {
     final metaDiaria = metadata['meta_diaria_minutos'];
     final especialidad = metadata['especialidad'];
     final gradoActualRaw =
-        usuarioRow['grado_actual'] ?? metadata['grado_actual'];
+        usuarioRow['grado_actual'] ??metadata['grado_actual'];
 
     final categoriaCompleta = categoria is String
         ? categoria.trim().isNotEmpty
@@ -718,8 +881,8 @@ class AuthService {
         : especialidad != null;
     final metaCompleta = metaDiaria is num
         ? metaDiaria > 0
-        : (int.tryParse(metaDiaria?.toString() ?? '') ?? 0) > 0;
-    final gradoActual = gradoActualRaw?.toString().trim() ?? '';
+        : (int.tryParse(metaDiaria?.toString() ??'') ??0) > 0;
+    final gradoActual = gradoActualRaw?.toString().trim() ??'';
     final gradoCompleto = gradoActual.isNotEmpty;
 
     return !categoriaCompleta ||

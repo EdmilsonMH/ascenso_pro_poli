@@ -42,7 +42,7 @@ class TutorDashboardInicio {
         : <String>[];
 
     return TutorDashboardInicio(
-      estado: (map['estado'] ?? 'sin_datos').toString(),
+      estado: (map['estado'] ??'sin_datos').toString(),
       sesionValida: map['sesion_valida'] == true,
       hero: TutorHeroStats.fromMap(heroRaw),
       misionDiaria: TutorMissionBlock.fromMap(misionRaw),
@@ -113,19 +113,19 @@ class TutorHeroStats {
   factory TutorHeroStats.fromMap(Map<String, dynamic> map) {
     double toDouble(dynamic value) {
       if (value is num) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? 0.0;
+      if (value is String) return double.tryParse(value) ??0.0;
       return 0.0;
     }
 
     int toInt(dynamic value) {
       if (value is int) return value;
       if (value is num) return value.toInt();
-      if (value is String) return int.tryParse(value) ?? 0;
+      if (value is String) return int.tryParse(value) ??0;
       return 0;
     }
 
     return TutorHeroStats(
-      nivel: (map['nivel'] ?? 'INICIAL').toString(),
+      nivel: (map['nivel'] ??'INICIAL').toString(),
       aprobacion: toDouble(map['aprobacion']),
       dominadasHoy: toInt(map['dominadas_hoy']),
       rachaDias: toInt(map['racha_dias']),
@@ -167,7 +167,7 @@ class TutorMissionBlock {
     int toInt(dynamic value, int fallback) {
       if (value is int) return value;
       if (value is num) return value.toInt();
-      if (value is String) return int.tryParse(value) ?? fallback;
+      if (value is String) return int.tryParse(value) ??fallback;
       return fallback;
     }
 
@@ -178,7 +178,7 @@ class TutorMissionBlock {
       minutosCompletados: toInt(map['minutos_completados'], 0),
       cantidadPractica: toInt(map['cantidad_practica'], 20),
       tiempoPractica: toInt(map['tiempo_practica'], 30),
-      resumen: (map['resumen'] ?? 'Sin resumen de mision').toString(),
+      resumen: (map['resumen'] ??'Sin resumen de mision').toString(),
       ctaHabilitada: map['cta_habilitada'] != false,
     );
   }
@@ -207,9 +207,9 @@ class TutorInsightCard {
   final String colorHex;
   final String iconName;
   final bool expandable;
-  final int? cantidadPractica;
-  final int? tiempoPractica;
-  final String? materia;
+  final int?cantidadPractica;
+  final int?tiempoPractica;
+  final String?materia;
   final List<String> preguntaIds;
   final List<String> preguntasNuevasIds;
   final List<String> preguntasRepasoIds;
@@ -237,7 +237,7 @@ class TutorInsightCard {
   });
 
   factory TutorInsightCard.fromMap(Map<String, dynamic> map) {
-    int? toOptionalInt(dynamic value) {
+    int?toOptionalInt(dynamic value) {
       if (value is int) return value;
       if (value is num) return value.toInt();
       if (value is String) return int.tryParse(value);
@@ -261,14 +261,14 @@ class TutorInsightCard {
         : <TutorRiskItem>[];
 
     return TutorInsightCard(
-      id: (map['id'] ?? 'card').toString(),
-      titulo: (map['titulo'] ?? 'Insight').toString(),
-      resumen: (map['resumen'] ?? '').toString(),
-      detalle: (map['detalle'] ?? '').toString(),
-      promptAccion: (map['prompt'] ?? '').toString(),
-      cta: (map['cta'] ?? 'Abrir en chat').toString(),
-      colorHex: (map['color'] ?? '#CBD5E1').toString(),
-      iconName: (map['icono'] ?? 'insights').toString(),
+      id: (map['id'] ??'card').toString(),
+      titulo: (map['titulo'] ??'Insight').toString(),
+      resumen: (map['resumen'] ??'').toString(),
+      detalle: (map['detalle'] ??'').toString(),
+      promptAccion: (map['prompt'] ??'').toString(),
+      cta: (map['cta'] ??'Abrir en chat').toString(),
+      colorHex: (map['color'] ??'#CBD5E1').toString(),
+      iconName: (map['icono'] ??'insights').toString(),
       expandable: map['expandable'] != false,
       cantidadPractica: toOptionalInt(map['cantidad_practica']),
       tiempoPractica: toOptionalInt(map['tiempo_practica']),
@@ -323,15 +323,15 @@ class TutorRiskItem {
   factory TutorRiskItem.fromMap(Map<String, dynamic> map) {
     double toDouble(dynamic value) {
       if (value is num) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? 0.0;
+      if (value is String) return double.tryParse(value) ??0.0;
       return 0.0;
     }
 
     return TutorRiskItem(
-      materia: (map['materia'] ?? 'Materia').toString(),
+      materia: (map['materia'] ??'Materia').toString(),
       tasa: toDouble(map['tasa']),
-      tendencia: (map['tendencia'] ?? 'estable').toString(),
-      semaforo: (map['semaforo'] ?? 'verde').toString(),
+      tendencia: (map['tendencia'] ??'estable').toString(),
+      semaforo: (map['semaforo'] ??'verde').toString(),
     );
   }
 

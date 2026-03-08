@@ -26,11 +26,11 @@ class RankingUsuario {
 
   factory RankingUsuario.fromJson(Map<String, dynamic> json) {
     return RankingUsuario(
-      id: json['id']?.toString() ?? '',
-      nombreCompleto: (json['nombre_completo'] ?? 'Usuario').toString(),
-      categoria: (json['categoria'] ?? '').toString(),
+      id: json['id']?.toString() ??'',
+      nombreCompleto: (json['nombre_completo'] ??'Usuario').toString(),
+      categoria: (json['categoria'] ??'').toString(),
       puntosTotales:
-          _toDouble(json['puntos_promedio'] ?? json['puntos_totales']) ?? 0.0,
+          _toDouble(json['puntos_promedio'] ??json['puntos_totales']) ??0.0,
       puntajeMaximo:
           _toDouble(
             json['puntaje_maximo'] ??
@@ -39,24 +39,24 @@ class RankingUsuario {
           ) ??
           0.0,
       porcentajeAciertos:
-          _toDouble(json['porcentaje_aciertos'] ?? json['efectividad']) ?? 0.0,
-      posicion: _toInt(json['posicion']) ?? 0,
+          _toDouble(json['porcentaje_aciertos'] ??json['efectividad']) ??0.0,
+      posicion: _toInt(json['posicion']) ??0,
       practicasParaRanking:
           _toInt(
-            json['practicas_para_ranking'] ?? json['simulacros_100_completados'],
+            json['practicas_para_ranking'] ??json['simulacros_100_completados'],
           ) ??
           0,
     );
   }
 
-  static int? _toInt(dynamic value) {
+  static int?_toInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
   }
 
-  static double? _toDouble(dynamic value) {
+  static double?_toDouble(dynamic value) {
     if (value == null) return null;
     if (value is double) return value;
     if (value is num) return value.toDouble();
@@ -132,7 +132,7 @@ extension CriterioRankingExt on CriterioRanking {
 class ResultadoRankingPeriodo {
   final List<RankingUsuario> rankingCompleto;
   final List<RankingUsuario> topRanking;
-  final RankingUsuario? miPosicion;
+  final RankingUsuario?miPosicion;
   final int misPracticas;
 
   const ResultadoRankingPeriodo({
@@ -149,12 +149,12 @@ class ServicioRanking {
   bool get _useSupabase => SupabaseService.isInitialized;
   bool get _tieneUsuarioAutenticado => AuthService.currentUser != null;
 
-  String? get _usuarioId => AuthService.currentUser?.id;
+  String?get _usuarioId => AuthService.currentUser?.id;
 
   Future<ResultadoRankingPeriodo> obtenerRankingPeriodo({
     required PeriodoRanking periodo,
     CriterioRanking criterio = CriterioRanking.promedio,
-    int? diasPersonalizados,
+    int?diasPersonalizados,
     int limiteTop = 50,
   }) async {
     if (!_useSupabase) {
@@ -200,14 +200,14 @@ class ServicioRanking {
         rankingCompleto: rankingTop,
         topRanking: top,
         miPosicion: miPosicion,
-        misPracticas: miPosicion?.practicasParaRanking ?? 0,
+        misPracticas: miPosicion?.practicasParaRanking ??0,
       );
     } catch (e) {
       debugPrint(
         'ServicioRanking.obtenerRankingPeriodo fallback legacy. Error: $e',
       );
       final top = await _obtenerTopRankingLegacy();
-      RankingUsuario? mi;
+      RankingUsuario?mi;
       var practicas = 0;
       if (_tieneUsuarioAutenticado) {
         mi = await _obtenerMiPosicionLegacy();
@@ -245,11 +245,11 @@ class ServicioRanking {
   }
 
   Future<List<Map<String, dynamic>>> _obtenerFilasRankingPeriodoConFallback({
-    required String? categoriaUsuario,
+    required String?categoriaUsuario,
     required PeriodoRanking periodo,
     required CriterioRanking criterio,
     required int limite,
-    int? diasPersonalizados,
+    int?diasPersonalizados,
   }) async {
     final rows = await _obtenerFilasRankingPeriodo(
       categoriaUsuario: categoriaUsuario,
@@ -286,7 +286,7 @@ class ServicioRanking {
     );
   }
 
-  bool _debeIntentarFallbackCategorias(String? categoriaUsuario) {
+  bool _debeIntentarFallbackCategorias(String?categoriaUsuario) {
     final normalizada = _normalizar(categoriaUsuario);
     return normalizada.isEmpty ||
         normalizada == 'ambos' ||
@@ -301,7 +301,7 @@ class ServicioRanking {
   }) {
     final porUsuario = <String, Map<String, dynamic>>{};
     for (final row in rows) {
-      final userId = row['usuario_id']?.toString() ?? row['id']?.toString() ?? '';
+      final userId = row['usuario_id']?.toString() ??row['id']?.toString() ??'';
       if (userId.isEmpty) continue;
 
       final actual = porUsuario[userId];
@@ -331,26 +331,26 @@ class ServicioRanking {
     Map<String, dynamic> b,
     CriterioRanking criterio,
   ) {
-    final aProm = _toDouble(a['puntos_promedio'] ?? a['puntos_totales']) ?? 0.0;
-    final bProm = _toDouble(b['puntos_promedio'] ?? b['puntos_totales']) ?? 0.0;
+    final aProm = _toDouble(a['puntos_promedio'] ??a['puntos_totales']) ??0.0;
+    final bProm = _toDouble(b['puntos_promedio'] ??b['puntos_totales']) ??0.0;
     final aMax =
         _toDouble(
-          a['puntaje_maximo'] ?? a['puntos_promedio'] ?? a['puntos_totales'],
+          a['puntaje_maximo'] ??a['puntos_promedio'] ??a['puntos_totales'],
         ) ??
         0.0;
     final bMax =
         _toDouble(
-          b['puntaje_maximo'] ?? b['puntos_promedio'] ?? b['puntos_totales'],
+          b['puntaje_maximo'] ??b['puntos_promedio'] ??b['puntos_totales'],
         ) ??
         0.0;
-    final aEf = _toDouble(a['efectividad'] ?? a['porcentaje_aciertos']) ?? 0.0;
-    final bEf = _toDouble(b['efectividad'] ?? b['porcentaje_aciertos']) ?? 0.0;
-    final aTotal = _toDouble(a['puntos_totales'] ?? a['puntos_promedio']) ?? 0.0;
-    final bTotal = _toDouble(b['puntos_totales'] ?? b['puntos_promedio']) ?? 0.0;
+    final aEf = _toDouble(a['efectividad'] ??a['porcentaje_aciertos']) ??0.0;
+    final bEf = _toDouble(b['efectividad'] ??b['porcentaje_aciertos']) ??0.0;
+    final aTotal = _toDouble(a['puntos_totales'] ??a['puntos_promedio']) ??0.0;
+    final bTotal = _toDouble(b['puntos_totales'] ??b['puntos_promedio']) ??0.0;
     final aFecha = _toDateTime(a['ultima_practica']);
     final bFecha = _toDateTime(b['ultima_practica']);
-    final aId = a['usuario_id']?.toString() ?? a['id']?.toString() ?? '';
-    final bId = b['usuario_id']?.toString() ?? b['id']?.toString() ?? '';
+    final aId = a['usuario_id']?.toString() ??a['id']?.toString() ??'';
+    final bId = b['usuario_id']?.toString() ??b['id']?.toString() ??'';
 
     if (criterio == CriterioRanking.puntuacionMasAlta) {
       final cMax = bMax.compareTo(aMax);
@@ -381,11 +381,11 @@ class ServicioRanking {
   }
 
   Future<List<Map<String, dynamic>>> _obtenerFilasRankingPeriodo({
-    required String? categoriaUsuario,
+    required String?categoriaUsuario,
     required PeriodoRanking periodo,
     required CriterioRanking criterio,
     required int limite,
-    int? diasPersonalizados,
+    int?diasPersonalizados,
   }) async {
     if (periodo == PeriodoRanking.mejorPuntaje &&
         criterio == CriterioRanking.puntuacionMasAlta) {
@@ -413,7 +413,7 @@ class ServicioRanking {
     };
 
     if (periodo == PeriodoRanking.diasPersonalizados) {
-      params['p_dias'] = (diasPersonalizados ?? 1).clamp(1, 3650);
+      params['p_dias'] = (diasPersonalizados ??1).clamp(1, 3650);
     }
 
     dynamic raw;
@@ -437,10 +437,10 @@ class ServicioRanking {
   }
 
   Future<RankingUsuario?> _obtenerMiPosicionPeriodo({
-    required String? categoriaUsuario,
+    required String?categoriaUsuario,
     required PeriodoRanking periodo,
     required CriterioRanking criterio,
-    int? diasPersonalizados,
+    int?diasPersonalizados,
   }) async {
     final userId = _usuarioId;
     if (userId == null || userId.isEmpty) return null;
@@ -463,7 +463,7 @@ class ServicioRanking {
           'p_criterio': criterio.rpcValue,
           'p_usuario_id': userId,
           if (periodo == PeriodoRanking.diasPersonalizados)
-            'p_dias': (diasPersonalizados ?? 1).clamp(1, 3650),
+            'p_dias': (diasPersonalizados ??1).clamp(1, 3650),
         };
         raw = await SupabaseService.client.rpc(
           'obtener_posicion_usuario_ranking_periodo',
@@ -481,7 +481,7 @@ class ServicioRanking {
     return parsed.first;
   }
 
-  Map<String, dynamic>? _extraerPrimeraFila(dynamic raw) {
+  Map<String, dynamic>?_extraerPrimeraFila(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return Map<String, dynamic>.from(raw);
     if (raw is List && raw.isNotEmpty) {
@@ -497,7 +497,7 @@ class ServicioRanking {
     for (var i = 0; i < rows.length; i++) {
       final row = rows[i];
       final userId =
-          row['usuario_id']?.toString() ?? row['id']?.toString() ?? '';
+          row['usuario_id']?.toString() ??row['id']?.toString() ??'';
       if (userId.isEmpty) continue;
 
       resultado.add(
@@ -511,7 +511,7 @@ class ServicioRanking {
               ? row['categoria'].toString().trim()
               : 'General',
           puntosTotales:
-              _toDouble(row['puntos_promedio'] ?? row['puntos_totales']) ?? 0.0,
+              _toDouble(row['puntos_promedio'] ??row['puntos_totales']) ??0.0,
           puntajeMaximo:
               _toDouble(
                 row['puntaje_maximo'] ??
@@ -520,8 +520,8 @@ class ServicioRanking {
               ) ??
               0.0,
           porcentajeAciertos:
-              _toDouble(row['efectividad'] ?? row['promedio_simulacros']) ?? 0.0,
-          posicion: _toInt(row['posicion']) ?? (i + 1),
+              _toDouble(row['efectividad'] ??row['promedio_simulacros']) ??0.0,
+          posicion: _toInt(row['posicion']) ??(i + 1),
           practicasParaRanking:
               _toInt(
                 row['practicas_para_ranking'] ??
@@ -534,7 +534,7 @@ class ServicioRanking {
     return resultado;
   }
 
-  RankingUsuario? _buscarMiPosicion(List<RankingUsuario> ranking) {
+  RankingUsuario?_buscarMiPosicion(List<RankingUsuario> ranking) {
     final usuarioId = _usuarioId;
     if (usuarioId == null) return null;
     for (final r in ranking) {
@@ -548,7 +548,7 @@ class ServicioRanking {
     if (user == null) return null;
 
     final fromAuth = _extraerCategoriaDesdeMetadata(
-      Map<String, dynamic>.from(user.userMetadata ?? {}),
+      Map<String, dynamic>.from(user.userMetadata ??{}),
     );
     if (fromAuth != null) return fromAuth;
 
@@ -569,13 +569,13 @@ class ServicioRanking {
           .eq('id', user.id)
           .maybeSingle();
       final metadata = _toMap(row?['metadata']);
-      return _extraerCategoriaDesdeMetadata(metadata) ?? 'Oficiales PNP';
+      return _extraerCategoriaDesdeMetadata(metadata) ??'Oficiales PNP';
     } catch (_) {
       return 'Oficiales PNP';
     }
   }
 
-  String? _extraerCategoriaDesdeMetadata(Map<String, dynamic> metadata) {
+  String?_extraerCategoriaDesdeMetadata(Map<String, dynamic> metadata) {
     final candidatos = [
       metadata['categoria'],
       metadata['categoria_usuario'],
@@ -589,7 +589,7 @@ class ServicioRanking {
   }
 
   String _aliasUsuario(String id) {
-    final shortId = id.length >= 4 ? id.substring(id.length - 4) : id;
+    final shortId = id.length >= 4 ?id.substring(id.length - 4) : id;
     return 'Usuario $shortId';
   }
 
@@ -652,12 +652,12 @@ class ServicioRanking {
             id: userId,
             nombreCompleto: _nombreVisible(id: userId, usuario: usuario),
             categoria: _categoriaVisible(metadata),
-            puntosTotales: _toDouble(r['puntos_totales']) ?? 0.0,
-            puntajeMaximo: _toDouble(r['puntos_totales']) ?? 0.0,
-            porcentajeAciertos: _toDouble(r['promedio_simulacros']) ?? 0.0,
+            puntosTotales: _toDouble(r['puntos_totales']) ??0.0,
+            puntajeMaximo: _toDouble(r['puntos_totales']) ??0.0,
+            porcentajeAciertos: _toDouble(r['promedio_simulacros']) ??0.0,
             posicion: i + 1,
             practicasParaRanking:
-                _toInt(r['simulacros_100_completados']) ?? 0,
+                _toInt(r['simulacros_100_completados']) ??0,
           ),
         );
       }
@@ -691,7 +691,7 @@ class ServicioRanking {
       );
       if (indice < 0) return null;
 
-      Map<String, dynamic>? usuario;
+      Map<String, dynamic>?usuario;
       try {
         final usuarioRow = await SupabaseService.client
             .from('usuario')
@@ -713,11 +713,11 @@ class ServicioRanking {
           usuario: usuario,
         ),
         categoria: _categoriaVisible(metadata),
-        puntosTotales: _toDouble(row['puntos_totales']) ?? 0.0,
-        puntajeMaximo: _toDouble(row['puntos_totales']) ?? 0.0,
-        porcentajeAciertos: _toDouble(row['promedio_simulacros']) ?? 0.0,
+        puntosTotales: _toDouble(row['puntos_totales']) ??0.0,
+        puntajeMaximo: _toDouble(row['puntos_totales']) ??0.0,
+        porcentajeAciertos: _toDouble(row['promedio_simulacros']) ??0.0,
         posicion: indice + 1,
-        practicasParaRanking: _toInt(row['simulacros_100_completados']) ?? 0,
+        practicasParaRanking: _toInt(row['simulacros_100_completados']) ??0,
       );
     } catch (e) {
       debugPrint('ServicioRanking._obtenerMiPosicionLegacy error: $e');
@@ -768,17 +768,17 @@ class ServicioRanking {
 
   String _nombreVisible({
     required String id,
-    Map<String, dynamic>? usuario,
+    Map<String, dynamic>?usuario,
   }) {
-    final nombre = usuario?['nombre_completo']?.toString().trim() ?? '';
+    final nombre = usuario?['nombre_completo']?.toString().trim() ??'';
     if (nombre.isNotEmpty) return nombre;
 
-    final shortId = id.length >= 4 ? id.substring(id.length - 4) : id;
+    final shortId = id.length >= 4 ?id.substring(id.length - 4) : id;
     return 'Usuario $shortId';
   }
 
   String _categoriaVisible(Map<String, dynamic> metadata) {
-    final categoria = metadata['categoria']?.toString().trim() ?? '';
+    final categoria = metadata['categoria']?.toString().trim() ??'';
     if (categoria.isNotEmpty) return categoria;
     return 'General';
   }
@@ -789,28 +789,28 @@ class ServicioRanking {
     return <String, dynamic>{};
   }
 
-  int? _toInt(dynamic value) {
+  int?_toInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
   }
 
-  double? _toDouble(dynamic value) {
+  double?_toDouble(dynamic value) {
     if (value == null) return null;
     if (value is double) return value;
     if (value is num) return value.toDouble();
     return double.tryParse(value.toString());
   }
 
-  DateTime? _toDateTime(dynamic value) {
+  DateTime?_toDateTime(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
     return DateTime.tryParse(value.toString());
   }
 
   String _normalizar(dynamic value) {
-    return (value ?? '').toString().trim().toLowerCase();
+    return (value ??'').toString().trim().toLowerCase();
   }
 
   List<RankingUsuario> _topMock() {

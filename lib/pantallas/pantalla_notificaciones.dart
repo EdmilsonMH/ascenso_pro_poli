@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+
 import '../servicios/servicio_notificaciones.dart';
+import '../tema/tema_aplicacion.dart';
 
 class PantallaNotificaciones extends StatefulWidget {
   const PantallaNotificaciones({super.key});
@@ -41,10 +43,11 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
     final exito = await _servicioNotificaciones.marcarTodasComoLeidas();
 
     if (exito && mounted) {
+      final paleta = TemaAplicacion.paleta(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Todas las notificaciones marcadas como leídas'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: const Text('Todas las notificaciones marcadas como leidas'),
+          backgroundColor: paleta.success,
         ),
       );
       _cargarNotificaciones();
@@ -65,7 +68,7 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
     } else if (diferencia.inHours < 24) {
       return 'Hace ${diferencia.inHours} horas';
     } else if (diferencia.inDays < 7) {
-      return 'Hace ${diferencia.inDays} días';
+      return 'Hace ${diferencia.inDays} dias';
     } else {
       return DateFormat('dd MMM yyyy').format(fecha);
     }
@@ -95,38 +98,40 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
       final hex = colorHex.replaceFirst('#', '');
       return Color(int.parse('FF$hex', radix: 16));
     } catch (e) {
-      return Colors.blue;
+      return TemaAplicacion.colorSecundario;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'Notificaciones',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: scheme.onSurface,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: IconThemeData(color: scheme.onSurface),
         actions: [
           if (_notificaciones.any((n) => !n.leida))
             TextButton(
               onPressed: _marcarTodasComoLeidas,
               child: Text(
-                'Marcar todo leído',
-                style: TextStyle(color: Colors.blue.shade700),
+                'Marcar todo leido',
+                style: TextStyle(color: scheme.primary),
               ),
             ),
         ],
       ),
       body: _cargando
-          ? const Center(child: CircularProgressIndicator())
+          ?const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _cargarNotificaciones,
               child: _notificaciones.isEmpty
@@ -144,6 +149,8 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
   }
 
   Widget _buildEmptyState() {
+    final scheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -151,21 +158,24 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
           Icon(
             Icons.notifications_off_outlined,
             size: 80,
-            color: Colors.grey.shade300,
+            color: scheme.outline,
           ),
           const SizedBox(height: 16),
           Text(
             'No tienes notificaciones',
             style: GoogleFonts.inter(
               fontSize: 18,
-              color: Colors.grey.shade600,
+              color: scheme.onSurface,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Aquí aparecerán tus logros y recordatorios',
-            style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade500),
+            'Aqui apareceran tus logros y recordatorios',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -173,6 +183,8 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
   }
 
   Widget _buildNotificationItem(Notificacion notif) {
+    final scheme = Theme.of(context).colorScheme;
+    final paleta = TemaAplicacion.paleta(context);
     final color = _obtenerColor(notif.color);
     final icono = _obtenerIcono(notif.icono);
 
@@ -186,9 +198,11 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: notif.leida ? Colors.white : Colors.blue.shade50,
+          color: notif.leida
+              ? scheme.surface
+              : paleta.actionCyan.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: scheme.outlineVariant),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,7 +229,7 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
-                            color: Colors.black87,
+                            color: scheme.onSurface,
                           ),
                         ),
                       ),
@@ -223,8 +237,8 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
                         Container(
                           width: 10,
                           height: 10,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
+                          decoration: BoxDecoration(
+                            color: scheme.error,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -235,7 +249,7 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
                     notif.mensaje,
                     style: GoogleFonts.inter(
                       fontSize: 13,
-                      color: Colors.grey[700],
+                      color: scheme.onSurfaceVariant,
                       height: 1.4,
                     ),
                   ),
@@ -244,7 +258,7 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
                     _formatearTiempo(notif.createdAt),
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
                     ),
                   ),
                 ],

@@ -4,8 +4,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../modelos/modelo_pregunta.dart';
 
 // Variables globales para acceso singleton
-AudioHandler? audioHandler;
-String? errorDeInicializacion;
+AudioHandler?audioHandler;
+String?errorDeInicializacion;
 
 class AudioPlayerHandler extends BaseAudioHandler {
   final FlutterTts _flutterTts = FlutterTts();

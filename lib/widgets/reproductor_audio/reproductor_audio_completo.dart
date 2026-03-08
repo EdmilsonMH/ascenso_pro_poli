@@ -7,7 +7,7 @@ import '../../modelos/modelo_pregunta.dart';
 /// Widget completo del reproductor de audio con diseño colapsable/expandible
 class ReproductorAudioCompleto extends StatefulWidget {
   final List<Pregunta> preguntas;
-  final VoidCallback? onConfiguracion;
+  final VoidCallback?onConfiguracion;
 
   const ReproductorAudioCompleto({
     super.key,
@@ -76,7 +76,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Cargando ${widget.preguntas.length} preguntas...'),
-            backgroundColor: const Color(0xFFA855F7),
+            backgroundColor: const Color(0xFF1E6B63),
             duration: const Duration(milliseconds: 1000),
           ),
         );
@@ -110,9 +110,9 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
     return StreamBuilder<PlaybackState>(
       stream: audioHandler!.playbackState,
       builder: (context, snapshot) {
-        final playing = snapshot.data?.playing ?? false;
+        final playing = snapshot.data?.playing ??false;
         final processingState =
-            snapshot.data?.processingState ?? AudioProcessingState.idle;
+            snapshot.data?.processingState ??AudioProcessingState.idle;
         final isActive = processingState != AudioProcessingState.idle;
 
         // Si está activo, forzamos que esté expandido
@@ -145,7 +145,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                         'Escucha las preguntas, alternativas y respuestas correctas',
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: const Color(0xFF7E22CE),
+                          color: const Color(0xFF1A5F59),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -181,7 +181,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: const BoxDecoration(
-                color: Color(0xFFA855F7),
+                color: Color(0xFF1E6B63),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.volume_up, color: Colors.white, size: 18),
@@ -193,7 +193,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF6B21A8),
+                  color: const Color(0xFF164A55),
                 ),
               ),
             ),
@@ -203,7 +203,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
               (_expandido || isActive)
                   ? Icons.keyboard_arrow_up
                   : Icons.keyboard_arrow_down,
-              color: const Color(0xFF6B21A8),
+              color: const Color(0xFF164A55),
               size: 24,
             ),
           ],
@@ -237,7 +237,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                     Icon(
                       Icons.settings_outlined,
                       size: 20,
-                      color: const Color(0xFFA855F7).withValues(alpha: 0.8),
+                      color: const Color(0xFF1E6B63).withValues(alpha: 0.8),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -245,10 +245,10 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                         '${widget.preguntas.length} preguntas disponibles',
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: const Color(0xFF6B21A8),
+                          color: const Color(0xFF164A55),
                           decoration: TextDecoration.underline, // Visual cue
                           decorationColor: const Color(
-                            0xFF6B21A8,
+                            0xFF164A55,
                           ).withValues(alpha: 0.3),
                         ),
                       ),
@@ -264,7 +264,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
             icon: const Icon(Icons.play_arrow, size: 20),
             label: const Text('Reproducir'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFA855F7),
+              backgroundColor: const Color(0xFF1E6B63),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -282,10 +282,10 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
       stream: audioHandler!.mediaItem,
       builder: (context, snapshot) {
         final mediaItem = snapshot.data;
-        final queueIndex = audioHandler!.playbackState.value.queueIndex ?? 0;
+        final queueIndex = audioHandler!.playbackState.value.queueIndex ??0;
         final totalPreguntas = widget.preguntas.length;
 
-        Pregunta? preguntaActual;
+        Pregunta?preguntaActual;
         if (queueIndex < widget.preguntas.length) {
           preguntaActual = widget.preguntas[queueIndex];
         }
@@ -311,11 +311,11 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Pregunta ${queueIndex + 1} - ${preguntaActual?.materia ?? mediaItem?.artist ?? "Cargando..."}',
+                      'Pregunta ${queueIndex + 1} - ${preguntaActual?.materia ??mediaItem?.artist ??"Cargando..."}',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF6B21A8),
+                        color: const Color(0xFF164A55),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -335,7 +335,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF7E22CE),
+                        color: const Color(0xFF1A5F59),
                       ),
                     ),
                   ),
@@ -343,7 +343,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
               ),
               const SizedBox(height: 8),
               Text(
-                preguntaActual?.texto ?? 'Preparando pregunta...',
+                preguntaActual?.texto ??'Preparando pregunta...',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: Colors.black87,
@@ -379,7 +379,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                   width: 48,
                   height: 48,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFA855F7),
+                    color: Color(0xFF1E6B63),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -390,7 +390,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                     ],
                   ),
                   child: Icon(
-                    playing ? Icons.pause : Icons.play_arrow,
+                    playing ?Icons.pause : Icons.play_arrow,
                     color: Colors.white,
                     size: 28,
                   ),
@@ -413,12 +413,12 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                 child: ElevatedButton.icon(
                   onPressed: _continuarReproduccion,
                   icon: Icon(
-                    playing ? Icons.pause : Icons.play_arrow,
+                    playing ?Icons.pause : Icons.play_arrow,
                     size: 18,
                   ),
-                  label: Text(playing ? 'Pausar' : 'Continuar'),
+                  label: Text(playing ?'Pausar' : 'Continuar'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFA855F7),
+                    backgroundColor: const Color(0xFF1E6B63),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
@@ -434,8 +434,8 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
                   icon: const Icon(Icons.stop, size: 18),
                   label: const Text('Detener'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF6B21A8),
-                    side: const BorderSide(color: Color(0xFFA855F7)),
+                    foregroundColor: const Color(0xFF164A55),
+                    side: const BorderSide(color: Color(0xFF1E6B63)),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -464,7 +464,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
       child: IconButton(
         onPressed: onTap,
         icon: Icon(icon),
-        color: const Color(0xFF6B21A8),
+        color: const Color(0xFF164A55),
         iconSize: 24,
         tooltip: tooltip,
         padding: const EdgeInsets.all(8),
@@ -491,7 +491,7 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
           style: GoogleFonts.inter(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: const Color(0xFF6B21A8),
+            color: const Color(0xFF164A55),
           ),
         ),
       ),
@@ -520,3 +520,4 @@ class _ReproductorAudioCompletoState extends State<ReproductorAudioCompleto> {
     );
   }
 }
+

@@ -30,7 +30,7 @@ class EncabezadoPantalla extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF1E3A8A),
+                color: const Color(0xFF0B2933),
                 letterSpacing: -0.5,
               ),
             ),
@@ -45,3 +45,4 @@ class EncabezadoPantalla extends StatelessWidget {
     );
   }
 }
+

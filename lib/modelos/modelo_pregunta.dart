@@ -6,7 +6,7 @@ class Pregunta {
   final List<String> opciones;
   final int indiceRespuestaCorrecta;
   final String explicacion;
-  final String? materiaId;
+  final String?materiaId;
   final String materia;
   final String categoria;
   final String dificultad;
@@ -44,7 +44,7 @@ class Pregunta {
       explicacion: json['explicacion'] as String? ?? '',
       materiaId: json['materia_id'] as String?,
       materia:
-          json['materia_nombre'] as String? ??
+          json['materia_nombre'] as String? ?? 
           (json['materias'] != null
               ? json['materias']['nombre']
               : 'Sin materia'),
@@ -55,7 +55,7 @@ class Pregunta {
 
   /// Convierte a mapa para enviar a Supabase
   Map<String, dynamic> toSupabase() {
-    String opcionSegura(int index) => index < opciones.length ? opciones[index] : '';
+    String opcionSegura(int index) => index < opciones.length ?opciones[index] : '';
     return {
       'id': id,
       'numero': numero,
@@ -86,7 +86,7 @@ class Pregunta {
 class IntentoFallido {
   final Pregunta pregunta;
   final int indiceIncorrectoSeleccionado;
-  final DateTime? fechaIntento;
+  final DateTime?fechaIntento;
 
   IntentoFallido({
     required this.pregunta,
@@ -115,7 +115,7 @@ class IntentoFallido {
 class Materia {
   final String id;
   final String nombre;
-  final String? descripcion;
+  final String?descripcion;
   final String icono;
   final String color;
   final int orden;
@@ -147,10 +147,10 @@ class SesionPractica {
   final int totalPreguntas;
   final int preguntasCorrectas;
   final int preguntasIncorrectas;
-  final int? tiempoTotalSegundos;
+  final int?tiempoTotalSegundos;
   final bool completada;
   final DateTime fechaCreacion;
-  final DateTime? fechaFinalizacion;
+  final DateTime?fechaFinalizacion;
 
   const SesionPractica({
     required this.id,
@@ -184,7 +184,7 @@ class SesionPractica {
   }
 
   Duration get duracion {
-    return Duration(seconds: tiempoTotalSegundos ?? 0);
+    return Duration(seconds: tiempoTotalSegundos ??0);
   }
 }
 
@@ -192,14 +192,14 @@ class SesionPractica {
 class Usuario {
   final String id;
   final String email;
-  final String? nombreCompleto;
-  final String? categoria;
-  final String? codigoReferido;
+  final String?nombreCompleto;
+  final String?categoria;
+  final String?codigoReferido;
   final int puntosTotales;
   final int preguntasRespondidas;
   final int preguntasCorrectas;
   final int rachaDias;
-  final DateTime? ultimoEstudio;
+  final DateTime?ultimoEstudio;
 
   const Usuario({
     required this.id,
@@ -240,8 +240,8 @@ class Usuario {
 /// Modelo para el ranking
 class RankingUsuario {
   final String id;
-  final String? nombreCompleto;
-  final String? categoria;
+  final String?nombreCompleto;
+  final String?categoria;
   final int puntosTotales;
   final int preguntasRespondidas;
   final int preguntasCorrectas;
@@ -270,7 +270,7 @@ class RankingUsuario {
       preguntasRespondidas: json['preguntas_respondidas'] as int? ?? 0,
       preguntasCorrectas: json['preguntas_correctas'] as int? ?? 0,
       porcentajeAciertos:
-          (json['porcentaje_aciertos'] as num?)?.toDouble() ?? 0,
+          (json['porcentaje_aciertos'] as num?)?.toDouble() ??0,
       rachaDias: json['racha_dias'] as int? ?? 0,
       posicion: json['posicion'] as int,
     );

@@ -33,7 +33,7 @@ class _PantallaPreguntasAcertadasState
   List<Pregunta> _preguntas = [];
   Map<String, EstadisticaPregunta> _estadisticasPorPregunta = {};
   List<String> _todasLasMaterias = [];
-  String? _materiaActiva;
+  String?_materiaActiva;
 
   bool _cargando = true;
   bool _mostrarReproductor = false;
@@ -121,7 +121,7 @@ class _PantallaPreguntasAcertadasState
 
   double _cantidadInicialPara(int total) {
     if (total <= 0) return 0;
-    return total >= 5 ? 5 : total.toDouble();
+    return total >= 5 ?5 : total.toDouble();
   }
 
   void _actualizarCantidadMaxima() {
@@ -163,7 +163,7 @@ class _PantallaPreguntasAcertadasState
   Map<String, int> _contarPreguntasPorMateria() {
     final conteo = <String, int>{};
     for (final pregunta in _preguntas) {
-      conteo[pregunta.materia] = (conteo[pregunta.materia] ?? 0) + 1;
+      conteo[pregunta.materia] = (conteo[pregunta.materia] ??0) + 1;
     }
     return conteo;
   }
@@ -203,7 +203,7 @@ class _PantallaPreguntasAcertadasState
       backgroundColor: Colors.transparent,
       builder: (context) => ConfiguracionAudioSheet(
         totalPreguntas: _preguntasFiltradas.length,
-        themeColor: const Color(0xFF10B981),
+        themeColor: const Color(0xFF237D57),
         onAplicar: _aplicarConfiguracionAudio,
       ),
     );
@@ -288,7 +288,7 @@ class _PantallaPreguntasAcertadasState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _materiaActiva ?? '',
+                    _materiaActiva ??'',
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       color: const Color(0xFF047857),
@@ -308,7 +308,7 @@ class _PantallaPreguntasAcertadasState
                         ? preguntasMateria.length - 1
                         : 1,
                     label: tempCantidad.round().toString(),
-                    activeColor: const Color(0xFF10B981),
+                    activeColor: const Color(0xFF237D57),
                     onChanged: (value) {
                       setModalState(() {
                         tempCantidad = value;
@@ -331,9 +331,9 @@ class _PantallaPreguntasAcertadasState
                         _iniciarPractica(parentContext, tempCantidad.toInt());
                       },
                       icon: const Icon(Icons.play_circle_outline, size: 20),
-                      label: const Text('Iniciar PrÃ¡ctica'),
+                      label: const Text('Iniciar Práctica'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: const Color(0xFF237D57),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         textStyle: GoogleFonts.inter(
@@ -417,12 +417,12 @@ class _PantallaPreguntasAcertadasState
       children: [
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-          color: const Color(0xFFF0FDF4),
+          color: const Color(0xFFD9EEE5),
           child: Container(
             height: 46,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
+              color: const Color(0xFFEEF2F4),
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextField(
@@ -452,7 +452,7 @@ class _PantallaPreguntasAcertadasState
                     'No se encontraron materias.',
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: const Color(0xFF6B7280),
+                      color: const Color(0xFF4B5D67),
                     ),
                   ),
                 )
@@ -462,7 +462,7 @@ class _PantallaPreguntasAcertadasState
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final materia = materiasFiltradas[index];
-                    final total = conteoPorMateria[materia] ?? 0;
+                    final total = conteoPorMateria[materia] ??0;
 
                     return Material(
                       color: Colors.white,
@@ -490,7 +490,7 @@ class _PantallaPreguntasAcertadasState
                                 ),
                                 child: const Icon(
                                   Icons.menu_book_rounded,
-                                  color: Color(0xFF10B981),
+                                  color: Color(0xFF237D57),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -503,7 +503,7 @@ class _PantallaPreguntasAcertadasState
                                       style: GoogleFonts.inter(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF111827),
+                                        color: const Color(0xFF1F2A1C),
                                       ),
                                     ),
                                     const SizedBox(height: 2),
@@ -512,7 +512,7 @@ class _PantallaPreguntasAcertadasState
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: const Color(0xFF6B7280),
+                                        color: const Color(0xFF4B5D67),
                                       ),
                                     ),
                                   ],
@@ -521,7 +521,7 @@ class _PantallaPreguntasAcertadasState
                               const Icon(
                                 Icons.arrow_forward_ios_rounded,
                                 size: 16,
-                                color: Color(0xFF6B7280),
+                                color: Color(0xFF4B5D67),
                               ),
                             ],
                           ),
@@ -543,14 +543,14 @@ class _PantallaPreguntasAcertadasState
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: const Color(0xFFEEF2F4),
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextField(
           controller: _controladorBusqueda,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: 'Buscar en ${_materiaActiva ?? ''}...',
+            hintText: 'Buscar en ${_materiaActiva ??''}...',
             hintStyle: GoogleFonts.inter(
               color: Colors.grey.shade500,
               fontSize: 14,
@@ -599,9 +599,9 @@ class _PantallaPreguntasAcertadasState
   Widget build(BuildContext context) {
     if (_cargando) {
       return Scaffold(
-        backgroundColor: Color(0xFFF0FDF4),
+        backgroundColor: Color(0xFFD9EEE5),
         body: const Center(
-          child: CircularProgressIndicator(color: Color(0xFF10B981)),
+          child: CircularProgressIndicator(color: Color(0xFF237D57)),
         ),
       );
     }
@@ -613,7 +613,7 @@ class _PantallaPreguntasAcertadasState
         _volverAMaterias();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF0FDF4),
+        backgroundColor: const Color(0xFFD9EEE5),
         appBar: BarraSuperior(
           mostrarBotonAudio: !_enVistaMaterias,
           audioVisible: _mostrarReproductor,
@@ -631,9 +631,9 @@ class _PantallaPreguntasAcertadasState
         body: _enVistaMaterias
             ? _buildVistaMaterias()
             : StreamBuilder<PlaybackState>(
-                stream: audioHandler?.playbackState ?? Stream.empty(),
+                stream: audioHandler?.playbackState ??Stream.empty(),
                 builder: (context, snapshot) {
-                  final playing = snapshot.data?.playing ?? false;
+                  final playing = snapshot.data?.playing ??false;
                   final processingState =
                       snapshot.data?.processingState ??
                       AudioProcessingState.idle;
@@ -680,7 +680,7 @@ class _PantallaPreguntasAcertadasState
                                     'No hay preguntas para mostrar en esta materia.',
                                     style: GoogleFonts.inter(
                                       fontSize: 14,
-                                      color: const Color(0xFF6B7280),
+                                      color: const Color(0xFF4B5D67),
                                     ),
                                   ),
                                 )
@@ -700,16 +700,16 @@ class _PantallaPreguntasAcertadasState
                                       pregunta: pregunta,
                                       numeroOrden: index + 1,
                                       colorBordeIzquierdo: const Color(
-                                        0xFF10B981,
+                                        0xFF237D57,
                                       ),
                                       colorEtiquetaId: const Color(0xFFDCFCE7),
                                       colorTextoEtiquetaId: const Color(
                                         0xFF15803D,
                                       ),
                                       aciertosCount:
-                                          estadistica?.totalAciertos ?? 0,
+                                          estadistica?.totalAciertos ??0,
                                       fallosCount:
-                                          estadistica?.totalFallos ?? 0,
+                                          estadistica?.totalFallos ??0,
                                     );
                                   },
                                 ),
@@ -728,7 +728,7 @@ class _PantallaPreguntasAcertadasState
                   style: GoogleFonts.inter(fontWeight: FontWeight.bold),
                 ),
                 icon: const Icon(Icons.play_arrow),
-                backgroundColor: const Color(0xFF10B981),
+                backgroundColor: const Color(0xFF237D57),
                 foregroundColor: Colors.white,
               )
             : null,
@@ -736,3 +736,4 @@ class _PantallaPreguntasAcertadasState
     );
   }
 }
+

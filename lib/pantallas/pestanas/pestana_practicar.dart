@@ -93,7 +93,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
   }
 
   void _actualizarPreguntasDisponibles() {
-    // Ya viene filtrado por categorÃ­a, aquÃ­ solo filtramos por materia.
+    // Ya viene filtrado por categoría, aquí solo filtramos por materia.
     final todas = _preguntasTotalesCache;
 
     // Filtrar preguntas que pertenezcan a las materias seleccionadas
@@ -105,7 +105,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
       _preguntasDisponibles = disponibles;
       // Validar si la cantidad actual excede las disponibles
       if (_cantidadPreguntas > _preguntasDisponibles) {
-        // Solo ajustar si hay disponibilidad (evitar poner 0 si no se seleccionÃ³ nada)
+        // Solo ajustar si hay disponibilidad (evitar poner 0 si no se seleccionó nada)
         _cantidadPreguntas = _preguntasDisponibles > 0
             ? _preguntasDisponibles
             : 0;
@@ -148,7 +148,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
 
   int get _rankingPracticasRestantesNoActivo {
     final restantes = _limitePracticasRankingNoActivo - _rankingPracticasUsadas;
-    return restantes < 0 ? 0 : restantes;
+    return restantes < 0 ?0 : restantes;
   }
 
   @override
@@ -189,7 +189,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                     ),
                   ),
 
-                  // TÃ­tulo
+                  // Título
                   Text(
                     'Filtrar por Materias',
                     style: GoogleFonts.inter(
@@ -200,7 +200,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                   ),
                   const SizedBox(height: 20),
 
-                  // OpciÃ³n Todas las materias
+                  // Opción Todas las materias
                   CheckboxListTile(
                     title: Text(
                       'Todas las materias',
@@ -215,12 +215,12 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                         _todasLasMateriasDisponibles.length,
                     fillColor: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.selected)
-                          ? const Color(0xFF2563EB)
+                          ? const Color(0xFF103D4A)
                           : null,
                     ),
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
-                    onChanged: (bool? value) {
+                    onChanged: (bool?value) {
                       setStateModal(() {
                         if (value == true) {
                           _materiasSeleccionadas = List.from(
@@ -228,7 +228,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                           );
                         } else {
                           // Debe haber al menos una seleccionada o permitimos 0?
-                          // El original permitÃ­a 0 y luego ponÃ­a 0 preguntas disponibles.
+                          // El original permitía 0 y luego ponía 0 preguntas disponibles.
                           _materiasSeleccionadas.clear();
                         }
                       });
@@ -246,18 +246,18 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                             materia,
                             style: GoogleFonts.inter(
                               fontSize: 14,
-                              color: const Color(0xFF4B5563),
+                              color: const Color(0xFF4B5D67),
                             ),
                           ),
                           value: _materiasSeleccionadas.contains(materia),
                           fillColor: WidgetStateProperty.resolveWith(
                             (states) => states.contains(WidgetState.selected)
-                                ? const Color(0xFF2563EB)
+                                ? const Color(0xFF103D4A)
                                 : null,
                           ),
                           contentPadding: EdgeInsets.zero,
                           controlAffinity: ListTileControlAffinity.leading,
-                          onChanged: (bool? value) {
+                          onChanged: (bool?value) {
                             setStateModal(() {
                               if (value == true) {
                                 _materiasSeleccionadas.add(materia);
@@ -273,7 +273,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
 
                   const SizedBox(height: 20),
 
-                  // BotÃ³n Aplicar
+                  // Botón Aplicar
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -286,7 +286,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
+                        backgroundColor: const Color(0xFF103D4A),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -362,9 +362,9 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0F7FF),
+                color: const Color(0xFFDEE6EA),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDBEAFE)),
+                border: Border.all(color: const Color(0xFFD7E9DF)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,7 +373,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                     children: [
                       const Icon(
                         Icons.settings_outlined,
-                        color: Color(0xFF2563EB),
+                        color: Color(0xFF103D4A),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -382,7 +382,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1E3A8A),
+                          color: const Color(0xFF0B2933),
                         ),
                       ),
                     ],
@@ -541,12 +541,12 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                       decoration: BoxDecoration(
                         color: _esEligibleParaRanking
                             ? const Color(0xFFFEFCE8)
-                            : const Color(0xFFEEF2FF),
+                            : const Color(0xFFDEE6EA),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: _esEligibleParaRanking
                               ? const Color(0xFFFEF08A)
-                              : const Color(0xFFC7D2FE),
+                              : const Color(0xFFBFD7C3),
                         ),
                       ),
                       child: Row(
@@ -557,8 +557,8 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                                 ? Icons.emoji_events
                                 : Icons.lock_outline,
                             color: _esEligibleParaRanking
-                                ? const Color(0xFFCA8A04)
-                                : const Color(0xFF4338CA),
+                                ? const Color(0xFF8B661E)
+                                : const Color(0xFF0B2933),
                             size: 18,
                           ),
                           const SizedBox(width: 8),
@@ -568,8 +568,8 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   color: _esEligibleParaRanking
-                                      ? const Color(0xFF854D0E)
-                                      : const Color(0xFF3730A3),
+                                      ? const Color(0xFF705823)
+                                      : const Color(0xFF2C4120),
                                 ),
                                 children: _esEligibleParaRanking
                                     ? (_esRegistradoNoActivo
@@ -615,7 +615,8 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                                       ]
                                     : const [
                                         TextSpan(
-                                          text: 'No aparecerás en el ranking ',
+                                          text:
+                                              'No aparecerás en el ranking ',
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -641,9 +642,9 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0F7FF),
+                color: const Color(0xFFDEE6EA),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDBEAFE)),
+                border: Border.all(color: const Color(0xFFD7E9DF)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,7 +654,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: const Color(0xFF1E3A8A),
+                      color: const Color(0xFF0B2933),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -682,7 +683,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                           ? Icons.expand_less_rounded
                           : Icons.expand_more_rounded,
                       size: 18,
-                      color: const Color(0xFF2563EB),
+                      color: const Color(0xFF103D4A),
                     ),
                     label: Text(
                       _mostrarInstruccionesCompletas
@@ -691,7 +692,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF2563EB),
+                        color: const Color(0xFF103D4A),
                       ),
                     ),
                   ),
@@ -873,7 +874,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
 
                   final materiasParaRegistroRanking = esRankingFinal
                       ? _preguntasTotalesCache
-                            .map((p) => p.materiaId?.trim() ?? '')
+                            .map((p) => p.materiaId?.trim() ??'')
                             .where((id) => id.isNotEmpty)
                             .toSet()
                             .toList()
@@ -900,7 +901,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
+                  backgroundColor: const Color(0xFF1F2A1C),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -933,7 +934,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
             width: 4,
             height: 4,
             decoration: const BoxDecoration(
-              color: Color(0xFF4B5563),
+              color: Color(0xFF4B5D67),
               shape: BoxShape.circle,
             ),
           ),
@@ -943,7 +944,7 @@ class _PestanaPracticarState extends State<PestanaPracticar> {
               text,
               style: GoogleFonts.inter(
                 fontSize: 12,
-                color: const Color(0xFF4B5563),
+                color: const Color(0xFF4B5D67),
                 height: 1.3,
               ),
             ),
@@ -989,3 +990,4 @@ class _ResumenCard extends StatelessWidget {
     );
   }
 }
+

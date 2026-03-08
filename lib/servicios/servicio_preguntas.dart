@@ -17,13 +17,13 @@ class ServicioPreguntas {
   // invitados regeneren su snapshot y no queden anclados a IDs antiguos.
   static const String _prefsGuestSnapshotPrefix =
       'guest_fixed_question_ids_v3_';
-  static List<Map<String, dynamic>>? _materiasActivasCache;
-  static DateTime? _materiasActivasCacheAt;
-  static List<Map<String, dynamic>>? _bancosActivosCache;
-  static DateTime? _bancosActivosCacheAt;
-  static String? _premiumCacheUserId;
-  static bool? _premiumCacheValue;
-  static DateTime? _premiumCacheAt;
+  static List<Map<String, dynamic>>?_materiasActivasCache;
+  static DateTime?_materiasActivasCacheAt;
+  static List<Map<String, dynamic>>?_bancosActivosCache;
+  static DateTime?_bancosActivosCacheAt;
+  static String?_premiumCacheUserId;
+  static bool?_premiumCacheValue;
+  static DateTime?_premiumCacheAt;
   static final Map<String, List<String>> _idsCachePorFiltro = {};
   static final Map<String, Map<String, List<String>>> _guestSnapshotCache = {};
   static final Map<String, Map<String, List<String>>>
@@ -71,12 +71,12 @@ class ServicioPreguntas {
     final ids = <String>[];
     final materiaIdsOrdenadas = snapshot.keys.toList()..sort();
     for (final materiaId in materiaIdsOrdenadas) {
-      ids.addAll(snapshot[materiaId] ?? const []);
+      ids.addAll(snapshot[materiaId] ??const []);
     }
     return ids;
   }
 
-  String? _tipoBancoPorCategoria(String? categoria) {
+  String?_tipoBancoPorCategoria(String?categoria) {
     final value = _normalizar(categoria);
     final compact = value.replaceAll(RegExp(r'[\s\-_]+'), '');
     if (value.isEmpty || value == 'ambos') return null;
@@ -91,14 +91,14 @@ class ServicioPreguntas {
 
   bool _esBancoSuboficial(Map<String, dynamic> banco) {
     final texto = _normalizar(
-      '${banco['nombre'] ?? ''} ${banco['descripcion'] ?? ''} ${banco['version'] ?? ''}',
+      '${banco['nombre'] ??''} ${banco['descripcion'] ??''} ${banco['version'] ??''}',
     );
     return texto.contains('suboficial');
   }
 
   bool _esBancoOficial(Map<String, dynamic> banco) {
     final texto = _normalizar(
-      '${banco['nombre'] ?? ''} ${banco['descripcion'] ?? ''} ${banco['version'] ?? ''}',
+      '${banco['nombre'] ??''} ${banco['descripcion'] ??''} ${banco['version'] ??''}',
     );
     if (_esBancoSuboficial(banco)) return false;
     return texto.contains('oficial');
@@ -137,7 +137,7 @@ class ServicioPreguntas {
           if (tipoBanco == 'suboficial') return _esBancoSuboficial(banco);
           return _esBancoOficial(banco);
         })
-        .map((banco) => banco['id']?.toString().trim() ?? '')
+        .map((banco) => banco['id']?.toString().trim() ??'')
         .where((id) => id.isNotEmpty)
         .toSet();
 
@@ -159,7 +159,7 @@ class ServicioPreguntas {
 
     final materiasActivas = await _obtenerMateriasActivasCached();
     final materiasObjetivo = materiasActivas
-        .map((m) => m['id']?.toString().trim() ?? '')
+        .map((m) => m['id']?.toString().trim() ??'')
         .where((id) => id.isNotEmpty)
         .toSet();
 
@@ -189,8 +189,8 @@ class ServicioPreguntas {
       if (page.isEmpty) break;
 
       for (final row in page) {
-        final materiaId = row['materia_id']?.toString().trim() ?? '';
-        final preguntaId = row['id']?.toString().trim() ?? '';
+        final materiaId = row['materia_id']?.toString().trim() ??'';
+        final preguntaId = row['id']?.toString().trim() ??'';
         if (materiaId.isEmpty || preguntaId.isEmpty) continue;
 
         final idsMateria = snapshot.putIfAbsent(materiaId, () => <String>[]);
@@ -254,7 +254,7 @@ class ServicioPreguntas {
   }
 
   String _claveSnapshotRegistradoNoActivo(String categoria) {
-    final userId = AuthService.currentUser?.id ?? 'anon';
+    final userId = AuthService.currentUser?.id ??'anon';
     final base = _claveSnapshotInvitado(categoria);
     return '$userId|$base';
   }
@@ -268,7 +268,7 @@ class ServicioPreguntas {
 
     final materiasActivas = await _obtenerMateriasActivasCached();
     final materiasObjetivo = materiasActivas
-        .map((m) => m['id']?.toString().trim() ?? '')
+        .map((m) => m['id']?.toString().trim() ??'')
         .where((id) => id.isNotEmpty)
         .toSet();
 
@@ -298,8 +298,8 @@ class ServicioPreguntas {
       if (page.isEmpty) break;
 
       for (final row in page) {
-        final materiaId = row['materia_id']?.toString().trim() ?? '';
-        final preguntaId = row['id']?.toString().trim() ?? '';
+        final materiaId = row['materia_id']?.toString().trim() ??'';
+        final preguntaId = row['id']?.toString().trim() ??'';
         if (materiaId.isEmpty || preguntaId.isEmpty) continue;
 
         final idsMateria = snapshot.putIfAbsent(materiaId, () => <String>[]);
@@ -351,12 +351,12 @@ class ServicioPreguntas {
 
   Future<List<String>> _obtenerIdsFijosRegistradoNoActivo({
     required String categoria,
-    String? materia,
+    String?materia,
   }) async {
     if (!await _esRegistradoNoActivoConSupabase()) return const [];
 
     try {
-      String? materiaFiltrada = materia;
+      String?materiaFiltrada = materia;
       final categoriaNormalizada = _normalizar(categoria);
       final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
 
@@ -387,7 +387,7 @@ class ServicioPreguntas {
       final ids = <String>[];
       final materiaOrdenadas = materiaIdsPermitidas.toList()..sort();
       for (final materiaId in materiaOrdenadas) {
-        ids.addAll(snapshot[materiaId] ?? const []);
+        ids.addAll(snapshot[materiaId] ??const []);
       }
       return ids;
     } catch (e) {
@@ -435,11 +435,11 @@ class ServicioPreguntas {
 
   Future<List<String>> _obtenerIdsFijosInvitado({
     required String categoria,
-    String? materia,
+    String?materia,
   }) async {
     if (!_esInvitadoConSupabase) return const [];
     try {
-      String? materiaFiltrada = materia;
+      String?materiaFiltrada = materia;
       final categoriaNormalizada = _normalizar(categoria);
       final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
 
@@ -468,7 +468,7 @@ class ServicioPreguntas {
       final ids = <String>[];
       final materiaOrdenadas = materiaIdsPermitidas.toList()..sort();
       for (final materiaId in materiaOrdenadas) {
-        ids.addAll(snapshot[materiaId] ?? const []);
+        ids.addAll(snapshot[materiaId] ??const []);
       }
       return ids;
     } catch (e) {
@@ -494,10 +494,10 @@ class ServicioPreguntas {
 
   Future<List<Pregunta>> obtenerPreguntasAleatorias({
     int cantidad = 20,
-    String? materia,
+    String?materia,
     String categoria = 'Ambos',
   }) async {
-    final cantidadSegura = cantidad <= 0 ? 1 : cantidad;
+    final cantidadSegura = cantidad <= 0 ?1 : cantidad;
 
     if (_esInvitadoConSupabase) {
       try {
@@ -611,10 +611,10 @@ class ServicioPreguntas {
   /// Es mas rapido que cargar preguntas completas y luego filtrar.
   Future<List<String>> obtenerIdsDisponibles({
     String categoria = 'Ambos',
-    String? materia,
+    String?materia,
     List<String> materias = const <String>[],
   }) async {
-    Future<List<String>> resolverPorMateria(String? materiaActual) async {
+    Future<List<String>> resolverPorMateria(String?materiaActual) async {
       if (_esInvitadoConSupabase) {
         return _obtenerIdsFijosInvitado(
           categoria: categoria,
@@ -681,7 +681,7 @@ class ServicioPreguntas {
     required String categoria,
     int cantidad = 100,
   }) async {
-    final cantidadSegura = cantidad <= 0 ? 100 : cantidad;
+    final cantidadSegura = cantidad <= 0 ?100 : cantidad;
 
     if (!SupabaseService.isInitialized) {
       final mock = await _obtenerPreguntasDesdeFuente(categoria: categoria);
@@ -718,7 +718,7 @@ class ServicioPreguntas {
   }
 
   Future<int> contarPreguntasDisponibles({
-    String? materia,
+    String?materia,
     String categoria = 'Ambos',
   }) async {
     if (_esInvitadoConSupabase) {
@@ -805,7 +805,7 @@ class ServicioPreguntas {
       final mock = await _obtenerPreguntasDesdeFuente(categoria: categoria);
       final conteo = <String, int>{};
       for (final pregunta in mock) {
-        conteo[pregunta.materia] = (conteo[pregunta.materia] ?? 0) + 1;
+        conteo[pregunta.materia] = (conteo[pregunta.materia] ??0) + 1;
       }
       return conteo;
     }
@@ -813,7 +813,7 @@ class ServicioPreguntas {
     try {
       final categoriaNormalizada = _normalizar(categoria);
       final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
-      String? materiaFiltrada;
+      String?materiaFiltrada;
       if (_debeCategoriaActuarComoFiltroMateria(
         categoriaNormalizada: categoriaNormalizada,
         categoriaFiltraBanco: categoriaFiltraBanco,
@@ -863,10 +863,10 @@ class ServicioPreguntas {
         if (page.isEmpty) break;
 
         for (final row in page) {
-          final materiaId = row['materia_id']?.toString().trim() ?? '';
+          final materiaId = row['materia_id']?.toString().trim() ??'';
           if (materiaId.isEmpty) continue;
           conteoPorMateriaId[materiaId] =
-              (conteoPorMateriaId[materiaId] ?? 0) + 1;
+              (conteoPorMateriaId[materiaId] ??0) + 1;
         }
 
         paginasLeidas++;
@@ -883,7 +883,7 @@ class ServicioPreguntas {
 
   Future<List<Pregunta>> obtenerPreguntasPorIds({
     required List<String> ids,
-    String? materia,
+    String?materia,
     String categoria = 'Ambos',
   }) async {
     final ordenIds = ids
@@ -975,11 +975,11 @@ class ServicioPreguntas {
           .map(
             (m) => Materia(
               id: m['id'].toString(),
-              nombre: (m['nombre'] ?? 'Sin nombre').toString(),
+              nombre: (m['nombre'] ??'Sin nombre').toString(),
               descripcion: m['descripcion']?.toString(),
-              icono: (m['icono'] ?? 'book').toString(),
-              color: (m['color_hex'] ?? '#3B82F6').toString(),
-              orden: _toInt(m['orden_visualizacion']) ?? 0,
+              icono: (m['icono'] ??'book').toString(),
+              color: (m['color_hex'] ??'#3B82F6').toString(),
+              orden: _toInt(m['orden_visualizacion']) ??0,
             ),
           )
           .toList();
@@ -1033,7 +1033,7 @@ class ServicioPreguntas {
         if (page.isEmpty) break;
 
         for (final row in page) {
-          final materiaId = row['materia_id']?.toString().trim() ?? '';
+          final materiaId = row['materia_id']?.toString().trim() ??'';
           if (materiaId.isNotEmpty) {
             materiaIds.add(materiaId);
           }
@@ -1060,11 +1060,11 @@ class ServicioPreguntas {
           .map(
             (m) => Materia(
               id: m['id'].toString(),
-              nombre: (m['nombre'] ?? 'Sin nombre').toString(),
+              nombre: (m['nombre'] ??'Sin nombre').toString(),
               descripcion: m['descripcion']?.toString(),
-              icono: (m['icono'] ?? 'book').toString(),
-              color: (m['color_hex'] ?? '#3B82F6').toString(),
-              orden: _toInt(m['orden_visualizacion']) ?? 0,
+              icono: (m['icono'] ??'book').toString(),
+              color: (m['color_hex'] ??'#3B82F6').toString(),
+              orden: _toInt(m['orden_visualizacion']) ??0,
             ),
           )
           .toList();
@@ -1078,7 +1078,7 @@ class ServicioPreguntas {
 
   Future<void> precalentarPreguntas({
     String categoria = 'Ambos',
-    String? materia,
+    String?materia,
   }) async {
     if (!SupabaseService.isInitialized) return;
     if (_esInvitadoConSupabase) {
@@ -1122,7 +1122,7 @@ class ServicioPreguntas {
     return materias;
   }
 
-  Future<Set<String>?> _resolverMateriaIdsPermitidas(String? materia) async {
+  Future<Set<String>?> _resolverMateriaIdsPermitidas(String?materia) async {
     if (materia == null || materia == 'Todas') return null;
 
     final objetivo = _normalizar(materia);
@@ -1141,12 +1141,12 @@ class ServicioPreguntas {
   }
 
   Future<List<String>> _obtenerIdsPreguntasDisponibles({
-    String? materia,
+    String?materia,
     String categoria = 'Ambos',
   }) async {
     final categoriaNormalizada = _normalizar(categoria);
     final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
-    String? materiaFiltrada = materia;
+    String?materiaFiltrada = materia;
 
     // Compatibilidad: categoria usada como nombre de materia.
     if (materiaFiltrada == null &&
@@ -1158,7 +1158,7 @@ class ServicioPreguntas {
     }
 
     final cacheKey =
-        '${_normalizar(categoria)}|${_normalizar(materiaFiltrada ?? 'todas')}';
+        '${_normalizar(categoria)}|${_normalizar(materiaFiltrada ??'todas')}';
     final cache = _idsCachePorFiltro[cacheKey];
     if (cache != null && cache.isNotEmpty) return cache;
 
@@ -1219,8 +1219,8 @@ class ServicioPreguntas {
   }
 
   Future<List<Pregunta>> _obtenerPreguntasDesdeFuente({
-    List<String>? ids,
-    String? materia,
+    List<String>?ids,
+    String?materia,
     String categoria = 'Ambos',
   }) async {
     if (!SupabaseService.isInitialized) {
@@ -1234,7 +1234,7 @@ class ServicioPreguntas {
     try {
       final client = SupabaseService.client;
 
-      String? materiaFiltrada = materia;
+      String?materiaFiltrada = materia;
       final categoriaNormalizada = _normalizar(categoria);
       final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
 
@@ -1363,18 +1363,18 @@ class ServicioPreguntas {
       final resultado = <Pregunta>[];
       for (final p in preguntasRows) {
         final preguntaId = p['id'].toString();
-        final alternativas = alternativasPorPregunta[preguntaId] ?? const [];
+        final alternativas = alternativasPorPregunta[preguntaId] ??const [];
         if (alternativas.isEmpty) continue;
 
         alternativas.sort((a, b) {
-          final ao = _toInt(a['orden']) ?? 0;
-          final bo = _toInt(b['orden']) ?? 0;
+          final ao = _toInt(a['orden']) ??0;
+          final bo = _toInt(b['orden']) ??0;
           if (ao != bo) return ao.compareTo(bo);
           return a['letra'].toString().compareTo(b['letra'].toString());
         });
 
         final opciones = alternativas
-            .map((a) => (a['texto'] ?? '').toString().trim())
+            .map((a) => (a['texto'] ??'').toString().trim())
             .where((t) => t.isNotEmpty)
             .toList();
         if (opciones.isEmpty) continue;
@@ -1392,7 +1392,7 @@ class ServicioPreguntas {
 
         final materiaId = p['materia_id']?.toString();
         final materiaNombre = materiaId != null
-            ? (materiaById[materiaId]?['nombre'] ?? 'Sin materia')
+            ? (materiaById[materiaId]?['nombre'] ??'Sin materia')
             : 'Sin materia';
 
         resultado.add(
@@ -1402,10 +1402,10 @@ class ServicioPreguntas {
                 _toInt(p['numero_oficial']) ??
                 _extraerNumero(p['codigo_pregunta']?.toString()) ??
                 0,
-            texto: (p['enunciado'] ?? '').toString(),
+            texto: (p['enunciado'] ??'').toString(),
             opciones: opciones,
             indiceRespuestaCorrecta: indiceCorrecta,
-            explicacion: (p['contexto'] ?? '').toString(),
+            explicacion: (p['contexto'] ??'').toString(),
             materiaId: materiaId,
             materia: materiaNombre.toString(),
             categoria: 'Ambos',
@@ -1431,13 +1431,13 @@ class ServicioPreguntas {
   }
 
   List<Pregunta> _obtenerPreguntasMock({
-    List<String>? ids,
-    String? materia,
+    List<String>?ids,
+    String?materia,
     String categoria = 'Ambos',
   }) {
     var preguntas = List<Pregunta>.from(DatosPrueba.preguntas);
 
-    String? materiaFiltrada = materia;
+    String?materiaFiltrada = materia;
     final categoriaNormalizada = _normalizar(categoria);
     final categoriaFiltraBanco = _tipoBancoPorCategoria(categoria) != null;
     if (materiaFiltrada == null &&
@@ -1503,9 +1503,9 @@ class ServicioPreguntas {
 
       for (final item in (raw as List<dynamic>)) {
         final row = _toMap(item);
-        final materiaId = row['materia_id']?.toString().trim() ?? '';
+        final materiaId = row['materia_id']?.toString().trim() ??'';
         if (materiaId.isEmpty) continue;
-        conteoPorMateriaId[materiaId] = (conteoPorMateriaId[materiaId] ?? 0) + 1;
+        conteoPorMateriaId[materiaId] = (conteoPorMateriaId[materiaId] ??0) + 1;
       }
     }
 
@@ -1519,14 +1519,14 @@ class ServicioPreguntas {
     final materias = await _obtenerMateriasActivasCached();
     final nombrePorId = <String, String>{
       for (final m in materias)
-        (m['id']?.toString().trim() ?? ''): (m['nombre']?.toString().trim() ?? ''),
+        (m['id']?.toString().trim() ??''): (m['nombre']?.toString().trim() ??''),
     };
 
     final conteoPorNombre = <String, int>{};
     for (final entry in conteoPorMateriaId.entries) {
       final nombre = nombrePorId[entry.key];
       if (nombre == null || nombre.isEmpty) continue;
-      conteoPorNombre[nombre] = (conteoPorNombre[nombre] ?? 0) + entry.value;
+      conteoPorNombre[nombre] = (conteoPorNombre[nombre] ??0) + entry.value;
     }
     return conteoPorNombre;
   }
@@ -1537,7 +1537,7 @@ class ServicioPreguntas {
     return <String, dynamic>{};
   }
 
-  int? _toInt(dynamic value) {
+  int?_toInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -1545,7 +1545,7 @@ class ServicioPreguntas {
   }
 
   String _normalizar(dynamic value) {
-    return (value ?? '').toString().toLowerCase().trim();
+    return (value ??'').toString().toLowerCase().trim();
   }
 
   bool _debeCategoriaActuarComoFiltroMateria({
@@ -1590,14 +1590,14 @@ class ServicioPreguntas {
     return true;
   }
 
-  int? _extraerNumero(String? codigoPregunta) {
+  int?_extraerNumero(String?codigoPregunta) {
     if (codigoPregunta == null || codigoPregunta.isEmpty) return null;
     final match = RegExp(r'(\d+)$').firstMatch(codigoPregunta);
     if (match == null) return null;
     return int.tryParse(match.group(1)!);
   }
 
-  String _normalizarDificultad(String? dificultad) {
+  String _normalizarDificultad(String?dificultad) {
     final value = _normalizar(dificultad);
     if (value.startsWith('facil')) return 'Facil';
     if (value.startsWith('dificil')) return 'Dificil';
@@ -1608,7 +1608,7 @@ class ServicioPreguntas {
     if (items.isEmpty) return const [];
     final chunks = <List<T>>[];
     for (var i = 0; i < items.length; i += size) {
-      final end = (i + size < items.length) ? i + size : items.length;
+      final end = (i + size < items.length) ?i + size : items.length;
       chunks.add(items.sublist(i, end));
     }
     return chunks;

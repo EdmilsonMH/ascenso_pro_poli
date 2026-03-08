@@ -85,7 +85,7 @@ class _PantallaBalotarioAudioMateriasState
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: const Color(0xFFEEF2F4),
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextField(
@@ -114,7 +114,7 @@ class _PantallaBalotarioAudioMateriasState
           'No hay materias disponibles por ahora.',
           style: GoogleFonts.inter(
             fontSize: 14,
-            color: const Color(0xFF6B7280),
+            color: const Color(0xFF4B5D67),
           ),
         ),
       );
@@ -125,7 +125,7 @@ class _PantallaBalotarioAudioMateriasState
           'No se encontraron materias.',
           style: GoogleFonts.inter(
             fontSize: 14,
-            color: const Color(0xFF6B7280),
+            color: const Color(0xFF4B5D67),
           ),
         ),
       );
@@ -184,7 +184,7 @@ class _PantallaBalotarioAudioMateriasState
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF111827),
+                            color: const Color(0xFF1F2A1C),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -193,7 +193,7 @@ class _PantallaBalotarioAudioMateriasState
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF6B7280),
+                            color: const Color(0xFF4B5D67),
                           ),
                         ),
                       ],
@@ -202,7 +202,7 @@ class _PantallaBalotarioAudioMateriasState
                   const Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 16,
-                    color: Color(0xFF6B7280),
+                    color: Color(0xFF4B5D67),
                   ),
                 ],
               ),
@@ -216,7 +216,7 @@ class _PantallaBalotarioAudioMateriasState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFEEF2F4),
       appBar: AppBar(
         title: Text(
           'Balotario en audio',
@@ -234,3 +234,4 @@ class _PantallaBalotarioAudioMateriasState
     );
   }
 }
+

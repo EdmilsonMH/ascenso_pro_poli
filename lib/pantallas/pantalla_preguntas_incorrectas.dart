@@ -33,7 +33,7 @@ class _PantallaPreguntasIncorrectasState
   List<IntentoFallido> _intentos = [];
   Map<String, EstadisticaPregunta> _estadisticasPorPregunta = {};
   List<String> _todasLasMaterias = [];
-  String? _materiaActiva;
+  String?_materiaActiva;
 
   bool _cargando = true;
   bool _mostrarReproductor = false;
@@ -122,7 +122,7 @@ class _PantallaPreguntasIncorrectasState
 
   double _cantidadInicialPara(int total) {
     if (total <= 0) return 0;
-    return total >= 5 ? 5 : total.toDouble();
+    return total >= 5 ?5 : total.toDouble();
   }
 
   void _actualizarCantidadMaxima() {
@@ -165,7 +165,7 @@ class _PantallaPreguntasIncorrectasState
     final conteo = <String, int>{};
     for (final intento in _intentos) {
       final materia = intento.pregunta.materia;
-      conteo[materia] = (conteo[materia] ?? 0) + 1;
+      conteo[materia] = (conteo[materia] ??0) + 1;
     }
     return conteo;
   }
@@ -205,7 +205,7 @@ class _PantallaPreguntasIncorrectasState
       backgroundColor: Colors.transparent,
       builder: (context) => ConfiguracionAudioSheet(
         totalPreguntas: _intentosFiltrados.length,
-        themeColor: const Color(0xFFEF4444),
+        themeColor: const Color(0xFFAD3636),
         onAplicar: _aplicarConfiguracionAudio,
       ),
     );
@@ -291,10 +291,10 @@ class _PantallaPreguntasIncorrectasState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _materiaActiva ?? '',
+                    _materiaActiva ??'',
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: const Color(0xFFB91C1C),
+                      color: const Color(0xFF982D2D),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -311,7 +311,7 @@ class _PantallaPreguntasIncorrectasState
                         ? intentosMateria.length - 1
                         : 1,
                     label: tempCantidad.round().toString(),
-                    activeColor: const Color(0xFFEF4444),
+                    activeColor: const Color(0xFFAD3636),
                     onChanged: (value) {
                       setModalState(() {
                         tempCantidad = value;
@@ -334,9 +334,9 @@ class _PantallaPreguntasIncorrectasState
                         _iniciarPractica(parentContext, tempCantidad.toInt());
                       },
                       icon: const Icon(Icons.play_circle_outline, size: 20),
-                      label: const Text('Iniciar PrÃ¡ctica'),
+                      label: const Text('Iniciar Práctica'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
+                        backgroundColor: const Color(0xFFAD3636),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         textStyle: GoogleFonts.inter(
@@ -408,12 +408,12 @@ class _PantallaPreguntasIncorrectasState
       children: [
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-          color: const Color(0xFFFEF2F2),
+          color: const Color(0xFFF6E0E0),
           child: Container(
             height: 46,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
+              color: const Color(0xFFEEF2F4),
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextField(
@@ -443,7 +443,7 @@ class _PantallaPreguntasIncorrectasState
                     'No se encontraron materias.',
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: const Color(0xFF6B7280),
+                      color: const Color(0xFF4B5D67),
                     ),
                   ),
                 )
@@ -453,7 +453,7 @@ class _PantallaPreguntasIncorrectasState
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final materia = materiasFiltradas[index];
-                    final total = conteoPorMateria[materia] ?? 0;
+                    final total = conteoPorMateria[materia] ??0;
 
                     return Material(
                       color: Colors.white,
@@ -481,7 +481,7 @@ class _PantallaPreguntasIncorrectasState
                                 ),
                                 child: const Icon(
                                   Icons.menu_book_rounded,
-                                  color: Color(0xFFEF4444),
+                                  color: Color(0xFFAD3636),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -494,7 +494,7 @@ class _PantallaPreguntasIncorrectasState
                                       style: GoogleFonts.inter(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF111827),
+                                        color: const Color(0xFF1F2A1C),
                                       ),
                                     ),
                                     const SizedBox(height: 2),
@@ -503,7 +503,7 @@ class _PantallaPreguntasIncorrectasState
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: const Color(0xFF6B7280),
+                                        color: const Color(0xFF4B5D67),
                                       ),
                                     ),
                                   ],
@@ -512,7 +512,7 @@ class _PantallaPreguntasIncorrectasState
                               const Icon(
                                 Icons.arrow_forward_ios_rounded,
                                 size: 16,
-                                color: Color(0xFF6B7280),
+                                color: Color(0xFF4B5D67),
                               ),
                             ],
                           ),
@@ -534,14 +534,14 @@ class _PantallaPreguntasIncorrectasState
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: const Color(0xFFEEF2F4),
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextField(
           controller: _controladorBusqueda,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: 'Buscar en ${_materiaActiva ?? ''}...',
+            hintText: 'Buscar en ${_materiaActiva ??''}...',
             hintStyle: GoogleFonts.inter(
               color: Colors.grey.shade500,
               fontSize: 14,
@@ -590,9 +590,9 @@ class _PantallaPreguntasIncorrectasState
   Widget build(BuildContext context) {
     if (_cargando) {
       return Scaffold(
-        backgroundColor: Color(0xFFFEF2F2),
+        backgroundColor: Color(0xFFF6E0E0),
         body: const Center(
-          child: CircularProgressIndicator(color: Color(0xFFEF4444)),
+          child: CircularProgressIndicator(color: Color(0xFFAD3636)),
         ),
       );
     }
@@ -604,7 +604,7 @@ class _PantallaPreguntasIncorrectasState
         _volverAMaterias();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFFEF2F2),
+        backgroundColor: const Color(0xFFF6E0E0),
         appBar: BarraSuperior(
           mostrarBotonAudio: !_enVistaMaterias,
           audioVisible: _mostrarReproductor,
@@ -622,9 +622,9 @@ class _PantallaPreguntasIncorrectasState
         body: _enVistaMaterias
             ? _buildVistaMaterias()
             : StreamBuilder<PlaybackState>(
-                stream: audioHandler?.playbackState ?? Stream.empty(),
+                stream: audioHandler?.playbackState ??Stream.empty(),
                 builder: (context, snapshot) {
-                  final playing = snapshot.data?.playing ?? false;
+                  final playing = snapshot.data?.playing ??false;
                   final processingState =
                       snapshot.data?.processingState ??
                       AudioProcessingState.idle;
@@ -671,7 +671,7 @@ class _PantallaPreguntasIncorrectasState
                                     'No hay preguntas para mostrar en esta materia.',
                                     style: GoogleFonts.inter(
                                       fontSize: 14,
-                                      color: const Color(0xFF6B7280),
+                                      color: const Color(0xFF4B5D67),
                                     ),
                                   ),
                                 )
@@ -693,7 +693,7 @@ class _PantallaPreguntasIncorrectasState
                                       pregunta: intento.pregunta,
                                       numeroOrden: index + 1,
                                       colorBordeIzquierdo: const Color(
-                                        0xFFEF4444,
+                                        0xFFAD3636,
                                       ),
                                       colorEtiquetaId: const Color(0xFFFEE2E2),
                                       colorTextoEtiquetaId: const Color(
@@ -702,9 +702,9 @@ class _PantallaPreguntasIncorrectasState
                                       indiceSeleccionadoIncorrecto:
                                           intento.indiceIncorrectoSeleccionado,
                                       aciertosCount:
-                                          estadistica?.totalAciertos ?? 0,
+                                          estadistica?.totalAciertos ??0,
                                       fallosCount:
-                                          estadistica?.totalFallos ?? 0,
+                                          estadistica?.totalFallos ??0,
                                     );
                                   },
                                 ),
@@ -723,7 +723,7 @@ class _PantallaPreguntasIncorrectasState
                   style: GoogleFonts.inter(fontWeight: FontWeight.bold),
                 ),
                 icon: const Icon(Icons.play_arrow),
-                backgroundColor: const Color(0xFFEF4444),
+                backgroundColor: const Color(0xFFAD3636),
                 foregroundColor: Colors.white,
               )
             : null,
@@ -731,3 +731,4 @@ class _PantallaPreguntasIncorrectasState
     );
   }
 }
+

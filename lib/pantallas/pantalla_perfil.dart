@@ -5,6 +5,7 @@ import '../servicios/auth_service.dart';
 import '../servicios/servicio_notificaciones_programadas.dart';
 import '../servicios/servicio_progreso.dart';
 import '../servicios/servicio_preguntas.dart';
+import '../tema/tema_aplicacion.dart';
 
 import 'pantalla_login.dart';
 import 'pantalla_notificaciones.dart';
@@ -41,13 +42,13 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
   Future<void> _cargarDatosUsuario() async {
     final profile = await AuthService.getCurrentUserProfile();
     final sesiones = await _servicioProgreso.obtenerHistorialSesiones();
-    final categoriaPerfil = (profile?['categoria'] as String?) ?? 'Ambos';
+    final categoriaPerfil = (profile?['categoria'] as String?) ??'Ambos';
     final preguntasDisponibles = await _servicioPreguntas
         .contarPreguntasDisponibles(categoria: categoriaPerfil);
     if (mounted) {
       setState(() {
-        _nombreUsuario = profile?['nombre_completo'] ?? 'Usuario';
-        _categoriaUsuario = profile?['categoria'] ?? 'Oficiales';
+        _nombreUsuario = profile?['nombre_completo'] ??'Usuario';
+        _categoriaUsuario = profile?['categoria'] ??'Oficiales';
 
         // Mismo criterio que Historial: promedio general por sesión.
         _porcentajeAciertos = _calcularPromedioGeneralDesdeSesiones(sesiones);
@@ -71,7 +72,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
   int _intValue(dynamic value, [int fallback = 0]) {
     if (value is int) return value;
     if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? fallback;
+    if (value is String) return int.tryParse(value) ??fallback;
     return fallback;
   }
 
@@ -86,7 +87,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
     return fallback;
   }
 
-  DateTime? _parseDate(dynamic value) {
+  DateTime?_parseDate(dynamic value) {
     if (value is DateTime) return value.toLocal();
     if (value is String && value.trim().isNotEmpty) {
       return DateTime.tryParse(value)?.toLocal();
@@ -101,18 +102,18 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
       a.year == b.year && a.month == b.month && a.day == b.day;
 
   int _calcularDiasEnApp(dynamic fechaRegistro, List<SesionPractica> sesiones) {
-    DateTime? inicio = _parseDate(fechaRegistro);
+    DateTime?inicio = _parseDate(fechaRegistro);
     if (inicio == null && sesiones.isNotEmpty) {
       inicio = sesiones
           .map((s) => s.fechaCreacion)
-          .reduce((a, b) => a.isBefore(b) ? a : b);
+          .reduce((a, b) => a.isBefore(b) ?a : b);
     }
     if (inicio == null) return 0;
 
     final inicioDia = _inicioDelDia(inicio);
     final hoyDia = _inicioDelDia(DateTime.now());
     final dias = hoyDia.difference(inicioDia).inDays + 1;
-    return dias < 1 ? 1 : dias;
+    return dias < 1 ?1 : dias;
   }
 
   int _calcularRachaDesdeSesiones(List<SesionPractica> sesiones) {
@@ -126,7 +127,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
 
     final hoy = _inicioDelDia(DateTime.now());
     final estudioHoy = diasEstudio.any((d) => _esMismoDia(d, hoy));
-    var cursor = estudioHoy ? hoy : hoy.subtract(const Duration(days: 1));
+    var cursor = estudioHoy ?hoy : hoy.subtract(const Duration(days: 1));
     var racha = 0;
 
     while (diasEstudio.any((d) => _esMismoDia(d, cursor))) {
@@ -241,7 +242,8 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                result.error ?? 'Error al cambiar contraseña',
+                                result.error ??
+                                    'Error al cambiar contraseña',
                               ),
                               backgroundColor: Colors.red,
                             ),
@@ -257,7 +259,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                 child: const Text(
                   'Guardar',
                   style: TextStyle(
-                    color: Color(0xFF6B21A8),
+                    color: Color(0xFF164A55),
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -291,7 +293,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                         prefixIcon: Icon(Icons.person_outline),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (v) => v!.isEmpty ? 'Ingresa tu nombre' : null,
+                      validator: (v) => v!.isEmpty ?'Ingresa tu nombre' : null,
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -361,7 +363,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
     int tiempoEstudio = _intValue(perfil?['meta_diaria_minutos'], 30);
     bool notificarMetaDiaria = _boolValue(perfil?['notificar_meta'], true);
     final List<String> diasSeleccionados = List<String>.from(
-      perfil?['dias_estudio'] ?? ['L', 'M', 'X', 'J', 'V'],
+      perfil?['dias_estudio'] ??['L', 'M', 'X', 'J', 'V'],
     );
 
     final String horaRaw =
@@ -369,8 +371,8 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
     TimeOfDay horaMetaDiaria = const TimeOfDay(hour: 8, minute: 0);
     final partesHora = horaRaw.split(':');
     if (partesHora.length >= 2) {
-      final h = (int.tryParse(partesHora[0]) ?? 8).clamp(0, 23).toInt();
-      final m = (int.tryParse(partesHora[1]) ?? 0).clamp(0, 59).toInt();
+      final h = (int.tryParse(partesHora[0]) ??8).clamp(0, 23).toInt();
+      final m = (int.tryParse(partesHora[1]) ??0).clamp(0, 59).toInt();
       horaMetaDiaria = TimeOfDay(hour: h, minute: m);
     }
 
@@ -408,7 +410,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                   TextButton(
                     onPressed: () async {
                       final nuevoTiempo =
-                          int.tryParse(tiempoController.text.trim()) ?? 30;
+                          int.tryParse(tiempoController.text.trim()) ??30;
                       final horaTexto =
                           '${horaMetaDiaria.hour.toString().padLeft(2, '0')}:${horaMetaDiaria.minute.toString().padLeft(2, '0')}:00';
 
@@ -440,14 +442,14 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                                 ? 'Preferencias guardadas correctamente'
                                 : 'Error al guardar preferencias',
                           ),
-                          backgroundColor: success ? Colors.green : Colors.red,
+                          backgroundColor: success ?Colors.green : Colors.red,
                         ),
                       );
                     },
                     child: const Text(
                       'Guardar',
                       style: TextStyle(
-                        color: Color(0xFF6B21A8),
+                        color: Color(0xFF164A55),
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -465,7 +467,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.timer, color: Color(0xFF6B21A8)),
+                          const Icon(Icons.timer, color: Color(0xFF164A55)),
                           const SizedBox(width: 8),
                           Text(
                             'Meta Diaria',
@@ -503,7 +505,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                           ),
                         ),
                         value: notificarMetaDiaria,
-                        activeThumbColor: const Color(0xFFA855F7),
+                        activeThumbColor: const Color(0xFF1E6B63),
                         contentPadding: EdgeInsets.zero,
                         onChanged: (val) =>
                             setState(() => notificarMetaDiaria = val),
@@ -523,7 +525,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                                 children: [
                                   const Icon(
                                     Icons.info_outline,
-                                    color: Color(0xFF6B21A8),
+                                    color: Color(0xFF164A55),
                                     size: 20,
                                   ),
                                   const SizedBox(width: 8),
@@ -532,7 +534,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                                       'A la hora programada recibirás una notificación. Si no inicias práctica en 10 min, sonará una alarma.',
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
-                                        color: const Color(0xFF6B21A8),
+                                        color: const Color(0xFF164A55),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -565,7 +567,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                                     horaMetaDiaria.format(context),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF6B21A8),
+                                      color: Color(0xFF164A55),
                                     ),
                                   ),
                                 ),
@@ -640,7 +642,7 @@ class _PantallaPerfilState extends State<PantallaPerfil> {
                   ListTile(
                     leading: const Icon(
                       Icons.email_outlined,
-                      color: Color(0xFF6B21A8),
+                      color: Color(0xFF164A55),
                       size: 28,
                     ),
                     title: const Text('Contáctanos por correo'),
@@ -787,7 +789,7 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
         iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ?const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               child: Column(
                 children: [
@@ -801,17 +803,20 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.blue.shade200,
+                              color: TemaAplicacion.colorSecundario.withValues(
+                                alpha: 0.35,
+                              ),
                               width: 2,
                             ),
                           ),
                           child: CircleAvatar(
                             radius: 50,
-                            backgroundColor: Colors.blue.shade100,
+                            backgroundColor: TemaAplicacion.colorSecundario
+                                .withValues(alpha: 0.2),
                             child: Icon(
                               Icons.person,
                               size: 60,
-                              color: Colors.blue.shade700,
+                              color: TemaAplicacion.colorSecundario,
                             ),
                           ),
                         ),
@@ -844,7 +849,7 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                     ),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF6B21A8), Color(0xFFA855F7)],
+                        colors: [Color(0xFF164A55), Color(0xFF1E6B63)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -852,7 +857,7 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                       boxShadow: [
                         BoxShadow(
                           color: const Color(
-                            0xFFA855F7,
+                            0xFF1E6B63,
                           ).withValues(alpha: 0.28),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
@@ -909,9 +914,9 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            _premiumActivo ? 'ON' : 'OFF',
+                            _premiumActivo ?'ON' : 'OFF',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFF6B21A8),
+                              color: const Color(0xFF164A55),
                               fontWeight: FontWeight.w800,
                               fontSize: 11,
                               letterSpacing: 0.4,
@@ -934,7 +939,7 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                             'Disponibles',
                             _preguntasDisponibles.toString(),
                             Icons.question_answer_outlined,
-                            Colors.blue,
+                            TemaAplicacion.colorSecundario,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -952,7 +957,7 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
                             'Racha',
                             '$_rachaDias días',
                             Icons.local_fire_department_outlined,
-                            Colors.orange,
+                            TemaAplicacion.colorDorado,
                           ),
                         ),
                       ],
@@ -1100,3 +1105,4 @@ No nos hacemos responsables por el mal uso de la aplicación o por resultados en
     );
   }
 }
+

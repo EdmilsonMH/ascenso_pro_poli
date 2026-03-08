@@ -62,216 +62,232 @@ class PantallaResultados extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SizedBox(height: compacto ? 2 : 6),
-                  Icon(
-                    Icons.emoji_events_outlined,
-                    size: iconSize,
-                    color: const Color(0xFF9CA3AF),
-                  ),
-                  SizedBox(height: gapSm),
-                  Text(
-                    '\u00A1Practica Completada!',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: tituloSize,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  SizedBox(height: gapXs),
-                  Text(
-                    'Has finalizado tu examen de practica',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  if (cuentaParaRanking) ...[
-                    SizedBox(height: gapSm),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: compacto ? 8 : 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEFCE8),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFDE047)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.emoji_events_outlined,
-                            color: Color(0xFFA16207),
-                            size: 16,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Spacer(),
+                        Icon(
+                          Icons.emoji_events_outlined,
+                          size: iconSize,
+                          color: const Color(0xFF9CA3AF),
+                        ),
+                        SizedBox(height: gapSm),
+                        Text(
+                          '\u00A1Practica Completada!',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: tituloSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Esta practica cuenta para el ranking porque completaste 100 preguntas con todas las materias.',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: const Color(0xFFA16207),
-                                fontWeight: FontWeight.w600,
-                                height: 1.25,
+                        ),
+                        SizedBox(height: gapXs),
+                        Text(
+                          'Has finalizado tu examen de practica',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        if (cuentaParaRanking) ...[
+                          SizedBox(height: gapSm),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: compacto ? 8 : 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEFCE8),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFFDE047),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  SizedBox(height: gapLg),
-                  Text(
-                    '${porcentaje.toStringAsFixed(1)}%',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: scoreSize,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                      height: 0.95,
-                    ),
-                  ),
-                  SizedBox(height: gapXs),
-                  Text(
-                    '$puntaje de $totalPreguntas respuestas correctas',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  SizedBox(height: gapLg),
-                  if (!esPracticaGuiada) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(
-                        vertical: compacto ? 9 : 10,
-                        horizontal: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: aprobado
-                            ? const Color(0xFFF0FDF4)
-                            : const Color(0xFFFFF7ED),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: aprobado
-                              ? const Color(0xFFBBF7D0)
-                              : const Color(0xFFFFEDD5),
-                        ),
-                      ),
-                      child: Text(
-                        aprobado
-                            ? 'Excelente trabajo. Has aprobado.'
-                            : 'Necesitas mas practica. Se requiere 70% para aprobar.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.5,
-                          color: aprobado
-                              ? const Color(0xFF15803D)
-                              : const Color(0xFFC2410C),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    SizedBox(height: gapMd),
-                    InkWell(
-                      onTap: preguntasCorrectas.isNotEmpty
-                          ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PantallaRevisionPractica(
-                                    titulo: 'Preguntas Correctas',
-                                    preguntas: preguntasCorrectas,
-                                    esCorrectas: true,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.emoji_events_outlined,
+                                  color: Color(0xFFA16207),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Esta practica cuenta para el ranking porque completaste 100 preguntas con todas las materias.',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: const Color(0xFFA16207),
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.25,
+                                    ),
                                   ),
                                 ),
-                              );
-                            }
-                          : null,
-                      child: _StatCard(
-                        label: 'Correctas',
-                        value: puntaje.toString(),
-                        color: const Color(0xFF10B981),
-                        bgColor: const Color(0xFFF0FDF4),
-                        borderColor: const Color(0xFFBBF7D0),
-                        compacto: compacto,
-                      ),
-                    ),
-                    SizedBox(height: gapMd),
-                    InkWell(
-                      onTap: preguntasIncorrectas.isNotEmpty
-                          ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PantallaRevisionPractica(
-                                    titulo: 'Preguntas Incorrectas',
-                                    intentosFallidos: preguntasIncorrectas,
-                                    esCorrectas: false,
-                                  ),
-                                ),
-                              );
-                            }
-                          : null,
-                      child: _StatCard(
-                        label: 'Incorrectas',
-                        value: incorrectas.toString(),
-                        color: const Color(0xFFEF4444),
-                        bgColor: const Color(0xFFFEF2F2),
-                        borderColor: const Color(0xFFFECACA),
-                        compacto: compacto,
-                      ),
-                    ),
-                    SizedBox(height: gapMd),
-                  ],
-                  Align(
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: muyCompacto ? 98 : 108,
-                      padding: EdgeInsets.symmetric(
-                        vertical: compacto ? 8 : 10,
-                        horizontal: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.access_time,
-                            color: Color(0xFF3B82F6),
-                            size: 22,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            esPracticaGuiada ? 'Tiempo transcurrido' : 'Tiempo',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: const Color(0xFF3B82F6),
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _formatearTiempo(tiempoTranscurrido),
-                            style: GoogleFonts.inter(
-                              fontSize: muyCompacto ? 16 : 17,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                              height: 1.0,
+                              ],
                             ),
                           ),
                         ],
-                      ),
+                        SizedBox(height: gapLg),
+                        Text(
+                          '${porcentaje.toStringAsFixed(1)}%',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: scoreSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            height: 0.95,
+                          ),
+                        ),
+                        SizedBox(height: gapXs),
+                        Text(
+                          '$puntaje de $totalPreguntas respuestas correctas',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        SizedBox(height: gapLg),
+                        if (!esPracticaGuiada) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                              vertical: compacto ? 9 : 10,
+                              horizontal: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: aprobado
+                                  ? const Color(0xFFD9EEE5)
+                                  : const Color(0xFFFFF7ED),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: aprobado
+                                    ? const Color(0xFFBBF7D0)
+                                    : const Color(0xFFFFEDD5),
+                              ),
+                            ),
+                            child: Text(
+                              aprobado
+                                  ? 'Excelente trabajo. Has aprobado.'
+                                  : 'Necesitas mas practica. Se requiere 70% para aprobar.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                color: aprobado
+                                    ? const Color(0xFF15803D)
+                                    : const Color(0xFFC2410C),
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(height: gapMd),
+                          InkWell(
+                            onTap: preguntasCorrectas.isNotEmpty
+                                ? () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            PantallaRevisionPractica(
+                                              titulo: 'Preguntas Correctas',
+                                              preguntas: preguntasCorrectas,
+                                              esCorrectas: true,
+                                            ),
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            child: _StatCard(
+                              label: 'Correctas',
+                              value: puntaje.toString(),
+                              color: const Color(0xFF237D57),
+                              bgColor: const Color(0xFFD9EEE5),
+                              borderColor: const Color(0xFFBBF7D0),
+                              compacto: compacto,
+                            ),
+                          ),
+                          SizedBox(height: gapMd),
+                          InkWell(
+                            onTap: preguntasIncorrectas.isNotEmpty
+                                ? () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            PantallaRevisionPractica(
+                                              titulo: 'Preguntas Incorrectas',
+                                              intentosFallidos:
+                                                  preguntasIncorrectas,
+                                              esCorrectas: false,
+                                            ),
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            child: _StatCard(
+                              label: 'Incorrectas',
+                              value: incorrectas.toString(),
+                              color: const Color(0xFFAD3636),
+                              bgColor: const Color(0xFFF6E0E0),
+                              borderColor: const Color(0xFFB85B5B),
+                              compacto: compacto,
+                            ),
+                          ),
+                          SizedBox(height: gapMd),
+                        ],
+                        Align(
+                          alignment: Alignment.center,
+                          child: Container(
+                            width: muyCompacto ? 98 : 108,
+                            padding: EdgeInsets.symmetric(
+                              vertical: compacto ? 8 : 10,
+                              horizontal: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDEE6EA),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF5A8F8A),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.access_time,
+                                  color: Color(0xFF1E6B63),
+                                  size: 22,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  esPracticaGuiada
+                                      ? 'Tiempo transcurrido'
+                                      : 'Tiempo',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF1E6B63),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _formatearTiempo(tiempoTranscurrido),
+                                  style: GoogleFonts.inter(
+                                    fontSize: muyCompacto ? 16 : 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                      ],
                     ),
                   ),
-                  const Spacer(),
                   Row(
                     children: [
                       Expanded(
