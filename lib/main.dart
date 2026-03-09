@@ -71,7 +71,6 @@ Future<void> main() async {
   try {
     debugPrint("Iniciando servicio de notificaciones...");
     await ServicioNotificacionesProgramadas.initialize();
-    await ServicioNotificacionesProgramadas.solicitarPermisos();
     debugPrint("Servicio de notificaciones iniciado con éxito.");
   } catch (e) {
     debugPrint("Error al iniciar notificaciones: $e");

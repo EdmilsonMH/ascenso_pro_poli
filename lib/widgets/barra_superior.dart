@@ -91,29 +91,31 @@ class BarraSuperior extends StatelessWidget implements PreferredSizeWidget {
                 : 'Mostrar reproductor',
           ),
         IconButton(
-          icon: Icon(Icons.person_outline, color: scheme.onPrimary),
+          icon: Icon(Icons.settings_outlined, color: scheme.onPrimary),
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Abriendo perfil...'),
-                duration: Duration(milliseconds: 500),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    const PantallaPerfil(soloConfiguracion: true),
               ),
             );
+          },
+          tooltip: 'Configuracion',
+        ),
+        IconButton(
+          icon: Icon(Icons.person_outline, color: scheme.onPrimary),
+          onPressed: () {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const PantallaPerfil()),
             );
           },
+          tooltip: 'Perfil',
         ),
         IconButton(
           icon: Icon(Icons.notifications_none, color: scheme.onPrimary),
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Abriendo notificaciones...'),
-                duration: Duration(milliseconds: 500),
-              ),
-            );
             Navigator.push(
               context,
               MaterialPageRoute(

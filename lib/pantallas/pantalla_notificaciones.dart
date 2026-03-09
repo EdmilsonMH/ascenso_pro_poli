@@ -104,8 +104,6 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -113,19 +111,19 @@ class _PantallaNotificacionesState extends State<PantallaNotificaciones> {
           'Notificaciones',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
-            color: scheme.onSurface,
+            color: Colors.white,
           ),
         ),
-        backgroundColor: scheme.surface,
+        backgroundColor: TemaAplicacion.colorPrimario,
         elevation: 0,
-        iconTheme: IconThemeData(color: scheme.onSurface),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           if (_notificaciones.any((n) => !n.leida))
             TextButton(
               onPressed: _marcarTodasComoLeidas,
               child: Text(
                 'Marcar todo leido',
-                style: TextStyle(color: scheme.primary),
+                style: const TextStyle(color: Colors.white),
               ),
             ),
         ],

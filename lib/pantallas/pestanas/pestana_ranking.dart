@@ -822,10 +822,15 @@ class _TarjetaTopUser extends StatelessWidget {
   }
 
   String get _iniciales {
-    if (usuario.nombreCompleto.isEmpty) return 'U';
-    final parts = usuario.nombreCompleto.split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return parts[0].substring(0, 1).toUpperCase();
+    final limpio = usuario.nombreCompleto.trim();
+    if (limpio.isEmpty) return 'U';
+
+    final parts = limpio.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'U';
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
   }
 
   @override
@@ -930,10 +935,15 @@ class _ItemRanking extends StatelessWidget {
   const _ItemRanking({required this.usuario, required this.criterio});
 
   String get _iniciales {
-    if (usuario.nombreCompleto.isEmpty) return 'U';
-    final parts = usuario.nombreCompleto.split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return parts[0].substring(0, 1).toUpperCase();
+    final limpio = usuario.nombreCompleto.trim();
+    if (limpio.isEmpty) return 'U';
+
+    final parts = limpio.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'U';
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
   }
 
   @override

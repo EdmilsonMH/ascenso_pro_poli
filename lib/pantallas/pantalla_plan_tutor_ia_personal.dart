@@ -12,13 +12,15 @@ import 'pantalla_practica.dart';
 // pero podríamos adaptar DiagnosticoIA más adelante.
 
 class PantallaPlanTutorIAPersonal extends StatefulWidget {
-  final TutorIAPersonalService?iaService;
-  final ServicioPreguntas?servicioPreguntas;
+  final TutorIAPersonalService? iaService;
+  final ServicioPreguntas? servicioPreguntas;
+  final bool esInvitado;
 
   const PantallaPlanTutorIAPersonal({
     super.key,
     this.iaService,
     this.servicioPreguntas,
+    this.esInvitado = false,
   });
 
   @override
@@ -37,11 +39,12 @@ class _PantallaPlanTutorIAPersonalState
   static final Map<String, DateTime> _cacheAnalisisAtPorUsuario = {};
   static final Map<String, Map<String, dynamic>> _cacheDashboardPorUsuario = {};
   static final Map<String, DateTime> _cacheDashboardAtPorUsuario = {};
-  Map<String, dynamic>?_analisisPerfil;
-  TutorDashboardInicio?_dashboardInicio;
+  Map<String, dynamic>? _analisisPerfil;
+  TutorDashboardInicio? _dashboardInicio;
   String _categoriaUsuario = 'Oficiales de Armas';
   String _userId = 'user_test_id';
   bool _cargando = true;
+  bool _accesoRestringidoInvitado = false;
   bool _actualizandoTutor = false;
 
   Map<String, dynamic> _analisisPerfilInicial() {
@@ -93,9 +96,14 @@ class _PantallaPlanTutorIAPersonalState
   @override
   void initState() {
     super.initState();
-    _iaService = widget.iaService ??TutorIAPersonalService();
-    _servicioPreguntas = widget.servicioPreguntas ??ServicioPreguntas();
+    _iaService = widget.iaService ?? TutorIAPersonalService();
+    _servicioPreguntas = widget.servicioPreguntas ?? ServicioPreguntas();
     _servicioProgreso = ServicioProgreso();
+    _accesoRestringidoInvitado = widget.esInvitado || !AuthService.isLoggedIn;
+    if (_accesoRestringidoInvitado) {
+      _cargando = false;
+      return;
+    }
     _cargarDatos();
   }
 
@@ -125,7 +133,7 @@ class _PantallaPlanTutorIAPersonalState
                 'recopilando',
               ) ??
               false) ||
-          ((dashboardData?['estado'] ??'').toString().toLowerCase() ==
+          ((dashboardData?['estado'] ?? '').toString().toLowerCase() ==
               'fallback');
 
       // Modo instantaneo: si hay cache, se pinta de inmediato.
@@ -167,7 +175,7 @@ class _PantallaPlanTutorIAPersonalState
       final dashboard = await _iaService.obtenerDashboardTutorInicio(
         userId: userId,
         perfilUsuario: Map<String, dynamic>.from(
-          perfilUsuario ??const <String, dynamic>{},
+          perfilUsuario ?? const <String, dynamic>{},
         ),
       );
       _cacheAnalisisPorUsuario[userId] = Map<String, dynamic>.from(resultado);
@@ -203,14 +211,14 @@ class _PantallaPlanTutorIAPersonalState
     if (value is int) return value;
     if (value is num) return value.toInt();
     if (value is String) {
-      return int.tryParse(value) ??fallback;
+      return int.tryParse(value) ?? fallback;
     }
     return fallback;
   }
 
   List<Map<String, dynamic>> _obtenerAnalisisMaterias() {
     final raw =
-        (_analisisPerfil ??_analisisPerfilInicial())['analisis_materias'];
+        (_analisisPerfil ?? _analisisPerfilInicial())['analisis_materias'];
     if (raw is List) {
       return raw
           .whereType<Map>()
@@ -222,7 +230,7 @@ class _PantallaPlanTutorIAPersonalState
 
   Future<void> _abrirDetalleMateria(Map<String, dynamic> materia) async {
     final debilidadesGlobales = List<String>.from(
-      _analisisPerfil?['debilidades'] ??[],
+      _analisisPerfil?['debilidades'] ?? [],
     );
     await showModalBottomSheet(
       context: context,
@@ -278,7 +286,7 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   List<Map<String, dynamic>> _obtenerCardsIA() {
-    final panel = (_analisisPerfil ??_analisisPerfilInicial())['panel_ia'];
+    final panel = (_analisisPerfil ?? _analisisPerfilInicial())['panel_ia'];
     if (panel is Map && panel['cards'] is List) {
       return (panel['cards'] as List)
           .whereType<Map>()
@@ -288,7 +296,7 @@ class _PantallaPlanTutorIAPersonalState
     return [];
   }
 
-  TutorInsightCard?_insightPorId(String id) {
+  TutorInsightCard? _insightPorId(String id) {
     final dashboard = _dashboardInicio;
     if (dashboard == null) return null;
     final objetivo = id.toLowerCase().trim();
@@ -322,9 +330,9 @@ class _PantallaPlanTutorIAPersonalState
 
     Map<String, dynamic> cardPracticaDesdeInsight({
       required String title,
-      required TutorInsightCard?insight,
-      String?fallbackMessage,
-      String?fallbackMateria,
+      required TutorInsightCard? insight,
+      String? fallbackMessage,
+      String? fallbackMateria,
       List<String> fallbackMaterias = const <String>[],
       List<String> fallbackPreguntaIds = const <String>[],
       bool excluirIdsInsight = false,
@@ -337,7 +345,7 @@ class _PantallaPlanTutorIAPersonalState
         insight?.tiempoPractica,
         tiempoBase,
       ).clamp(10, 120);
-      final materia = (insight?.materia ??fallbackMateria ??'').trim();
+      final materia = (insight?.materia ?? fallbackMateria ?? '').trim();
       final preguntaIds = idsUnicos([
         if (!excluirIdsInsight) ...?insight?.preguntaIds,
         ...fallbackPreguntaIds,
@@ -354,7 +362,7 @@ class _PantallaPlanTutorIAPersonalState
         'type': 'practice',
         'title': title,
         'message':
-            (insight?.resumen ??fallbackMessage ??'Sin recomendacion IA.')
+            (insight?.resumen ?? fallbackMessage ?? 'Sin recomendacion IA.')
                 .toString()
                 .trim(),
         'cta': 'Entrar',
@@ -372,7 +380,7 @@ class _PantallaPlanTutorIAPersonalState
     final materiaRiesgo = (riesgo != null && riesgo.riesgos.isNotEmpty)
         ? riesgo.riesgos.first.materia
         : null;
-    final materiasRiesgo = (riesgo?.riesgos ??const <TutorRiskItem>[])
+    final materiasRiesgo = (riesgo?.riesgos ?? const <TutorRiskItem>[])
         .map((e) => e.materia.trim())
         .where((e) => e.isNotEmpty)
         .toList();
@@ -412,7 +420,7 @@ class _PantallaPlanTutorIAPersonalState
         insight: riesgo,
         fallbackMessage:
             'Atiende primero tus materias con mayor riesgo para no perder avance.',
-        fallbackMateria: materiaRiesgo ??materiaPrioritaria?.materia,
+        fallbackMateria: materiaRiesgo ?? materiaPrioritaria?.materia,
         fallbackMaterias: materiasRiesgo,
       ),
       {
@@ -478,7 +486,7 @@ class _PantallaPlanTutorIAPersonalState
       context,
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          backgroundColor: const Color(0xFFEEF2F4),
+          backgroundColor: const Color(0xFFECEFF3),
           appBar: AppBar(
             title: Text(
               'ORDENES DEL TUTOR PARA HOY',
@@ -547,9 +555,9 @@ class _PantallaPlanTutorIAPersonalState
   Color _colorPorTipo(String type) {
     switch (type) {
       case 'study':
-        return const Color(0xFF00A8B8);
+        return const Color(0xFF5EC7A7);
       case 'guided':
-        return const Color(0xFF103D4A);
+        return const Color(0xFF0B5A45);
       case 'plan':
         return const Color(0xFFB68B2E);
       case 'practice':
@@ -557,14 +565,14 @@ class _PantallaPlanTutorIAPersonalState
       case 'streak':
         return const Color(0xFF237D57);
       case 'recommendation':
-        return const Color(0xFF00A8B8);
+        return const Color(0xFF5EC7A7);
       case 'alert':
         return const Color(0xFFAD3636);
       case 'failed':
         return const Color(0xFFAD3636);
       case 'message':
       default:
-        return const Color(0xFF1F2A1C);
+        return const Color(0xFF111827);
     }
   }
 
@@ -596,7 +604,7 @@ class _PantallaPlanTutorIAPersonalState
     String type,
     int cantidad,
     int tiempo,
-    String?materia,
+    String? materia,
   ) {
     if (type == 'study') {
       if (materia != null && materia.isNotEmpty) {
@@ -621,7 +629,7 @@ class _PantallaPlanTutorIAPersonalState
     }
     if (type == 'streak') {
       final racha = _intValue(_analisisPerfil?['racha_dias'], 0);
-      return racha > 0 ?'Racha actual: $racha dias' : 'Disciplina diaria';
+      return racha > 0 ? 'Racha actual: $racha dias' : 'Disciplina diaria';
     }
     if (type == 'recommendation') return 'Sugerencia tactica personalizada';
     if (type == 'alert') return 'Atencion prioritaria';
@@ -666,7 +674,7 @@ class _PantallaPlanTutorIAPersonalState
       context: context,
       builder: (_) => AlertDialog(
         title: Text(title),
-        content: Text(detail.isEmpty ?'Sin detalles adicionales.' : detail),
+        content: Text(detail.isEmpty ? 'Sin detalles adicionales.' : detail),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -678,10 +686,10 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   Future<void> _abrirChatTutor({
-    String?promptInicial,
+    String? promptInicial,
     bool enviarAutomatico = false,
   }) async {
-    final analisis = _analisisPerfil ??_analisisPerfilInicial();
+    final analisis = _analisisPerfil ?? _analisisPerfilInicial();
     final contexto = <String, dynamic>{
       'user_id': _userId,
       'categoria_usuario': _categoriaUsuario,
@@ -706,9 +714,9 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   Future<void> _ejecutarAccionTarjetaIA(Map<String, dynamic> card) async {
-    final type = (card['type'] ??'message').toString().trim().toLowerCase();
-    final title = (card['title'] ??'Recomendacion IA').toString().trim();
-    final message = (card['message'] ??'').toString();
+    final type = (card['type'] ?? 'message').toString().trim().toLowerCase();
+    final title = (card['title'] ?? 'Recomendacion IA').toString().trim();
+    final message = (card['message'] ?? '').toString();
     final items = (card['items'] is List)
         ? (card['items'] as List)
               .whereType<String>()
@@ -736,7 +744,7 @@ class _PantallaPlanTutorIAPersonalState
               .where((e) => e.isNotEmpty)
               .toList()
         : <String>[];
-    final insightId = (card['insight_id'] ??'').toString().trim();
+    final insightId = (card['insight_id'] ?? '').toString().trim();
     final isStudy = type == 'study';
     final isGuided = type == 'guided';
     final isFailed = type == 'failed';
@@ -780,7 +788,7 @@ class _PantallaPlanTutorIAPersonalState
     }
 
     _mostrarDetalleOrden(
-      title: title.isEmpty ?'Recomendacion IA' : title,
+      title: title.isEmpty ? 'Recomendacion IA' : title,
       message: message,
       items: items,
     );
@@ -799,7 +807,7 @@ class _PantallaPlanTutorIAPersonalState
       return;
     }
 
-    BuildContext?dialogContext;
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -821,12 +829,12 @@ class _PantallaPlanTutorIAPersonalState
 
       final materiasObjetivo = <String>{};
       final materiaPrioritaria =
-          (_insightPorId('materia_prioritaria')?.materia ??'').trim();
+          (_insightPorId('materia_prioritaria')?.materia ?? '').trim();
       if (materiaPrioritaria.isNotEmpty) {
         materiasObjetivo.add(materiaPrioritaria);
       }
       final radar = _insightPorId('radar_riesgo');
-      for (final riesgo in (radar?.riesgos ??const <TutorRiskItem>[])) {
+      for (final riesgo in (radar?.riesgos ?? const <TutorRiskItem>[])) {
         final materia = riesgo.materia.trim();
         if (materia.isNotEmpty) {
           materiasObjetivo.add(materia);
@@ -843,7 +851,7 @@ class _PantallaPlanTutorIAPersonalState
 
       final estadisticas = await _servicioProgreso
           .obtenerEstadisticasPreguntas();
-      int prioridadFallo(EstadisticaPregunta?estadistica) {
+      int prioridadFallo(EstadisticaPregunta? estadistica) {
         if (estadistica == null) return 0;
         if (estadistica.rachaAciertos >= 3) return 0;
         return estadistica.fallosVisibles;
@@ -860,16 +868,16 @@ class _PantallaPlanTutorIAPersonalState
         final prioridadB = prioridadFallo(estadisticas[b]);
         final byFallos = prioridadB.compareTo(prioridadA);
         if (byFallos != 0) return byFallos;
-        final aciertosA = estadisticas[a]?.aciertosVisibles ??0;
-        final aciertosB = estadisticas[b]?.aciertosVisibles ??0;
+        final aciertosA = estadisticas[a]?.aciertosVisibles ?? 0;
+        final aciertosB = estadisticas[b]?.aciertosVisibles ?? 0;
         final byAciertos = aciertosA.compareTo(aciertosB);
         if (byAciertos != 0) return byAciertos;
-        final idxA = posicionOriginal[a] ??999999;
-        final idxB = posicionOriginal[b] ??999999;
+        final idxA = posicionOriginal[a] ?? 999999;
+        final idxB = posicionOriginal[b] ?? 999999;
         return idxA.compareTo(idxB);
       });
 
-      final n = cantidad > idsOrdenados.length ?idsOrdenados.length : cantidad;
+      final n = cantidad > idsOrdenados.length ? idsOrdenados.length : cantidad;
       final idsSeleccionados = idsOrdenados.take(n).toList();
       seleccionadas = await _servicioPreguntas.obtenerPreguntasPorIds(
         ids: idsSeleccionados,
@@ -909,7 +917,7 @@ class _PantallaPlanTutorIAPersonalState
   Future<void> _iniciarPracticaFalladasDesdeIA({int cantidad = 20}) async {
     if (!mounted) return;
 
-    BuildContext?dialogContext;
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -936,7 +944,7 @@ class _PantallaPlanTutorIAPersonalState
       return;
     }
 
-    final limite = cantidad <= 0 ?20 : cantidad;
+    final limite = cantidad <= 0 ? 20 : cantidad;
     final preguntas = intentos.map((e) => e.pregunta).take(limite).toList();
     if (preguntas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -968,9 +976,9 @@ class _PantallaPlanTutorIAPersonalState
     Map<String, dynamic> card, {
     required Future<void> Function() onTap,
   }) {
-    final type = (card['type'] ??'message').toString().trim().toLowerCase();
-    final title = (card['title'] ??'Recomendacion IA').toString().trim();
-    final message = (card['message'] ??'').toString().trim();
+    final type = (card['type'] ?? 'message').toString().trim().toLowerCase();
+    final title = (card['title'] ?? 'Recomendacion IA').toString().trim();
+    final message = (card['message'] ?? '').toString().trim();
     final payload = card['payload'] is Map
         ? Map<String, dynamic>.from(card['payload'])
         : <String, dynamic>{};
@@ -1013,13 +1021,13 @@ class _PantallaPlanTutorIAPersonalState
             ),
             const SizedBox(height: 10),
             Text(
-              title.isEmpty ?'Recomendacion IA' : title.toUpperCase(),
+              title.isEmpty ? 'Recomendacion IA' : title.toUpperCase(),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF1F2A1C),
+                color: const Color(0xFF111827),
                 height: 1.2,
               ),
             ),
@@ -1038,7 +1046,7 @@ class _PantallaPlanTutorIAPersonalState
             const SizedBox(height: 6),
             Expanded(
               child: Text(
-                message.isEmpty ?'Sin detalle tactico.' : message,
+                message.isEmpty ? 'Sin detalle tactico.' : message,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
@@ -1070,10 +1078,10 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   Widget _buildTarjetaAccionIA(Map<String, dynamic> card) {
-    final type = (card['type'] ??'message').toString().trim().toLowerCase();
-    final title = (card['title'] ??'Recomendacion IA').toString().trim();
-    final message = (card['message'] ??'').toString();
-    final cta = (card['cta'] ??'').toString().trim();
+    final type = (card['type'] ?? 'message').toString().trim().toLowerCase();
+    final title = (card['title'] ?? 'Recomendacion IA').toString().trim();
+    final message = (card['message'] ?? '').toString();
+    final cta = (card['cta'] ?? '').toString().trim();
     final items = (card['items'] is List)
         ? (card['items'] as List)
               .whereType<String>()
@@ -1092,7 +1100,7 @@ class _PantallaPlanTutorIAPersonalState
         : null;
     final color = _colorPorTipo(type);
     final subtitulo = _subtituloPorTipo(type, cantidad, tiempo, materia);
-    final ctaFinal = cta.isNotEmpty ?cta : _ctaPorDefecto(type, cantidad);
+    final ctaFinal = cta.isNotEmpty ? cta : _ctaPorDefecto(type, cantidad);
 
     final description = <String>[
       if (message.trim().isNotEmpty) message.trim(),
@@ -1133,7 +1141,7 @@ class _PantallaPlanTutorIAPersonalState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title.isEmpty ?'Recomendacion IA' : title,
+                      title.isEmpty ? 'Recomendacion IA' : title,
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1155,7 +1163,7 @@ class _PantallaPlanTutorIAPersonalState
           ),
           const SizedBox(height: 16),
           Text(
-            description.isEmpty ?'Sin descripcion tactica.' : description,
+            description.isEmpty ? 'Sin descripcion tactica.' : description,
             style: GoogleFonts.inter(
               fontSize: 14,
               color: Colors.grey.shade700,
@@ -1193,12 +1201,12 @@ class _PantallaPlanTutorIAPersonalState
   Future<void> _iniciarPractica({
     required int cantidad,
     required int tiempoLimite,
-    String?materia,
+    String? materia,
     List<String> materiasObjetivo = const <String>[],
     List<String> preguntaIdsPrioritarias = const [],
     bool esPracticaGuiada = false,
   }) async {
-    BuildContext?dialogContext;
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1209,7 +1217,7 @@ class _PantallaPlanTutorIAPersonalState
     );
 
     final preguntas = <Pregunta>[];
-    String?errorMessage;
+    String? errorMessage;
     try {
       final seleccionadas = await _seleccionarPreguntasDeterministicas(
         cantidad: cantidad,
@@ -1259,11 +1267,11 @@ class _PantallaPlanTutorIAPersonalState
 
   Future<List<Pregunta>> _seleccionarPreguntasDeterministicas({
     required int cantidad,
-    String?materia,
+    String? materia,
     List<String> materiasObjetivo = const <String>[],
     List<String> preguntaIdsPrioritarias = const <String>[],
   }) async {
-    final objetivoCantidad = cantidad <= 0 ?1 : cantidad;
+    final objetivoCantidad = cantidad <= 0 ? 1 : cantidad;
     final seleccion = <Pregunta>[];
     final usados = <String>{};
 
@@ -1341,22 +1349,22 @@ class _PantallaPlanTutorIAPersonalState
     candidatasIds.sort((a, b) {
       final sa = estadisticas[a];
       final sb = estadisticas[b];
-      final fallosA = sa?.fallosVisibles ??0;
-      final fallosB = sb?.fallosVisibles ??0;
+      final fallosA = sa?.fallosVisibles ?? 0;
+      final fallosB = sb?.fallosVisibles ?? 0;
       if (fallosA != fallosB) return fallosB.compareTo(fallosA);
 
-      final rachaFallosA = sa?.rachaFallos ??0;
-      final rachaFallosB = sb?.rachaFallos ??0;
+      final rachaFallosA = sa?.rachaFallos ?? 0;
+      final rachaFallosB = sb?.rachaFallos ?? 0;
       if (rachaFallosA != rachaFallosB) {
         return rachaFallosB.compareTo(rachaFallosA);
       }
 
-      final aciertosA = sa?.aciertosVisibles ??0;
-      final aciertosB = sb?.aciertosVisibles ??0;
+      final aciertosA = sa?.aciertosVisibles ?? 0;
+      final aciertosB = sb?.aciertosVisibles ?? 0;
       if (aciertosA != aciertosB) return aciertosA.compareTo(aciertosB);
 
-      final idxA = posicionOriginal[a] ??999999;
-      final idxB = posicionOriginal[b] ??999999;
+      final idxA = posicionOriginal[a] ?? 999999;
+      final idxB = posicionOriginal[b] ?? 999999;
       return idxA.compareTo(idxB);
     });
 
@@ -1438,7 +1446,7 @@ class _PantallaPlanTutorIAPersonalState
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF00A8B8), Color(0xFF103D4A)],
+          colors: [Color(0xFF5EC7A7), Color(0xFF0B5A45)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1538,7 +1546,7 @@ class _PantallaPlanTutorIAPersonalState
 
   double _doubleValue(dynamic value, [double fallback = 0.0]) {
     if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ??fallback;
+    if (value is String) return double.tryParse(value) ?? fallback;
     return fallback;
   }
 
@@ -1561,11 +1569,11 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   String _nombreMateriaDesdeMap(Map<String, dynamic> materia) {
-    final raw = materia['materia'] ??materia['nombre'];
+    final raw = materia['materia'] ?? materia['nombre'];
     if (raw is Map) {
-      return (raw['nombre'] ??'Materia').toString().trim();
+      return (raw['nombre'] ?? 'Materia').toString().trim();
     }
-    return (raw ??'Materia').toString().trim();
+    return (raw ?? 'Materia').toString().trim();
   }
 
   String _nivelDesdePorcentaje(double porcentaje) {
@@ -1629,7 +1637,7 @@ class _PantallaPlanTutorIAPersonalState
               : 'Conoces el tema, pero aun hay dudas por consolidar.',
         _SemaforoTema.rojo =>
           (analisis == null || porcentaje <= 0)
-              ?'Punto ciego: aun no has empezado este tema.'
+              ? 'Punto ciego: aun no has empezado este tema.'
               : 'Punto ciego prioritario para hoy.',
       };
 
@@ -1643,7 +1651,7 @@ class _PantallaPlanTutorIAPersonalState
             ...?analisis,
             'materia': nombre,
             'porcentaje': porcentaje,
-            'nivel': (analisis?['nivel'] ??_nivelDesdePorcentaje(porcentaje))
+            'nivel': (analisis?['nivel'] ?? _nivelDesdePorcentaje(porcentaje))
                 .toString(),
           },
         ),
@@ -1683,7 +1691,7 @@ class _PantallaPlanTutorIAPersonalState
             ...analisis,
             'materia': nombre,
             'porcentaje': porcentaje,
-            'nivel': (analisis['nivel'] ??_nivelDesdePorcentaje(porcentaje))
+            'nivel': (analisis['nivel'] ?? _nivelDesdePorcentaje(porcentaje))
                 .toString(),
           },
         ),
@@ -1767,7 +1775,7 @@ class _PantallaPlanTutorIAPersonalState
     );
     final resumenMapa = _construirResumenMapaTemas(
       items: items,
-      resumenBase: (_analisisPerfil?['resumen_materias'] ??'').toString(),
+      resumenBase: (_analisisPerfil?['resumen_materias'] ?? '').toString(),
     );
 
     if (!mounted) return;
@@ -1853,7 +1861,7 @@ class _PantallaPlanTutorIAPersonalState
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF1F2A1C),
+                color: const Color(0xFF111827),
                 height: 1.2,
               ),
             ),
@@ -1929,7 +1937,7 @@ class _PantallaPlanTutorIAPersonalState
   }
 
   Widget _buildDashboardV2({required Map<String, dynamic> analisis}) {
-    final dashboard = _dashboardInicio ??TutorDashboardInicio.fallback();
+    final dashboard = _dashboardInicio ?? TutorDashboardInicio.fallback();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1959,13 +1967,70 @@ class _PantallaPlanTutorIAPersonalState
 
   @override
   Widget build(BuildContext context) {
-    final analisis = _analisisPerfil ??_analisisPerfilInicial();
+    if (_accesoRestringidoInvitado) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        appBar: AppBar(
+          title: Text(
+            'Tutor IA Personal',
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: Colors.black87,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.black87),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 44,
+                  color: Color(0xFF0B5A45),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'El Tutor IA Personal es solo para usuarios registrados.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Inicia sesion o registrate para activar recomendaciones personalizadas.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('Volver'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final analisis = _analisisPerfil ?? _analisisPerfilInicial();
     final cardsIa = _obtenerCardsIA();
-    final diagnostico = (analisis['diagnostico'] ??'').toString();
-    final resumenMaterias = (analisis['resumen_materias'] ??'').toString();
+    final diagnostico = (analisis['diagnostico'] ?? '').toString();
+    final resumenMaterias = (analisis['resumen_materias'] ?? '').toString();
     final materiasAnalisis = _obtenerAnalisisMaterias();
     final fortalezasAnalisis = [
-      ...List<String>.from(analisis['fortalezas'] ??[]),
+      ...List<String>.from(analisis['fortalezas'] ?? []),
       if ((analisis['velocidad_promedio'] as num?) != null &&
           (analisis['velocidad_promedio'] as num) < 15)
         "Buena velocidad (${analisis['velocidad_promedio']} seg/preg)",
@@ -1973,7 +2038,7 @@ class _PantallaPlanTutorIAPersonalState
         "Racha de ${analisis['racha_dias']} dias",
     ];
     final debilidadesAnalisis = [
-      ...List<String>.from(analisis['debilidades'] ??[]),
+      ...List<String>.from(analisis['debilidades'] ?? []),
       if ((analisis['tasa_acierto'] as num? ?? 0) < 50)
         "Tendencia a impulsividad (Necesitas mas analisis)",
     ];
@@ -2031,7 +2096,7 @@ class _PantallaPlanTutorIAPersonalState
               ),
             )
           : _tutorDashboardV2Enabled
-          ?_buildDashboardV2(analisis: analisis)
+          ? _buildDashboardV2(analisis: analisis)
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -2039,8 +2104,8 @@ class _PantallaPlanTutorIAPersonalState
                 children: [
                   // 1. Tarjeta de Diagnóstico Principal (Nivel Global)
                   _SeccionNivelGlobal(
-                    nivel: analisis['nivel_global'] ??'INICIAL',
-                    tasaAcierto: analisis['tasa_acierto'] ??0,
+                    nivel: analisis['nivel_global'] ?? 'INICIAL',
+                    tasaAcierto: analisis['tasa_acierto'] ?? 0,
                   ),
 
                   const SizedBox(height: 24),
@@ -2116,7 +2181,7 @@ class _MensajeChatTutor {
 class _ChatTutorSheet extends StatefulWidget {
   final TutorIAPersonalService iaService;
   final Map<String, dynamic> contexto;
-  final String?promptInicial;
+  final String? promptInicial;
   final bool enviarAutomatico;
 
   const _ChatTutorSheet({
@@ -2174,8 +2239,8 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
     });
   }
 
-  Future<void> _enviarMensaje([String?mensajeForzado]) async {
-    final mensaje = (mensajeForzado ??_controller.text).trim();
+  Future<void> _enviarMensaje([String? mensajeForzado]) async {
+    final mensaje = (mensajeForzado ?? _controller.text).trim();
     if (mensaje.isEmpty || _enviando) return;
 
     if (mensajeForzado == null) {
@@ -2224,25 +2289,25 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
 
   List<Map<String, String>> _historialParaIA() {
     if (_mensajes.isEmpty) return const [];
-    final start = _mensajes.length > 10 ?_mensajes.length - 10 : 0;
+    final start = _mensajes.length > 10 ? _mensajes.length - 10 : 0;
     return _mensajes
         .sublist(start)
         .map(
-          (m) => {'rol': m.esUsuario ?'usuario' : 'tutor', 'texto': m.texto},
+          (m) => {'rol': m.esUsuario ? 'usuario' : 'tutor', 'texto': m.texto},
         )
         .toList();
   }
 
   Widget _burbuja(_MensajeChatTutor mensaje) {
     final esUsuario = mensaje.esUsuario;
-    final bg = esUsuario ?const Color(0xFF103D4A) : const Color(0xFFF1F5F9);
-    final fg = esUsuario ?Colors.white : const Color(0xFF1F2A1C);
-    final align = esUsuario ?CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final bg = esUsuario ? const Color(0xFF0B5A45) : const Color(0xFFF1F5F9);
+    final fg = esUsuario ? Colors.white : const Color(0xFF111827);
+    final align = esUsuario ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(14),
       topRight: const Radius.circular(14),
-      bottomLeft: Radius.circular(esUsuario ?14 : 4),
-      bottomRight: Radius.circular(esUsuario ?4 : 14),
+      bottomLeft: Radius.circular(esUsuario ? 14 : 4),
+      bottomRight: Radius.circular(esUsuario ? 4 : 14),
     );
 
     return Column(
@@ -2298,7 +2363,7 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
                         style: GoogleFonts.inter(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1F2A1C),
+                          color: const Color(0xFF111827),
                         ),
                       ),
                     ),
@@ -2314,7 +2379,7 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
                 child: ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                  itemCount: _mensajes.length + (_enviando ?1 : 0),
+                  itemCount: _mensajes.length + (_enviando ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (_enviando && index == _mensajes.length) {
                       return Column(
@@ -2368,7 +2433,7 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
                           hintText: 'Escribe tu consulta...',
                           hintStyle: GoogleFonts.inter(fontSize: 13),
                           filled: true,
-                          fillColor: const Color(0xFFEEF2F4),
+                          fillColor: const Color(0xFFECEFF3),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 10,
@@ -2384,7 +2449,7 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: const BorderSide(
-                              color: Color(0xFF103D4A),
+                              color: Color(0xFF0B5A45),
                             ),
                           ),
                         ),
@@ -2395,9 +2460,9 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
                       height: 46,
                       width: 46,
                       child: ElevatedButton(
-                        onPressed: _enviando ?null : _enviarMensaje,
+                        onPressed: _enviando ? null : _enviarMensaje,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF103D4A),
+                          backgroundColor: const Color(0xFF0B5A45),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -2533,7 +2598,7 @@ class _ProgresoDetalladoCard extends StatelessWidget {
           const Divider(height: 24),
           _RowProgreso(
             label: "Tiempo Estudiado",
-            value: _formatTiempo(analisis['tiempo_total_estudio'] ??0),
+            value: _formatTiempo(analisis['tiempo_total_estudio'] ?? 0),
             icon: Icons.timer_rounded,
             color: Colors.orange,
           ),
@@ -2610,9 +2675,9 @@ class _BloqueAnalisisTactico extends StatelessWidget {
         .map((raw) {
           final texto = raw.trim();
           final match = regex.firstMatch(texto);
-          final nombre = match != null ?match.group(1)!.trim() : texto;
+          final nombre = match != null ? match.group(1)!.trim() : texto;
           final score = match != null
-              ? double.tryParse(match.group(2) ??'')
+              ? double.tryParse(match.group(2) ?? '')
               : null;
           final porcentaje = score ?? (tipo == 'fortaleza' ? 75.0 : 45.0);
           return {
@@ -2637,7 +2702,7 @@ class _BloqueAnalisisTactico extends StatelessWidget {
   List<Map<String, dynamic>> _materiasPorTipo(String tipo) {
     if (materiasAnalisis.isNotEmpty) {
       return materiasAnalisis
-          .where((m) => (m['tipo'] ??'').toString() == tipo)
+          .where((m) => (m['tipo'] ?? '').toString() == tipo)
           .map((m) => Map<String, dynamic>.from(m))
           .toList();
     }
@@ -2671,15 +2736,15 @@ class _BloqueAnalisisTactico extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF0B1220), Color(0xFF0B2933)],
+            colors: [Color(0xFF0B1220), Color(0xFF084434)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF0B2933)),
+          border: Border.all(color: const Color(0xFF084434)),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0B2933).withValues(alpha: 0.25),
+              color: const Color(0xFF084434).withValues(alpha: 0.25),
               blurRadius: 14,
               offset: const Offset(0, 8),
             ),
@@ -2778,14 +2843,14 @@ class _BloqueAnalisisTactico extends StatelessWidget {
     required Map<String, dynamic> materia,
     required Color color,
   }) {
-    final nombreRaw = materia['materia'] ??materia['nombre'];
+    final nombreRaw = materia['materia'] ?? materia['nombre'];
     final nombre = (nombreRaw is Map)
-        ? (nombreRaw['nombre'] ??'Materia').toString()
-        : (nombreRaw ??'Materia').toString();
+        ? (nombreRaw['nombre'] ?? 'Materia').toString()
+        : (nombreRaw ?? 'Materia').toString();
     final porcentaje = (materia['porcentaje'] is num)
         ? (materia['porcentaje'] as num).toDouble()
-        : double.tryParse(materia['porcentaje']?.toString() ??'0') ??0.0;
-    final nivel = (materia['nivel'] ??_nivelDesdePorcentaje(porcentaje))
+        : double.tryParse(materia['porcentaje']?.toString() ?? '0') ?? 0.0;
+    final nivel = (materia['nivel'] ?? _nivelDesdePorcentaje(porcentaje))
         .toString();
 
     return InkWell(
@@ -2938,14 +3003,14 @@ class _BloqueAnalisisTactico extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF1F2A1C), Color(0xFF0B2933)],
+              colors: [Color(0xFF111827), Color(0xFF084434)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0B2933).withValues(alpha: 0.24),
+                color: const Color(0xFF084434).withValues(alpha: 0.24),
                 blurRadius: 14,
                 offset: const Offset(0, 6),
               ),
@@ -3004,18 +3069,18 @@ class _PantallaAnalisisMaterias extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2F4),
+      backgroundColor: const Color(0xFFECEFF3),
       appBar: AppBar(
         title: Text(
           'Analisis por Materia',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
-            color: const Color(0xFF1F2A1C),
+            color: const Color(0xFF111827),
           ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF1F2A1C)),
+        iconTheme: const IconThemeData(color: Color(0xFF111827)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -3028,7 +3093,7 @@ class _PantallaAnalisisMaterias extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF5A8F8A)),
+                border: Border.all(color: const Color(0xFF5EC7A7)),
               ),
               child: Text(
                 resumenMaterias.trim().isNotEmpty
@@ -3037,7 +3102,7 @@ class _PantallaAnalisisMaterias extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   height: 1.45,
-                  color: const Color(0xFF0B2933),
+                  color: const Color(0xFF084434),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -3121,7 +3186,7 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
 
   List<_MateriaSemaforoItem> _itemsPor(
     _SemaforoTema semaforo, {
-    _SemaforoTema?filtroActivo,
+    _SemaforoTema? filtroActivo,
   }) {
     final base = items.where((e) => e.semaforo == semaforo).toList();
     if (filtroActivo == null) return base;
@@ -3140,7 +3205,7 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
       label: Text(
         '$titulo ($total)',
         style: GoogleFonts.inter(
-          color: selected ?Colors.white : color,
+          color: selected ? Colors.white : color,
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
@@ -3157,7 +3222,7 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
   Widget _buildSeccion(
     BuildContext context, {
     required _SemaforoTema semaforo,
-    _SemaforoTema?filtroActivo,
+    _SemaforoTema? filtroActivo,
   }) {
     final lista = _itemsPor(semaforo, filtroActivo: filtroActivo);
     if (lista.isEmpty) return const SizedBox.shrink();
@@ -3219,7 +3284,7 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1F2A1C),
+                              color: const Color(0xFF111827),
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -3258,21 +3323,21 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
     final totalVerdes = _itemsPor(_SemaforoTema.verde).length;
     final totalAmbar = _itemsPor(_SemaforoTema.ambar).length;
     final totalRojos = _itemsPor(_SemaforoTema.rojo).length;
-    _SemaforoTema?filtroActivo;
+    _SemaforoTema? filtroActivo;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2F4),
+      backgroundColor: const Color(0xFFECEFF3),
       appBar: AppBar(
         title: Text(
           'Mapa de temas del prospecto',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
-            color: const Color(0xFF1F2A1C),
+            color: const Color(0xFF111827),
           ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF1F2A1C)),
+        iconTheme: const IconThemeData(color: Color(0xFF111827)),
       ),
       body: StatefulBuilder(
         builder: (context, setLocalState) {
@@ -3291,7 +3356,7 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFDEE6EA),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF5A8F8A)),
+                    border: Border.all(color: const Color(0xFF5EC7A7)),
                   ),
                   child: Text(
                     resumen.trim().isEmpty
@@ -3300,7 +3365,7 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       height: 1.35,
-                      color: const Color(0xFF0B2933),
+                      color: const Color(0xFF084434),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -3439,17 +3504,17 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
   List<Map<String, dynamic>> _preguntasCriticas = const [];
 
   String get _materia =>
-      (widget.materia['materia'] ??widget.materia['nombre'] ??'Materia')
+      (widget.materia['materia'] ?? widget.materia['nombre'] ?? 'Materia')
           .toString();
 
   double get _porcentaje {
     final raw = widget.materia['porcentaje'];
     if (raw is num) return raw.toDouble();
-    return double.tryParse(raw?.toString() ??'0') ??0.0;
+    return double.tryParse(raw?.toString() ?? '0') ?? 0.0;
   }
 
   String get _nivel =>
-      (widget.materia['nivel'] ??'INTERMEDIO').toString().toUpperCase();
+      (widget.materia['nivel'] ?? 'INTERMEDIO').toString().toUpperCase();
 
   @override
   void initState() {
@@ -3555,14 +3620,14 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
   int _intValue(dynamic value, int fallback) {
     if (value is int) return value;
     if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value) ??fallback;
+    if (value is String) return int.tryParse(value) ?? fallback;
     return fallback;
   }
 
   double _doubleValue(dynamic value, double fallback) {
     if (value is double) return value;
     if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ??fallback;
+    if (value is String) return double.tryParse(value) ?? fallback;
     return fallback;
   }
 
@@ -3576,7 +3641,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF1F2A1C),
+            color: const Color(0xFF111827),
           ),
         ),
       ],
@@ -3587,7 +3652,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     required String label,
     required String value,
     required Color color,
-    VoidCallback?onTap,
+    VoidCallback? onTap,
   }) {
     final tarjeta = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -3673,7 +3738,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
       return;
     }
 
-    BuildContext?dialogContext;
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -3684,7 +3749,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     );
 
     List<Pregunta> preguntas = const [];
-    String?error;
+    String? error;
     try {
       preguntas = await widget.servicioPreguntas.obtenerPreguntasPorIds(
         ids: idsLimpios,
@@ -3734,7 +3799,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
           heightFactor: 0.88,
           child: Container(
             decoration: const BoxDecoration(
-              color: Color(0xFFEEF2F4),
+              color: Color(0xFFECEFF3),
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SafeArea(
@@ -3760,7 +3825,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                             style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFF1F2A1C),
+                              color: const Color(0xFF111827),
                             ),
                           ),
                         ),
@@ -3822,7 +3887,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF103D4A),
+                          backgroundColor: const Color(0xFF0B5A45),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
@@ -3884,14 +3949,14 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     );
     if (idsIncorrectas.isEmpty && _preguntasCriticas.isNotEmpty) {
       idsIncorrectas = _preguntasCriticas
-          .map((q) => (q['pregunta_id'] ??'').toString().trim())
+          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
           .where((id) => id.isNotEmpty)
           .toList();
     }
     final preguntasCriticasTop = _preguntasCriticas.take(10).toList();
     final idsPrioritariasDetalle = <String>{
       ...preguntasCriticasTop
-          .map((q) => (q['pregunta_id'] ??'').toString().trim())
+          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
           .where((id) => id.isNotEmpty),
     }.toList();
     final cantidadPracticarCriticas = idsPrioritariasDetalle.length;
@@ -3899,7 +3964,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.86,
       decoration: const BoxDecoration(
-        color: Color(0xFFEEF2F4),
+        color: Color(0xFFECEFF3),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
@@ -3917,7 +3982,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
             const SizedBox(height: 14),
             Expanded(
               child: _cargando
-                  ?const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                       children: [
@@ -3926,7 +3991,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                           style: GoogleFonts.inter(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF1F2A1C),
+                            color: const Color(0xFF111827),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -3940,7 +4005,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0B2933),
+                                  color: const Color(0xFF084434),
                                 ),
                               ),
                             ),
@@ -3950,7 +4015,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                               style: GoogleFonts.inter(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: const Color(0xFF1F2A1C),
+                                color: const Color(0xFF111827),
                               ),
                             ),
                           ],
@@ -3963,7 +4028,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                             minHeight: 9,
                             backgroundColor: Colors.white,
                             valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF103D4A),
+                              Color(0xFF0B5A45),
                             ),
                           ),
                         ),
@@ -4022,22 +4087,22 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                         _buildSectionTitle(
                           '2) Prediccion',
                           Icons.auto_awesome_rounded,
-                          const Color(0xFF0B2933),
+                          const Color(0xFF084434),
                         ),
                         const SizedBox(height: 10),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEEF4FF),
+                            color: const Color(0xFFEAF6F1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF5A8F8A)),
+                            border: Border.all(color: const Color(0xFF5EC7A7)),
                           ),
                           child: Text(
                             'Tu esfuerzo da frutos. Aunque hoy tu probabilidad es del ${probActual.toStringAsFixed(0)}%, si cumples con tus tareas diarias, en solo una semana habras subido al ${prob7.toStringAsFixed(0)}%. Sigue asi para llegar al ${prob30.toStringAsFixed(0)}% en un mes.',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               height: 1.45,
-                              color: const Color(0xFF0B2933),
+                              color: const Color(0xFF084434),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -4108,7 +4173,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                     onPressed: cantidadPracticarCriticas == 0
                         ? null
                         : () async {
-                            final tiempoPractica = tiempo > 0 ?tiempo : 20;
+                            final tiempoPractica = tiempo > 0 ? tiempo : 20;
                             Navigator.pop(context);
                             await widget.onPracticar(
                               cantidadPracticarCriticas,
@@ -4119,7 +4184,7 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
                             );
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF103D4A),
+                      backgroundColor: const Color(0xFF0B5A45),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -4142,4 +4207,3 @@ class _DetalleMateriaSheetState extends State<_DetalleMateriaSheet> {
     );
   }
 }
-

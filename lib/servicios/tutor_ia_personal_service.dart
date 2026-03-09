@@ -1179,27 +1179,23 @@ Devuelve SOLO JSON valido (sin markdown):
         return respuestaConversacional;
       }
 
-      final usarContextoBd = _requiereContextoBdParaChat(
+      var usarContextoBd = _requiereContextoBdParaChat(
         mensaje: mensajeLimpio,
         contexto: contextoBase,
       );
       if (usarContextoBd &&
           (userId == null || userId.isEmpty || userId == 'user_test_id')) {
-        return 'Para responder eso con precision necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
+        // En modo invitado seguimos como tutor general sin contexto personal.
+        usarContextoBd = false;
       }
 
-      final contextoBd = usarContextoBd
-          ? await _contextoUsuarioChatDesdeBD(userId)
-          : const <String, dynamic>{};
-      final contextoFinal = <String, dynamic>{
-        ...contextoBase,
-        if (usarContextoBd && contextoBd.isNotEmpty)
-          'contexto_bd_usuario': contextoBd,
-      };
-
-      final prompt = _construirPromptTutor(
-        mensaje: mensajeLimpio,
-        contextoFinal: contextoFinal,
+      // El contexto fuerte se arma en la Edge Function para evitar duplicidad
+      // de tokens y mantener una sola estrategia de tutor.
+      final prompt = mensajeLimpio;
+      await _guardarEstadoTutorUsuario(
+        userId: userId,
+        contexto: contextoBase,
+        ultimoMensaje: mensajeLimpio,
       );
 
       final response = await _invocarTutorConReintento401(
@@ -1216,16 +1212,9 @@ Devuelve SOLO JSON valido (sin markdown):
 
       final parsed = _parsePanelJson(raw);
       if (parsed != null) {
-        for (final key in const [
-          'respuesta',
-          'mensaje',
-          'text',
-          'diagnostico',
-        ]) {
-          final value = parsed[key];
-          if (value is String && value.trim().isNotEmpty) {
-            return _normalizarRespuestaTutor(value);
-          }
+        final estructurada = _extraerRespuestaEstructurada(parsed);
+        if (estructurada != null && estructurada.isNotEmpty) {
+          return _normalizarRespuestaTutor(estructurada);
         }
       }
 
@@ -1292,6 +1281,7 @@ Devuelve SOLO JSON valido (sin markdown):
     }
   }
 
+  // ignore: unused_element
   String _construirPromptTutor({
     required String mensaje,
     required Map<String, dynamic> contextoFinal,
@@ -1458,7 +1448,7 @@ $instrucciones
         t.contains('que modelo eres') ||
         t.contains('quien eres');
     if (preguntaIdentidad) {
-      return 'Si. Este tutor usa DeepSeek y se conecta a tu progreso en Supabase para personalizar las recomendaciones. Si quieres, ahora mismo te propongo tu plan de hoy.';
+      return 'Si. Soy tu Tutor IA Personal con Gemini. Si inicias sesion puedo personalizar con tu progreso en Supabase; si no, te guio con un plan general de estudio.';
     }
 
     return null;
@@ -1492,6 +1482,15 @@ $instrucciones
     required String?userId,
     required Map<String, dynamic> contexto,
   }) async {
+    // Sin sesion valida evitamos rutas deterministicas que exigen BD personal
+    // y dejamos que el tutor responda en modo general via Edge Function.
+    if (_sesionInvalida(userId)) {
+      if (_esConsultaRanking(mensaje)) {
+        return 'Para decirte tu puesto exacto en el ranking necesito tu sesion activa. Inicia sesion y te digo tu posicion semanal e historica.';
+      }
+      return null;
+    }
+
     if (_esConsultaPlanDiario(mensaje)) {
       return await _resolverConsultaPlanDiario(userId: userId);
     }
@@ -2992,6 +2991,7 @@ $instrucciones
     return const <String, dynamic>{};
   }
 
+  // ignore: unused_element
   Future<Map<String, dynamic>> _contextoUsuarioChatDesdeBD(
     String?userId,
   ) async {
@@ -3152,6 +3152,79 @@ $instrucciones
         return _invocarTutorConAnon(prompt: prompt, mode: mode);
       }
     }
+  }
+
+  Future<void> _guardarEstadoTutorUsuario({
+    required String?userId,
+    required Map<String, dynamic> contexto,
+    required String ultimoMensaje,
+  }) async {
+    if (!SupabaseService.isInitialized) return;
+    if (userId == null || userId.isEmpty || userId == 'user_test_id') return;
+
+    final estadoParcial = _construirEstadoTutorParcial(
+      contexto: contexto,
+      ultimoMensaje: ultimoMensaje,
+    );
+    if (estadoParcial.isEmpty) return;
+
+    try {
+      await _supabase.rpc(
+        'fn_upsert_ia_tutor_estado_usuario',
+        params: {
+          'p_estado_parcial': estadoParcial,
+          'p_fuente': 'app',
+          'p_version': 1,
+        },
+      );
+    } catch (e) {
+      debugPrint('TutorIA: no se pudo guardar estado tutor JSON: $e');
+    }
+  }
+
+  Map<String, dynamic> _construirEstadoTutorParcial({
+    required Map<String, dynamic> contexto,
+    required String ultimoMensaje,
+  }) {
+    final contextoBd = _asMap(contexto['contexto_bd_usuario']);
+
+    final plan = _asMap(
+      contexto['plan'] ??
+          contexto['plan_hoy'] ??
+          contexto['plan_diario'] ??
+          contextoBd['plan_hoy'] ??
+          contextoBd['plan'],
+    );
+    final progreso = _asMap(
+      contexto['progreso'] ??
+          contexto['resumen_global'] ??
+          contexto['rendimiento_reciente'] ??
+          contextoBd['resumen_global'] ??
+          contextoBd['rendimiento_reciente'],
+    );
+    final diagnostico = _asMap(
+      contexto['diagnostico'] ??
+          contexto['panel_ia'] ??
+          contexto['analisis'] ??
+          contextoBd['diagnostico'],
+    );
+    final ranking = _asMap(
+      contexto['ranking_usuario'] ??contexto['ranking'] ??contextoBd['ranking_usuario'],
+    );
+
+    final metadata = <String, dynamic>{
+      'ultimo_mensaje': ultimoMensaje,
+      'origen': 'chat_tutor',
+      'updated_at_iso': DateTime.now().toIso8601String(),
+    };
+
+    return {
+      if (plan.isNotEmpty) 'plan_dia': plan,
+      if (progreso.isNotEmpty) 'progreso': progreso,
+      if (diagnostico.isNotEmpty) 'diagnostico': diagnostico,
+      if (ranking.isNotEmpty) 'ranking': ranking,
+      'metadata': metadata,
+    };
   }
 
   Future<FunctionResponse> _invocarTutorConAnon({
@@ -3800,7 +3873,7 @@ DATOS:
     return 'Briefing IA: $f materias en control y $d en mejora. Entra a Revisar para ejecutar el plan por materia.';
   }
 
-  // Panel IA (DeepSeek controla tarjetas y mensajes)
+  // Panel IA (Gemini controla tarjetas y mensajes)
   Future<Map<String, dynamic>> _generarPanelIA({
     required String nivel,
     required List<String> fortalezas,
@@ -3897,7 +3970,7 @@ REGLAS:
 
       return _normalizarPanel(parsed, nivel, debilidades);
     } catch (e) {
-      debugPrint('Error llamando a DeepSeek: $e');
+      debugPrint('Error llamando a Gemini: $e');
       return _panelBasico(nivel, debilidades);
     }
   }
@@ -4029,7 +4102,7 @@ REGLAS:
     }
   }
 
-  // Fallback en caso de que DeepSeek falle o no haya internet
+  // Fallback en caso de que Gemini falle o no haya internet
   String _generarDiagnosticoBasico(String nivel, List<String> debilidades) {
     if (debilidades.isEmpty || debilidades.first.contains('proceso')) {
       return "?Bienvenido! Empieza tus pr?cticas para que pueda analizar tu rendimiento.";
@@ -4103,15 +4176,74 @@ REGLAS:
 
     final parsed = _parsePanelJson(text);
     if (parsed != null) {
-      for (final key in const ['respuesta', 'mensaje', 'text', 'diagnostico']) {
-        final value = parsed[key];
-        if (value is String && value.trim().isNotEmpty) {
-          return value.trim();
-        }
+      final estructurada = _extraerRespuestaEstructurada(parsed);
+      if (estructurada != null && estructurada.isNotEmpty) {
+        return estructurada.trim();
       }
     }
 
     return text;
+  }
+
+  String? _extraerRespuestaEstructurada(Map<String, dynamic> parsed) {
+    for (final key in const ['respuesta', 'mensaje', 'text']) {
+      final value = parsed[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    String? campo(String key) {
+      final value = parsed[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+      return null;
+    }
+
+    final diagnostico = campo('diagnostico') ?? campo('Diagnostico');
+    final accionHoy = campo('accion_hoy') ??
+        campo('accionHoy') ??
+        campo('Accion_hoy') ??
+        campo('AccionHoy');
+    final control = campo('control') ?? campo('Control');
+    final seguimiento24h = campo('seguimiento_24h') ??
+        campo('seguimiento24h') ??
+        campo('Seguimiento_24h');
+
+    String? pasos;
+    final pasosRaw = parsed['pasos'] ?? parsed['Pasos'];
+    if (pasosRaw is String && pasosRaw.trim().isNotEmpty) {
+      pasos = pasosRaw.trim();
+    } else if (pasosRaw is List) {
+      final items = pasosRaw
+          .whereType<String>()
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (items.isNotEmpty) {
+        pasos = items
+            .asMap()
+            .entries
+            .map((e) => '${e.key + 1}) ${e.value}')
+            .join(' ');
+      }
+    }
+
+    final partes = <String>[
+      if (diagnostico != null) 'Diagnostico: $diagnostico',
+      if (accionHoy != null) 'Accion_hoy: $accionHoy',
+      if (pasos != null) 'Pasos: $pasos',
+      if (control != null) 'Control: $control',
+      if (seguimiento24h != null) 'Seguimiento_24h: $seguimiento24h',
+    ];
+
+    if (partes.isNotEmpty) {
+      return partes.join('\n');
+    }
+
+    final diagnosticoSolo = campo('diagnostico') ?? campo('Diagnostico');
+    if (diagnosticoSolo != null) return diagnosticoSolo;
+
+    return null;
   }
 
   String _mensajeErrorTutorDesdeFuncion(FunctionException e) {
@@ -4120,7 +4252,7 @@ REGLAS:
     final rateLimit = _detallePareceRateLimit(detalle);
 
     if (status == 429 || rateLimit) {
-      return 'El tutor IA esta con alta demanda ahora (limite temporal de DeepSeek). Intenta nuevamente en 1 o 2 minutos.';
+      return 'El tutor IA esta con alta demanda ahora (limite temporal de Gemini). Intenta nuevamente en 1 o 2 minutos.';
     }
 
     if (status == 401 || status == 403) {
@@ -4143,8 +4275,8 @@ REGLAS:
     }
 
     if (status == 502 || status == 503 || status == 504) {
-      final extra = detalle.isEmpty ?'Fallo al consultar DeepSeek.' : detalle;
-      return 'Error $status (DeepSeek): $extra';
+      final extra = detalle.isEmpty ?'Fallo al consultar Gemini.' : detalle;
+      return 'Error $status (Gemini): $extra';
     }
 
     final extra = detalle.isEmpty ?(e.reasonPhrase ??'Sin detalle') : detalle;

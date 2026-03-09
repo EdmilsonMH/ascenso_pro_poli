@@ -423,16 +423,21 @@ class ServicioNotificacionesProgramadas {
 
   /// Solicitar permisos de notificación (Android 13+)
   static Future<bool> solicitarPermisos() async {
-    final androidImplementation = _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    try {
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
 
-    if (androidImplementation != null) {
-      final granted = await androidImplementation
-          .requestNotificationsPermission();
-      return granted ?? false;
+      if (androidImplementation != null) {
+        final granted = await androidImplementation
+            .requestNotificationsPermission();
+        return granted ?? false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('No se pudo solicitar permisos de notificación: $e');
+      return false;
     }
-    return true;
   }
 }

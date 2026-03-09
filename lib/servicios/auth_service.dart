@@ -103,6 +103,7 @@ class AuthService {
   static final Map<String, dynamic> _mockProfile = {
     'id': 'mock-user-123',
     'email': 'demo@ascensopoli.pe',
+    'telefono': null,
     'nombre_completo': 'Oficial Demo',
     'nombres': 'Oficial',
     'apellido_paterno': 'Demo',
@@ -141,14 +142,14 @@ class AuthService {
       try {
         usuario = await _selectUsuarioByIdOrUserId(
           select:
-              'id, nombre_completo, nombres, apellido_paterno, apellido_materno, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, premium, fecha_registro, metadata',
+              'id, nombre_completo, nombres, apellido_paterno, apellido_materno, email, telefono, grado_actual, codigo_referido, referido_por_usuario_id, creditos, premium, fecha_registro, metadata',
           authUserId: user.id,
         );
       } catch (_) {
         // Compatibilidad con esquemas antiguos donde aun no existen columnas nuevas.
             usuario = await _selectUsuarioByIdOrUserId(
           select:
-              'id, nombre_completo, email, grado_actual, codigo_referido, referido_por_usuario_id, creditos, metadata',
+              'id, nombre_completo, email, telefono, grado_actual, codigo_referido, referido_por_usuario_id, creditos, metadata',
           authUserId: user.id,
         );
       }
@@ -192,6 +193,7 @@ class AuthService {
         'id': usuarioId,
         'usuario_id': usuarioId,
         'email': user.email ??usuario?['email'],
+        'telefono': usuario?['telefono'],
         'nombre_completo':
             partesNombre['nombre_completo'] ??_nombreDesdeAuth(user),
         'nombres': partesNombre['nombres'],
@@ -419,7 +421,7 @@ class AuthService {
     try {
       final existing = await _selectUsuarioByIdOrUserId(
         select:
-            'id, nombre_completo, nombres, apellido_paterno, apellido_materno, grado_actual, email, metadata',
+            'id, nombre_completo, nombres, apellido_paterno, apellido_materno, grado_actual, email, telefono, metadata',
         authUserId: user.id,
       );
 
@@ -468,6 +470,9 @@ class AuthService {
       }
       if (updates.containsKey('email')) {
         columnUpdates['email'] = updates['email'];
+      }
+      if (updates.containsKey('telefono')) {
+        columnUpdates['telefono'] = updates['telefono'];
       }
       if (updates.containsKey('grado_actual')) {
         columnUpdates['grado_actual'] = updates['grado_actual'];
@@ -832,26 +837,21 @@ class AuthService {
             apellidoMaternoFinal.isEmpty)) {
       final parts = nombreCompletoFinal.split(' ').where((p) => p.isNotEmpty).toList();
       if (parts.length >= 3) {
-        final maybeNombres = parts.sublist(0, parts.length - 2).join(' ');
-        if (nombresFinal.isEmpty) nombresFinal = maybeNombres;
-        if (apellidoPaternoFinal.isEmpty) {
-          apellidoPaternoFinal = parts[parts.length - 2];
-        }
-        if (apellidoMaternoFinal.isEmpty) {
-          apellidoMaternoFinal = parts[parts.length - 1];
-        }
+        if (apellidoPaternoFinal.isEmpty) apellidoPaternoFinal = parts[0];
+        if (apellidoMaternoFinal.isEmpty) apellidoMaternoFinal = parts[1];
+        if (nombresFinal.isEmpty) nombresFinal = parts.sublist(2).join(' ');
       } else if (parts.length == 2) {
-        if (nombresFinal.isEmpty) nombresFinal = parts[0];
-        if (apellidoPaternoFinal.isEmpty) apellidoPaternoFinal = parts[1];
+        if (apellidoPaternoFinal.isEmpty) apellidoPaternoFinal = parts[0];
+        if (nombresFinal.isEmpty) nombresFinal = parts[1];
       } else if (parts.length == 1) {
         if (nombresFinal.isEmpty) nombresFinal = parts[0];
       }
     }
 
     nombreCompletoFinal = [
-      nombresFinal,
       apellidoPaternoFinal,
       apellidoMaternoFinal,
+      nombresFinal,
     ].where((p) => p.isNotEmpty).join(' ');
     if (nombreCompletoFinal.isEmpty) nombreCompletoFinal = 'Usuario';
 

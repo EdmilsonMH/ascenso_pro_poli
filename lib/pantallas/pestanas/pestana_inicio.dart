@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../constantes/constantes_pnp.dart';
 import '../../servicios/auth_service.dart';
 import '../../servicios/servicio_preguntas.dart';
 import '../../servicios/servicio_progreso.dart';
@@ -109,51 +110,7 @@ class _PestanaInicioState extends State<PestanaInicio>
     return 'No activa: ranking agotado.$detalle';
   }
 
-  String _normalizarTexto(String value) {
-    var text = value.toLowerCase().trim();
-    const reemplazos = {
-      'á': 'a',
-      'é': 'e',
-      'í': 'i',
-      'ó': 'o',
-      'ú': 'u',
-      'ü': 'u',
-      'ñ': 'n',
-    };
-    reemplazos.forEach((origen, destino) {
-      text = text.replaceAll(origen, destino);
-    });
-    return text;
-  }
-
-  String _grupoPorGrado(String grado) {
-    final g = _normalizarTexto(grado);
-    if (g == 'so3' || g == 'so2' || g == 'so1') return 'Suboficiales';
-    if (g == 'sot3' || g == 'sot2' || g == 'sot1') {
-      return 'Suboficiales Tecnicos';
-    }
-    if (g == 'sob' || g == 'sos') return 'Suboficiales Superiores';
-    if (g == 'alferez' || g == 'teniente' || g == 'capitan') {
-      return 'Oficiales Subalternos';
-    }
-    if (g == 'mayor' || g == 'comandante' || g == 'coronel') {
-      return 'Oficiales Superiores';
-    }
-    if (g == 'general' || g == 'teniente general') {
-      return 'Oficiales Generales';
-    }
-    return '';
-  }
-
-  String _aliasNivelSuboficial(String grado) {
-    final g = _normalizarTexto(grado);
-    if (g == 'so3') return 'S3';
-    if (g == 'so2') return 'S2';
-    if (g == 'so1') return 'S1';
-    return grado.trim().toUpperCase();
-  }
-
-  String _construirTituloCabecera() {
+  String _construirTituloCabeceraPrincipal() {
     final categoria = widget.categoriaUsuario.trim();
     if (categoria.isEmpty) return 'CATEGORIA';
     final categoriaUpper = categoria.toUpperCase();
@@ -162,10 +119,8 @@ class _PestanaInicioState extends State<PestanaInicio>
       return categoriaUpper;
     }
 
-    final nivel = _aliasNivelSuboficial(grado);
-    final grupo = _grupoPorGrado(grado);
-    if (grupo.isEmpty) return nivel.toUpperCase();
-    return '${nivel.toUpperCase()} (${grupo.toUpperCase()})';
+    final nivel = ConstantesPNP.normalizarGradoCompleto(grado).toUpperCase();
+    return nivel;
   }
 
   Future<void> _cargarDatosUsuario() async {
@@ -204,7 +159,9 @@ class _PestanaInicioState extends State<PestanaInicio>
       _codigoReferido = (perfil?['codigo_referido'] as String? ?? '')
           .trim()
           .toUpperCase();
-      _gradoActual = (perfil?['grado_actual'] as String? ?? '').trim();
+      _gradoActual = ConstantesPNP.normalizarGradoCompleto(
+        (perfil?['grado_actual'] as String? ?? '').trim(),
+      );
       _metaDiariaMinutos = perfil?['meta_diaria_minutos'] as int? ?? 30;
       _premiumActivo = premiumActivo;
       _rankingPracticasUsadas = rankingUsadas;
@@ -241,7 +198,7 @@ class _PestanaInicioState extends State<PestanaInicio>
         return AlertDialog(
           title: const Text('Tutor IA Personal'),
           content: const Text(
-            'Para usar el Tutor IA Personal primero debes iniciar sesion o registrarte.',
+            'El Tutor IA Personal es solo para usuarios registrados. Inicia sesion o registrate para usarlo.',
           ),
           actions: [
             TextButton(
@@ -344,7 +301,8 @@ class _PestanaInicioState extends State<PestanaInicio>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const PantallaPlanTutorIAPersonal(),
+        builder: (context) =>
+            PantallaPlanTutorIAPersonal(esInvitado: widget.esInvitado),
       ),
     );
   }
@@ -385,7 +343,7 @@ class _PestanaInicioState extends State<PestanaInicio>
   }
 
   List<_TarjetaInicioItem> _tarjetasInicio() {
-    return [
+    final items = <_TarjetaInicioItem>[
       _TarjetaInicioItem(
         titulo: 'Banco de preguntas',
         descripcion: 'Refuerza lo que mas te cuesta.',
@@ -406,13 +364,6 @@ class _PestanaInicioState extends State<PestanaInicio>
         icono: Icons.school_outlined,
         color: const Color(0xFF8B46E8),
         onTap: _abrirPracticaGuiada,
-      ),
-      _TarjetaInicioItem(
-        titulo: 'Tutor IA personal',
-        descripcion: 'Resuelve dudas al instante.',
-        icono: Icons.psychology_alt_outlined,
-        color: const Color(0xFFD98A1E),
-        onTap: _abrirTutorIA,
       ),
       _TarjetaInicioItem(
         titulo: 'Balotario en audio',
@@ -443,6 +394,21 @@ class _PestanaInicioState extends State<PestanaInicio>
         onTap: _abrirAcertadas,
       ),
     ];
+
+    items.insert(
+      3,
+      _TarjetaInicioItem(
+        titulo: 'Tutor IA personal',
+        descripcion: widget.esInvitado
+            ? 'Solo para usuarios registrados.'
+            : 'Resuelve dudas al instante.',
+        icono: Icons.psychology_alt_outlined,
+        color: const Color(0xFFD98A1E),
+        onTap: _abrirTutorIA,
+      ),
+    );
+
+    return items;
   }
 
   @override
@@ -451,7 +417,7 @@ class _PestanaInicioState extends State<PestanaInicio>
     final colorSecundario = Theme.of(context).colorScheme.secondary;
     final scheme = Theme.of(context).colorScheme;
     final tarjetas = _tarjetasInicio();
-    final tituloCabecera = _construirTituloCabecera();
+    final tituloCabecera = _construirTituloCabeceraPrincipal();
     final subtituloCabecera = (!widget.esInvitado && _codigoReferido.isNotEmpty)
         ? 'CODIGO DE REFERIDO: $_codigoReferido'
         : 'CODIGO DE REFERIDO: SIN CODIGO';
@@ -478,25 +444,23 @@ class _PestanaInicioState extends State<PestanaInicio>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            tituloCabecera,
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.3,
-                              height: 0.95,
-                            ),
-                          ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 30,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        tituloCabecera,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
+                          height: 0.95,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Row(

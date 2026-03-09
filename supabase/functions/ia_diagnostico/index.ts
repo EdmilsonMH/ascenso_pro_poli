@@ -3,24 +3,25 @@
 /// <reference lib="dom" />
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-const PROVIDER_NAME = "deepseek";
+const PROVIDER_NAME = "gemini";
 const CACHE_TABLE = "ia_tutor_cache";
-const CACHE_TEMPLATE_VERSION = "v1";
+const TUTOR_STATE_TABLE = "ia_tutor_estado_usuario";
+const CACHE_TEMPLATE_VERSION = "v2";
 const TTL_SECONDS_CHAT = 90;
 const TTL_SECONDS_PANEL = 600;
-const MAX_OUTPUT_TOKENS = 768;
+const MAX_OUTPUT_TOKENS = 420;
 
 type Mode = "chat" | "panel";
 
-type DeepSeekCallResult = {
+type GeminiCallResult = {
   text: string;
   finishReason: string | null;
   modelUsed: string;
   raw: unknown;
 };
 
-type DeepSeekHttpError = {
-  kind: "deepseek_http";
+type GeminiHttpError = {
+  kind: "gemini_http";
   status: number;
   statusText: string;
   model: string;
@@ -140,6 +141,122 @@ function toSafeText(value: unknown): string {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
+function toShortText(value: unknown, maxChars = 220): string {
+  const txt = toSafeText(value);
+  if (txt.length <= maxChars) return txt;
+  return `${txt.slice(0, maxChars).trim()}...`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+function itemToText(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return toSafeText(value);
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const row = value as Record<string, unknown>;
+    return toSafeText(row["materia"] ?? row["nombre"] ?? row["id"] ?? "");
+  }
+  return "";
+}
+
+function toStringArray(value: unknown, max = 5): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => itemToText(v))
+    .filter((v) => v.length > 0)
+    .slice(0, max);
+}
+
+function normalizarEstadoTutorCompacto(estadoRaw: unknown) {
+  const estado = asRecord(estadoRaw);
+  const plan = asRecord(estado["plan_dia"] ?? estado["plan"]);
+  const progreso = asRecord(estado["progreso"] ?? estado["avance"]);
+  const diagnostico = asRecord(estado["diagnostico"]);
+  const ranking = asRecord(estado["ranking"]);
+
+  return {
+    plan_hoy: {
+      fecha: toSafeText(plan["fecha"] ?? plan["fecha_objetivo"]),
+      total_preguntas: toNumber(
+        plan["total_preguntas"] ?? plan["total_preguntas_dia"],
+      ),
+      nuevas: toNumber(plan["nuevas"] ?? plan["cantidad_nuevas"]),
+      repaso: toNumber(plan["repaso"] ?? plan["cantidad_repaso"]),
+      tiempo_minutos: toNumber(
+        plan["tiempo_minutos"] ?? plan["tiempo_practica"] ??
+          plan["tiempo_total_minutos"],
+      ),
+      materias_prioritarias: toStringArray(
+        plan["materias_prioritarias"] ?? plan["foco_materias"],
+        4,
+      ),
+    },
+    progreso: {
+      avance_pct: toNumber(progreso["avance_pct"] ?? progreso["progreso_pct"]),
+      racha_dias: toNumber(progreso["racha_dias"] ?? progreso["dias_consecutivos"]),
+      respondidas_hoy: toNumber(
+        progreso["respondidas_hoy"] ?? progreso["preguntas_hoy"],
+      ),
+      correctas_hoy: toNumber(progreso["correctas_hoy"]),
+    },
+    diagnostico: {
+      nivel: toSafeText(diagnostico["nivel"] ?? diagnostico["estado"]),
+      resumen: toShortText(
+        diagnostico["resumen"] ?? diagnostico["texto"] ??
+          diagnostico["diagnostico"],
+      ),
+      materias_riesgo: toStringArray(
+        diagnostico["materias_riesgo"] ?? diagnostico["debilidades"],
+        4,
+      ),
+    },
+    ranking: {
+      puesto_actual: toNumber(ranking["puesto_actual"] ?? ranking["posicion"]),
+      total_participantes: toNumber(
+        ranking["total_participantes"] ?? ranking["total"],
+      ),
+      percentil: toNumber(ranking["percentil"]),
+    },
+  };
+}
+
+async function obtenerEstadoTutorDesdeBD(
+  userId: string,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+) {
+  try {
+    const rows = await fetchSupabaseRows(
+      TUTOR_STATE_TABLE,
+      {
+        select: "usuario_id,estado,fuente,version,actualizado_at",
+        usuario_id: `eq.${userId}`,
+        limit: "1",
+      },
+      supabaseUrl,
+      serviceRoleKey,
+    );
+
+    const row = rows?.[0];
+    if (!row) return null;
+
+    return {
+      fuente: toSafeText(row?.fuente) || "app",
+      version: toNumber(row?.version, 1),
+      actualizado_at: toSafeText(row?.actualizado_at),
+      estado_compacto: normalizarEstadoTutorCompacto(row?.estado),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
 function contextoCacheEstable(contextoBD: any) {
   const perfil = contextoBD?.perfil ?? {};
   const resumen = contextoBD?.resumen_historial ?? {};
@@ -152,6 +269,8 @@ function contextoCacheEstable(contextoBD: any) {
   const criticas = Array.isArray(contextoBD?.preguntas_criticas)
     ? contextoBD.preguntas_criticas
     : [];
+  const tutorMemoria = asRecord(contextoBD?.tutor_memoria_usuario);
+  const estadoCompacto = asRecord(tutorMemoria["estado_compacto"]);
 
   return {
     perfil: {
@@ -185,6 +304,12 @@ function contextoCacheEstable(contextoBD: any) {
         pregunta_id: toSafeText(q?.pregunta_id),
         fallos: toNumber(q?.fallos),
       })),
+    tutor_memoria_usuario: {
+      plan_hoy: asRecord(estadoCompacto["plan_hoy"]),
+      progreso: asRecord(estadoCompacto["progreso"]),
+      diagnostico: asRecord(estadoCompacto["diagnostico"]),
+      ranking: asRecord(estadoCompacto["ranking"]),
+    },
   };
 }
 
@@ -329,7 +454,8 @@ function esError429(err: unknown): boolean {
   return details.includes("429") ||
     lower.includes("quota") ||
     lower.includes("rate limit") ||
-    lower.includes("too many requests");
+    lower.includes("too many requests") ||
+    lower.includes("resource_exhausted");
 }
 
 function respuestaPareceIncompleta(texto: string) {
@@ -346,11 +472,10 @@ function debeRegenerar(text: string, finishReason: string | null) {
   if (!t) return true;
   const fr = (finishReason ?? "").toLowerCase().trim();
   if (fr && fr !== "stop") return true;
-  if (t.length < 80) return false;
   return respuestaPareceIncompleta(t);
 }
 
-async function llamarDeepSeek({
+async function llamarGemini({
   apiKey,
   baseUrl,
   model,
@@ -360,22 +485,31 @@ async function llamarDeepSeek({
   baseUrl: string;
   model: string;
   prompt: string;
-}): Promise<DeepSeekCallResult> {
+}): Promise<GeminiCallResult> {
   const normalizedBase = baseUrl.replace(/\/+$/, "");
-  const url = `${normalizedBase}/chat/completions`;
+  const url =
+    `${normalizedBase}/models/${encodeURIComponent(model)}:generateContent?key=${
+      encodeURIComponent(apiKey)
+    }`;
 
   const payload = {
-    model,
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.35,
-    max_tokens: MAX_OUTPUT_TOKENS,
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.25,
+      topP: 0.9,
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+    },
   };
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -389,35 +523,34 @@ async function llamarDeepSeek({
       // keep raw text
     }
     throw {
-      kind: "deepseek_http",
+      kind: "gemini_http",
       status: response.status,
       statusText: response.statusText,
       model,
       details,
-    } as DeepSeekHttpError;
+    } as GeminiHttpError;
   }
 
   const data = await response.json();
-  const choice = data?.choices?.[0] ?? {};
-  const finishReason = choice?.finish_reason ?? null;
-  const content = choice?.message?.content;
-  const text = Array.isArray(content)
-    ? content
+  const candidate = data?.candidates?.[0] ?? {};
+  const finishReason = candidate?.finishReason ?? null;
+  const parts = Array.isArray(candidate?.content?.parts)
+    ? candidate.content.parts
+    : [];
+  const text = parts
       .map((p) => {
-        if (typeof p === "string") return p;
         if (typeof p?.text === "string") return p.text;
         return "";
       })
       .join("")
-      .trim()
-    : String(content ?? "").trim();
+      .trim();
 
   if (!text) {
     throw new Response(
       JSON.stringify({
-        error: "DeepSeek devolvio respuesta vacia",
+        error: "Gemini devolvio respuesta vacia",
         finishReason,
-        request_id: data?.id ?? null,
+        promptFeedback: data?.promptFeedback ?? null,
       }),
       {
         status: 502,
@@ -426,7 +559,8 @@ async function llamarDeepSeek({
     );
   }
 
-  return { text, finishReason, modelUsed: model, raw: data };
+  const modelUsed = toSafeText(data?.modelVersion) || model;
+  return { text, finishReason, modelUsed, raw: data };
 }
 
 function construirMensajeRateLimit(contextoBD: any) {
@@ -436,9 +570,9 @@ function construirMensajeRateLimit(contextoBD: any) {
     : "";
 
   if (primeraDebilidad) {
-    return `Tengo alta demanda de IA en este momento (limite temporal de DeepSeek). Mientras se libera, refuerza ${primeraDebilidad} durante 15 minutos y vuelve a escribirme.`;
+    return `Tengo alta demanda de IA en este momento (limite temporal de Gemini). Mientras se libera, refuerza ${primeraDebilidad} durante 15 minutos y vuelve a escribirme.`;
   }
-  return "Tengo alta demanda de IA en este momento (limite temporal de DeepSeek). Intenta nuevamente en 1 a 2 minutos.";
+  return "Tengo alta demanda de IA en este momento (limite temporal de Gemini). Intenta nuevamente en 1 a 2 minutos.";
 }
 
 function logEjecucion(data: Record<string, unknown>) {
@@ -494,63 +628,75 @@ async function obtenerContextoUsuarioDesdeBD(
   supabaseUrl: string,
   serviceRoleKey: string,
 ) {
-  const [perfilRows, estadisticaRows, dominiosRows, sesionesRows, respuestasRows] =
-    await Promise.all([
-      fetchSupabaseRows(
-        "perfil_usuario",
-        {
-          select:
-            "tasa_acierto_global,velocidad_promedio_segundos,dias_consecutivos_estudio",
-          usuario_id: `eq.${userId}`,
-          limit: "1",
-        },
-        supabaseUrl,
-        serviceRoleKey,
-      ),
-      fetchSupabaseRows(
-        "estadistica_usuario",
-        {
-          select: "tiempo_total_estudio_minutos",
-          usuario_id: `eq.${userId}`,
-          limit: "1",
-        },
-        supabaseUrl,
-        serviceRoleKey,
-      ),
-      fetchSupabaseRows(
-        "dominio_materia",
-        {
-          select: "tasa_dominio,materia:materia_id(nombre)",
-          usuario_id: `eq.${userId}`,
-          limit: "40",
-        },
-        supabaseUrl,
-        serviceRoleKey,
-      ),
-      fetchSupabaseRows(
-        "sesion_practica",
-        {
-          select:
-            "id,creado_at,fecha_inicio,fecha_fin,completada,total_preguntas_planeadas,preguntas_respondidas,preguntas_correctas,preguntas_incorrectas,preguntas_omitidas",
-          usuario_id: `eq.${userId}`,
-          order: "creado_at.desc",
-          limit: "24",
-        },
-        supabaseUrl,
-        serviceRoleKey,
-      ),
-      fetchSupabaseRows(
-        "respuesta_usuario",
-        {
-          select: "es_correcta,fue_omitida,respondida_at,pregunta_id",
-          usuario_id: `eq.${userId}`,
-          order: "respondida_at.desc",
-          limit: "120",
-        },
-        supabaseUrl,
-        serviceRoleKey,
-      ),
-    ]);
+  const estadoTutorPromise = obtenerEstadoTutorDesdeBD(
+    userId,
+    supabaseUrl,
+    serviceRoleKey,
+  );
+  const [
+    estadoTutor,
+    perfilRows,
+    estadisticaRows,
+    dominiosRows,
+    sesionesRows,
+    respuestasRows,
+  ] = await Promise.all([
+    estadoTutorPromise,
+    fetchSupabaseRows(
+      "perfil_usuario",
+      {
+        select:
+          "tasa_acierto_global,velocidad_promedio_segundos,dias_consecutivos_estudio",
+        usuario_id: `eq.${userId}`,
+        limit: "1",
+      },
+      supabaseUrl,
+      serviceRoleKey,
+    ),
+    fetchSupabaseRows(
+      "estadistica_usuario",
+      {
+        select: "tiempo_total_estudio_minutos",
+        usuario_id: `eq.${userId}`,
+        limit: "1",
+      },
+      supabaseUrl,
+      serviceRoleKey,
+    ),
+    fetchSupabaseRows(
+      "dominio_materia",
+      {
+        select: "tasa_dominio,materia:materia_id(nombre)",
+        usuario_id: `eq.${userId}`,
+        limit: "40",
+      },
+      supabaseUrl,
+      serviceRoleKey,
+    ),
+    fetchSupabaseRows(
+      "sesion_practica",
+      {
+        select:
+          "id,creado_at,fecha_inicio,fecha_fin,completada,total_preguntas_planeadas,preguntas_respondidas,preguntas_correctas,preguntas_incorrectas,preguntas_omitidas",
+        usuario_id: `eq.${userId}`,
+        order: "creado_at.desc",
+        limit: "24",
+      },
+      supabaseUrl,
+      serviceRoleKey,
+    ),
+    fetchSupabaseRows(
+      "respuesta_usuario",
+      {
+        select: "es_correcta,fue_omitida,respondida_at,pregunta_id",
+        usuario_id: `eq.${userId}`,
+        order: "respondida_at.desc",
+        limit: "120",
+      },
+      supabaseUrl,
+      serviceRoleKey,
+    ),
+  ]);
 
   const perfil = perfilRows?.[0] ?? {};
   const estadistica = estadisticaRows?.[0] ?? {};
@@ -649,7 +795,81 @@ async function obtenerContextoUsuarioDesdeBD(
     debilidades_materia: debilidades,
     sesiones_recientes: sesionesRecientes,
     preguntas_criticas: preguntasCriticas,
+    tutor_memoria_usuario: estadoTutor ?? null,
   };
+}
+
+function recortarTexto(value: string, maxChars = 900) {
+  const txt = String(value ?? "").trim();
+  if (txt.length <= maxChars) return txt;
+  return `${txt.slice(0, maxChars).trim()}...`;
+}
+
+function extraerMensajeUsuario(promptRaw: string) {
+  const raw = String(promptRaw ?? "").trim();
+  if (!raw) return "";
+
+  const matchConComillas = /MENSAJE DEL ESTUDIANTE:\s*"([\s\S]*?)"\s*(?:REGLAS:|$)/i
+    .exec(raw);
+  if (matchConComillas?.[1]) {
+    return recortarTexto(matchConComillas[1], 700);
+  }
+
+  const matchSinComillas = /MENSAJE DEL ESTUDIANTE:\s*([\s\S]*?)\s*(?:REGLAS:|$)/i
+    .exec(raw);
+  if (matchSinComillas?.[1]) {
+    return recortarTexto(matchSinComillas[1], 700);
+  }
+
+  const matchResponder = /MENSAJE A RESPONDER:\s*([\s\S]*)$/i.exec(raw);
+  if (matchResponder?.[1]) {
+    return recortarTexto(matchResponder[1], 700);
+  }
+
+  return recortarTexto(raw, 700);
+}
+
+function construirPromptTutorFinal({
+  mensajeUsuario,
+  mode,
+  contextoBD,
+}: {
+  mensajeUsuario: string;
+  mode: Mode;
+  contextoBD: any;
+}) {
+  const contextoCompacto = contextoCacheEstable(contextoBD ?? {});
+  const formato =
+    mode === "panel"
+      ? "80 a 130 palabras"
+      : "90 a 150 palabras";
+
+  return `
+Eres el Tutor IA Personal para preparacion de ascenso PNP.
+Tu trabajo es entrenar al estudiante con acciones concretas, medibles y enfocadas en examen.
+No respondas como chatbot general ni menciones politicas internas del modelo.
+
+CONTEXTO_USUARIO_JSON:
+${JSON.stringify(contextoCompacto)}
+
+CONSULTA_DEL_USUARIO:
+${mensajeUsuario}
+
+INSTRUCCIONES:
+- Personaliza usando el contexto. Prioriza debilidades_materia y preguntas_criticas si existen.
+- Si existe tutor_memoria_usuario, usa su plan_hoy/progreso/diagnostico/ranking para responder mas preciso.
+- Si faltan datos para decidir, dilo brevemente y pide 1 dato puntual en "Control".
+- Evita relleno, frases vacias y explicaciones largas.
+- No uses markdown ni bloques de codigo.
+- Longitud total: ${formato}.
+
+FORMATO OBLIGATORIO DE SALIDA (texto plano):
+Diagnostico: ...
+Accion_hoy: ...
+Pasos: 1) ... 2) ... 3) ...
+Control: ...
+Seguimiento_24h: ...
+`.trim();
 }
 
 serve(async (req) => {
@@ -750,23 +970,26 @@ serve(async (req) => {
     }
   }
 
-  const promptFinal = contextoBD
-    ? `CONTEXTO REAL DESDE SUPABASE (HISTORIAL DEL USUARIO):
-${JSON.stringify(contextoBD)}
+  const promptOriginal = prompt.trim();
+  const promptLower = promptOriginal.toLowerCase();
+  const promptEsEstructurado = promptLower.includes("devuelve solo json") ||
+    promptLower.includes("no agregues texto fuera del json") ||
+    promptLower.includes("solo una frase corta");
 
-INSTRUCCIONES ADICIONALES:
-- Usa este contexto para personalizar al maximo tu respuesta.
-- Si detectas debilidades, prioriza acciones sobre esas materias.
-- Si el usuario pide plan, propon pasos con tiempos y metas medibles.
+  const mensajeUsuario = extraerMensajeUsuario(promptOriginal) || promptOriginal;
+  const promptFinal = promptEsEstructurado
+    ? promptOriginal
+    : construirPromptTutorFinal({
+      mensajeUsuario,
+      mode,
+      contextoBD,
+    });
+  const promptParaCache = promptEsEstructurado ? promptOriginal : mensajeUsuario;
 
-MENSAJE A RESPONDER:
-${prompt}`
-    : prompt;
-
-  const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "DEEPSEEK_API_KEY no configurada" }),
+      JSON.stringify({ error: "GEMINI_API_KEY no configurada" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -774,8 +997,9 @@ ${prompt}`
     );
   }
 
-  const baseUrl = Deno.env.get("DEEPSEEK_BASE_URL") ?? "https://api.deepseek.com/v1";
-  const model = Deno.env.get("DEEPSEEK_MODEL") ?? "deepseek-chat";
+  const baseUrl = Deno.env.get("GEMINI_BASE_URL") ??
+    "https://generativelanguage.googleapis.com/v1beta";
+  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-1.5-flash";
 
   const cacheHabilitada = Boolean(supabaseUrl && serviceRoleKey && userId);
   const ttlSeconds = ttlSegundosPorModo(mode);
@@ -789,7 +1013,7 @@ ${prompt}`
       const firma = await firmaCache({
         userId,
         mode,
-        prompt,
+        prompt: promptParaCache,
         contextoEstable,
         model,
       });
@@ -854,7 +1078,7 @@ ${prompt}`
       }
     }
 
-    const first = await llamarDeepSeek({
+    const first = await llamarGemini({
       apiKey,
       baseUrl,
       model,
@@ -867,22 +1091,39 @@ ${prompt}`
 
     if (debeRegenerar(finalText, finalReason)) {
       regenerado = true;
-      const promptRegenerado = `
+      const promptRegenerado = promptEsEstructurado
+        ? `
 La respuesta anterior se corto o quedo incompleta.
-Reescribe una version final COMPLETA y natural, sin cortes.
+Reescribe una version FINAL COMPLETA respetando exactamente el formato solicitado en el prompt original.
+No agregues explicaciones fuera del formato pedido.
+
+PROMPT ORIGINAL:
+${promptOriginal}
+
+RESPUESTA PARCIAL:
+${finalText}
+`
+        : `
+La respuesta anterior se corto o quedo incompleta.
+Reescribe una version final COMPLETA con formato de tutor.
 
 PREGUNTA DEL USUARIO:
-${prompt}
+${mensajeUsuario}
 
 RESPUESTA PARCIAL:
 ${finalText}
 
 REGLAS:
-- 2 a 6 frases completas.
-- Tono humano, claro y directo.
+- Mantener exactamente este formato:
+  Diagnostico: ...
+  Accion_hoy: ...
+  Pasos: 1) ... 2) ... 3) ...
+  Control: ...
+  Seguimiento_24h: ...
+- Tono humano, claro y directo, sin markdown.
 - No uses markdown.
 `;
-      const second = await llamarDeepSeek({
+      const second = await llamarGemini({
         apiKey,
         baseUrl,
         model,
@@ -939,7 +1180,7 @@ REGLAS:
         text: construirMensajeRateLimit(contextoBD),
         finishReason: "RATE_LIMIT",
         degraded: true,
-        reason: "deepseek_quota",
+        reason: "gemini_quota",
         provider: PROVIDER_NAME,
         model,
         cached: false,
@@ -989,21 +1230,21 @@ REGLAS:
       );
     }
 
-    if (e && typeof e === "object" && (e as any).kind === "deepseek_http") {
-      const err = e as DeepSeekHttpError;
+    if (e && typeof e === "object" && (e as any).kind === "gemini_http") {
+      const err = e as GeminiHttpError;
       logEjecucion({
         mode,
         cache_hit: false,
         latency_ms: Date.now() - startedAt,
         provider: PROVIDER_NAME,
         model: err.model,
-        status: "deepseek_http_error",
+        status: "gemini_http_error",
         http_status: err.status,
       });
 
       return new Response(
         JSON.stringify({
-          error: "Error al llamar a DeepSeek",
+          error: "Error al llamar a Gemini",
           status: err.status,
           statusText: err.statusText,
           provider: PROVIDER_NAME,
@@ -1029,7 +1270,7 @@ REGLAS:
 
     return new Response(
       JSON.stringify({
-        error: "Fallo inesperado llamando a DeepSeek",
+        error: "Fallo inesperado llamando a Gemini",
         details: String(e),
         provider: PROVIDER_NAME,
         model,

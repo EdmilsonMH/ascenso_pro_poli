@@ -25,7 +25,10 @@ class PantallaRegistro extends StatefulWidget {
 class _PantallaRegistroState extends State<PantallaRegistro> {
   String _categoriaSeleccionada = ConstantesPNP.categorias.first;
   String _gradoSeleccionado = '';
-  String _especialidadSeleccionada = ConstantesPNP.especialidades.first;
+  String _especialidadSeleccionada =
+      ConstantesPNP.obtenerEspecialidadesParaCategoria(
+        ConstantesPNP.categorias.first,
+      ).first;
 
   final _claveFormulario = GlobalKey<FormState>();
 
@@ -38,6 +41,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
   final _controladorConfirmPassword = TextEditingController();
   final _controladorMetaDiaria = TextEditingController(text: '30');
   final _controladorCodigoReferido = TextEditingController();
+  final _controladorEspecialidad = TextEditingController();
 
   bool _cargando = false;
 
@@ -52,9 +56,17 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     final gradosIniciales = ConstantesPNP.obtenerGradosParaCategoria(
       _categoriaSeleccionada,
     );
+    final especialidadesIniciales =
+        ConstantesPNP.obtenerEspecialidadesParaCategoria(
+          _categoriaSeleccionada,
+        );
     _gradoSeleccionado = gradosIniciales.isNotEmpty
         ? gradosIniciales.first
         : '';
+    _especialidadSeleccionada = especialidadesIniciales.isNotEmpty
+        ? especialidadesIniciales.first
+        : '';
+    _controladorEspecialidad.text = _especialidadSeleccionada;
 
     if (widget.completarPerfilGoogle) {
       _precargarDatosGoogle();
@@ -114,18 +126,27 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       final gradosCategoria = ConstantesPNP.obtenerGradosParaCategoria(
         _categoriaSeleccionada,
       );
-      final grado = profile?['grado_actual']?.toString();
-      if (grado != null && gradosCategoria.contains(grado)) {
+      final grado = ConstantesPNP.normalizarGradoCompleto(
+        profile?['grado_actual']?.toString() ??'',
+      );
+      if (gradosCategoria.contains(grado)) {
         _gradoSeleccionado = grado;
       } else if (gradosCategoria.isNotEmpty) {
         _gradoSeleccionado = gradosCategoria.first;
       }
 
       final especialidad = profile?['especialidad']?.toString();
+      final especialidadesCategoria =
+          ConstantesPNP.obtenerEspecialidadesParaCategoria(
+            _categoriaSeleccionada,
+          );
       if (especialidad != null &&
-          ConstantesPNP.especialidades.contains(especialidad)) {
+          especialidadesCategoria.contains(especialidad)) {
         _especialidadSeleccionada = especialidad;
+      } else if (especialidadesCategoria.isNotEmpty) {
+        _especialidadSeleccionada = especialidadesCategoria.first;
       }
+      _controladorEspecialidad.text = _especialidadSeleccionada;
 
       final metaDiaria = int.tryParse(
         (profile?['meta_diaria_minutos'] ??'').toString(),
@@ -146,6 +167,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     _controladorConfirmPassword.dispose();
     _controladorMetaDiaria.dispose();
     _controladorCodigoReferido.dispose();
+    _controladorEspecialidad.dispose();
     super.dispose();
   }
 
@@ -167,6 +189,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
 
   Future<void> _manejarRegistro() async {
     if (_cargando) return;
+    _normalizarEspecialidadDesdeTexto();
     if (!_claveFormulario.currentState!.validate()) return;
 
     setState(() {
@@ -178,7 +201,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     final nombres = _controladorNombres.text.trim();
     final apellidoPaterno = _controladorApellidoPaterno.text.trim();
     final apellidoMaterno = _controladorApellidoMaterno.text.trim();
-    final nombreCompleto = [nombres, apellidoPaterno, apellidoMaterno]
+    final nombreCompleto = [apellidoPaterno, apellidoMaterno, nombres]
         .where((p) => p.isNotEmpty)
         .join(' ');
 
@@ -376,16 +399,16 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     final partes = limpio.split(' ').where((p) => p.isNotEmpty).toList();
     if (partes.length >= 3) {
       return {
-        'nombres': partes.sublist(0, partes.length - 2).join(' '),
-        'apellido_paterno': partes[partes.length - 2],
-        'apellido_materno': partes[partes.length - 1],
+        'apellido_paterno': partes[0],
+        'apellido_materno': partes[1],
+        'nombres': partes.sublist(2).join(' '),
       };
     }
 
     if (partes.length == 2) {
       return {
-        'nombres': partes[0],
-        'apellido_paterno': partes[1],
+        'apellido_paterno': partes[0],
+        'nombres': partes[1],
         'apellido_materno': '',
       };
     }
@@ -395,6 +418,26 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
       'apellido_paterno': '',
       'apellido_materno': '',
     };
+  }
+
+  void _normalizarEspecialidadDesdeTexto() {
+    final especialidades = ConstantesPNP.obtenerEspecialidadesParaCategoria(
+      _categoriaSeleccionada,
+    );
+    final texto = _controladorEspecialidad.text.trim();
+    final exacta = especialidades.where(
+      (e) => e.toLowerCase() == texto.toLowerCase(),
+    );
+    if (exacta.isNotEmpty) {
+      _especialidadSeleccionada = exacta.first;
+      _controladorEspecialidad.text = _especialidadSeleccionada;
+      return;
+    }
+    if (!especialidades.contains(_especialidadSeleccionada) &&
+        especialidades.isNotEmpty) {
+      _especialidadSeleccionada = especialidades.first;
+      _controladorEspecialidad.text = _especialidadSeleccionada;
+    }
   }
 
   Widget _buildSelectorCategoria() {
@@ -418,7 +461,13 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                     final grados = ConstantesPNP.obtenerGradosParaCategoria(
                       categoria,
                     );
+                    final especialidades = ConstantesPNP
+                        .obtenerEspecialidadesParaCategoria(categoria);
                     _gradoSeleccionado = grados.isNotEmpty ?grados.first : '';
+                    _especialidadSeleccionada = especialidades.isNotEmpty
+                        ? especialidades.first
+                        : '';
+                    _controladorEspecialidad.text = _especialidadSeleccionada;
                   });
                 },
               ),
@@ -465,25 +514,73 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
   }
 
   Widget _buildDropdownEspecialidad() {
+    final especialidades = ConstantesPNP.obtenerEspecialidadesParaCategoria(
+      _categoriaSeleccionada,
+    );
+    if (especialidades.isEmpty) {
+      return const Text('Sin especialidades disponibles');
+    }
+    if (!especialidades.contains(_especialidadSeleccionada)) {
+      _especialidadSeleccionada = especialidades.first;
+    }
+    if (_controladorEspecialidad.text.trim().isEmpty ||
+        !especialidades.any(
+          (e) =>
+              e.toLowerCase() ==
+              _controladorEspecialidad.text.trim().toLowerCase(),
+        )) {
+      _controladorEspecialidad.text = _especialidadSeleccionada;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _especialidadSeleccionada,
-          isExpanded: true,
-          items: ConstantesPNP.especialidades
-              .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
-              .toList(),
-          onChanged: (val) {
-            if (val == null) return;
-            setState(() => _especialidadSeleccionada = val);
-          },
-        ),
+      child: Autocomplete<String>(
+        key: ValueKey('especialidad_${_categoriaSeleccionada}_$_especialidadSeleccionada'),
+        initialValue: TextEditingValue(text: _controladorEspecialidad.text),
+        optionsBuilder: (TextEditingValue textEditingValue) {
+          final query = textEditingValue.text.trim().toLowerCase();
+          if (query.isEmpty) return especialidades;
+          return especialidades.where(
+            (e) => e.toLowerCase().contains(query),
+          );
+        },
+        onSelected: (String seleccion) {
+          setState(() {
+            _especialidadSeleccionada = seleccion;
+            _controladorEspecialidad.text = seleccion;
+          });
+        },
+        fieldViewBuilder:
+            (context, textEditingController, focusNode, onFieldSubmitted) {
+              return TextFormField(
+                controller: textEditingController,
+                focusNode: focusNode,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Escribe tu especialidad',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (value) {
+                  _controladorEspecialidad.text = value;
+                },
+                validator: (value) {
+                  final txt = (value ??'').trim().toLowerCase();
+                  final existe = especialidades.any(
+                    (e) => e.toLowerCase() == txt,
+                  );
+                  if (!existe) {
+                    return 'Selecciona una especialidad de la lista';
+                  }
+                  return null;
+                },
+              );
+            },
       ),
     );
   }
