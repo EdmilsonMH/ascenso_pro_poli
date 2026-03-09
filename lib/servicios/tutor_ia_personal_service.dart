@@ -732,9 +732,13 @@ class TutorIAPersonalService {
 
       final promedio = _promedio(tiempos);
       final impulsiva = tiempos.where((t) => t < 8).length;
+      final optimas = tiempos.where((t) => t >= 8 && t <= 20).length;
+      final lentas = tiempos.where((t) => t > 20).length;
       final pctImpulsiva = tiempos.isEmpty
           ? 0
           : (impulsiva * 100.0 / tiempos.length);
+      final pctOptima = tiempos.isEmpty ? 0 : (optimas * 100.0 / tiempos.length);
+      final pctLenta = tiempos.isEmpty ? 0 : (lentas * 100.0 / tiempos.length);
       final clasificacion = promedio < 8
           ? 'Impulsivo'
           : (promedio <= 20 ?'Optimo' : 'Lento');
@@ -744,7 +748,7 @@ class TutorIAPersonalService {
                 ? 'Tu ritmo es saludable. Mantiene precision con lectura activa.'
                 : 'Acelera descarte de opciones para ganar tiempo por pregunta.');
 
-      final Map<String, List<double>> tiemposPorMateria = {};
+      final Map<String, Map<String, dynamic>> tiemposPorMateria = {};
       for (final row in rows) {
         final tiempo = _toDouble(row['tiempo_total_respuesta']) ??0;
         if (tiempo <= 0) continue;
@@ -753,18 +757,60 @@ class TutorIAPersonalService {
         final materia = _asMap(pregunta['materia']);
         final nombre = (materia['nombre'] ??'').toString().trim();
         if (nombre.isEmpty) continue;
-        tiemposPorMateria.putIfAbsent(nombre, () => <double>[]).add(tiempo);
+        final bucket = tiemposPorMateria.putIfAbsent(
+          nombre,
+          () => <String, dynamic>{
+            'total': 0,
+            'suma': 0.0,
+            'impulsivas': 0,
+            'optimas': 0,
+            'lentas': 0,
+            'correctas': 0,
+          },
+        );
+        bucket['total'] = _toInt(bucket['total']) + 1;
+        bucket['suma'] = (_toDouble(bucket['suma']) ??0) + tiempo;
+        if (tiempo < 8) {
+          bucket['impulsivas'] = _toInt(bucket['impulsivas']) + 1;
+        } else if (tiempo <= 20) {
+          bucket['optimas'] = _toInt(bucket['optimas']) + 1;
+        } else {
+          bucket['lentas'] = _toInt(bucket['lentas']) + 1;
+        }
+        if (row['es_correcta'] == true) {
+          bucket['correctas'] = _toInt(bucket['correctas']) + 1;
+        }
       }
 
       final rankingMaterias =
           tiemposPorMateria.entries.map((entry) {
-            final lista = entry.value;
-            final total = lista.fold<double>(0.0, (a, b) => a + b);
+            final stats = entry.value;
+            final totalPreguntas = _toInt(stats['total']);
+            final total = _toDouble(stats['suma']) ??0;
+            final prom = totalPreguntas > 0 ? (total / totalPreguntas) : 0.0;
+            final imp = _toInt(stats['impulsivas']);
+            final opt = _toInt(stats['optimas']);
+            final len = _toInt(stats['lentas']);
+            final cor = _toInt(stats['correctas']);
+            final pctImp = totalPreguntas > 0 ? (imp * 100.0 / totalPreguntas) : 0.0;
+            final pctOpt = totalPreguntas > 0 ? (opt * 100.0 / totalPreguntas) : 0.0;
+            final pctLen = totalPreguntas > 0 ? (len * 100.0 / totalPreguntas) : 0.0;
+            final tasaAcierto = totalPreguntas > 0
+                ? (cor * 100.0 / totalPreguntas)
+                : 0.0;
+            final clase = prom < 8
+                ? 'Impulsivo'
+                : (prom <= 20 ? 'Optimo' : 'Lento');
             return <String, dynamic>{
               'materia': entry.key,
-              'promedio_segundos': _promedio(lista),
+              'promedio_segundos': prom,
               'total_segundos': total,
-              'preguntas': lista.length,
+              'preguntas': totalPreguntas,
+              'pct_impulsiva': pctImp,
+              'pct_optima': pctOpt,
+              'pct_lenta': pctLen,
+              'tasa_acierto': tasaAcierto,
+              'clasificacion': clase,
             };
           }).toList()..sort((a, b) {
             final aProm = _toDouble(a['promedio_segundos']) ??0;
@@ -808,6 +854,20 @@ class TutorIAPersonalService {
         'color': '#BBF7D0',
         'icono': 'bolt',
         'expandable': true,
+        'metricas_velocidad': {
+          'promedio_segundos': promedio,
+          'clasificacion': clasificacion,
+          'total_respuestas': tiempos.length,
+          'impulsivas': impulsiva,
+          'optimas': optimas,
+          'lentas': lentas,
+          'pct_impulsiva': pctImpulsiva,
+          'pct_optima': pctOptima,
+          'pct_lenta': pctLenta,
+          'rango_optimo_min': 8,
+          'rango_optimo_max': 20,
+          'recomendacion': recomendacion,
+        },
         if (rankingMaterias.isNotEmpty) 'materias_tiempo': rankingMaterias,
       };
     } catch (_) {

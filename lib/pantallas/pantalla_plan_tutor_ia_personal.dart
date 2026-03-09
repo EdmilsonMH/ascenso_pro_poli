@@ -1793,10 +1793,38 @@ class _PantallaPlanTutorIAPersonalState
     );
   }
 
+  Future<void> _abrirCoachVelocidad() async {
+    if (!mounted) return;
+    final req = await Navigator.push<_CoachVelocidadPracticaRequest>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _PantallaCoachVelocidad(
+          userId: _userId,
+          iaService: _iaService,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    if (req == null) return;
+
+    await _iniciarPractica(
+      cantidad: req.cantidad,
+      tiempoLimite: req.tiempoMinutos,
+      materia: req.materia,
+      esPracticaGuiada: true,
+    );
+  }
+
   Future<void> _ejecutarInsightCard(TutorInsightCard card) async {
     final id = card.id.toLowerCase().trim();
     if (id == 'analisis_perfil') {
       await _abrirMapaTemasSemaforo();
+      return;
+    }
+
+    if (id == 'coach_velocidad') {
+      await _abrirCoachVelocidad();
       return;
     }
 
@@ -3463,6 +3491,546 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _CoachVelocidadPracticaRequest {
+  final int cantidad;
+  final int tiempoMinutos;
+  final String? materia;
+
+  const _CoachVelocidadPracticaRequest({
+    required this.cantidad,
+    required this.tiempoMinutos,
+    this.materia,
+  });
+}
+
+class _PantallaCoachVelocidad extends StatefulWidget {
+  final String userId;
+  final TutorIAPersonalService iaService;
+
+  const _PantallaCoachVelocidad({
+    required this.userId,
+    required this.iaService,
+  });
+
+  @override
+  State<_PantallaCoachVelocidad> createState() => _PantallaCoachVelocidadState();
+}
+
+class _PantallaCoachVelocidadState extends State<_PantallaCoachVelocidad> {
+  bool _cargando = true;
+  String? _error;
+  Map<String, dynamic> _card = const <String, dynamic>{};
+  Map<String, dynamic> _metricas = const <String, dynamic>{};
+  List<Map<String, dynamic>> _materias = const <Map<String, dynamic>>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  int _toInt(dynamic value, [int fallback = 0]) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  double _toDouble(dynamic value, [double fallback = 0.0]) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  String _clasificacionPorPromedio(double promedio) {
+    if (promedio < 8) return 'Impulsivo';
+    if (promedio <= 20) return 'Optimo';
+    return 'Lento';
+  }
+
+  String _extraerRecomendacion(String detalle) {
+    final idx = detalle.toLowerCase().lastIndexOf('recomendacion:');
+    if (idx < 0) return '';
+    return detalle.substring(idx + 'recomendacion:'.length).trim();
+  }
+
+  Map<String, dynamic> _inferirMetricasDesdeMaterias(
+    List<Map<String, dynamic>> materias,
+    Map<String, dynamic> card,
+  ) {
+    if (materias.isEmpty) {
+      return const <String, dynamic>{};
+    }
+
+    var totalPreguntas = 0;
+    var totalSegundos = 0.0;
+    var impulsivas = 0;
+    var lentas = 0;
+
+    for (final m in materias) {
+      final preguntas = _toInt(m['preguntas']);
+      if (preguntas <= 0) continue;
+      final prom = _toDouble(m['promedio_segundos']);
+      final impPct = _toDouble(m['pct_impulsiva']);
+      final lenPct = _toDouble(m['pct_lenta']);
+
+      totalPreguntas += preguntas;
+      totalSegundos += prom * preguntas;
+      impulsivas += ((impPct / 100) * preguntas).round();
+      lentas += ((lenPct / 100) * preguntas).round();
+    }
+
+    if (totalPreguntas <= 0) {
+      return const <String, dynamic>{};
+    }
+
+    final promedio = totalSegundos / totalPreguntas;
+    final optimas = (totalPreguntas - impulsivas - lentas).clamp(0, totalPreguntas);
+    final pctImp = impulsivas * 100.0 / totalPreguntas;
+    final pctLen = lentas * 100.0 / totalPreguntas;
+    final pctOpt = optimas * 100.0 / totalPreguntas;
+    final clasificacion = _clasificacionPorPromedio(promedio);
+    final recomendacion = _extraerRecomendacion((card['detalle'] ?? '').toString());
+
+    return {
+      'promedio_segundos': promedio,
+      'clasificacion': clasificacion,
+      'total_respuestas': totalPreguntas,
+      'impulsivas': impulsivas,
+      'optimas': optimas,
+      'lentas': lentas,
+      'pct_impulsiva': pctImp,
+      'pct_optima': pctOpt,
+      'pct_lenta': pctLen,
+      'rango_optimo_min': 8,
+      'rango_optimo_max': 20,
+      'recomendacion': recomendacion,
+    };
+  }
+
+  Future<void> _cargar() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+
+    try {
+      final card = await widget.iaService.obtenerAnalisisVelocidadEstructurado(
+        userId: widget.userId,
+      );
+      final materiasRaw = card['materias_tiempo'];
+      final materias = materiasRaw is List
+          ? materiasRaw
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : <Map<String, dynamic>>[];
+
+      final metricasRaw = card['metricas_velocidad'];
+      final metricas = metricasRaw is Map
+          ? Map<String, dynamic>.from(metricasRaw)
+          : _inferirMetricasDesdeMaterias(materias, card);
+
+      if (!mounted) return;
+      setState(() {
+        _card = card;
+        _materias = materias;
+        _metricas = metricas;
+        _cargando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _cargando = false;
+      });
+    }
+  }
+
+  Color _colorClasificacion(String clasificacion) {
+    final c = clasificacion.toLowerCase();
+    if (c.contains('impuls')) return const Color(0xFFB45309);
+    if (c.contains('lent')) return const Color(0xFFB91C1C);
+    return const Color(0xFF166534);
+  }
+
+  Color _fondoClasificacion(String clasificacion) {
+    final c = clasificacion.toLowerCase();
+    if (c.contains('impuls')) return const Color(0xFFFFF7ED);
+    if (c.contains('lent')) return const Color(0xFFFEF2F2);
+    return const Color(0xFFF0FDF4);
+  }
+
+  int _sugerirCantidad(Map<String, dynamic> materia) {
+    final preguntas = _toInt(materia['preguntas']);
+    if (preguntas >= 80) return 20;
+    if (preguntas >= 30) return 15;
+    return 12;
+  }
+
+  int _sugerirTiempo(double promedio) {
+    if (promedio > 20) return 30;
+    if (promedio < 8) return 25;
+    return 20;
+  }
+
+  Widget _chipMetrica(String titulo, double porcentaje, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        '$titulo ${porcentaje.toStringAsFixed(1)}%',
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResumen() {
+    final promedio = _toDouble(_metricas['promedio_segundos']);
+    final total = _toInt(_metricas['total_respuestas']);
+    final clasificacion = (_metricas['clasificacion'] ?? 'Sin datos').toString();
+    final pctImp = _toDouble(_metricas['pct_impulsiva']);
+    final pctOpt = _toDouble(_metricas['pct_optima']);
+    final pctLen = _toDouble(_metricas['pct_lenta']);
+    final recomendacion = (_metricas['recomendacion'] ?? '').toString().trim();
+    final color = _colorClasificacion(clasificacion);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _fondoClasificacion(clasificacion),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Estado actual: ${clasificacion.toUpperCase()}',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Promedio: ${promedio.toStringAsFixed(1)} seg/preg · Muestra: $total respuestas.',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: const Color(0xFF1F2937),
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _chipMetrica('Impulsivo', pctImp, const Color(0xFFB45309)),
+              _chipMetrica('Óptimo', pctOpt, const Color(0xFF166534)),
+              _chipMetrica('Lento', pctLen, const Color(0xFFB91C1C)),
+            ],
+          ),
+          if (recomendacion.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Recomendación IA: $recomendacion',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF334155),
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccionesInteligentes() {
+    final ordenPromedio = [..._materias]
+      ..sort(
+        (a, b) => _toDouble(
+          b['promedio_segundos'],
+        ).compareTo(_toDouble(a['promedio_segundos'])),
+      );
+    final ordenImpulsividad = [..._materias]
+      ..sort(
+        (a, b) => _toDouble(
+          b['pct_impulsiva'],
+        ).compareTo(_toDouble(a['pct_impulsiva'])),
+      );
+
+    final materiaLenta = ordenPromedio.isNotEmpty ? ordenPromedio.first : null;
+    final materiaImpulsiva = ordenImpulsividad.isNotEmpty
+        ? ordenImpulsividad.first
+        : null;
+
+    final lentaValida =
+        materiaLenta != null && _toDouble(materiaLenta['promedio_segundos']) > 20;
+    final impulsivaValida =
+        materiaImpulsiva != null &&
+        _toDouble(materiaImpulsiva['pct_impulsiva']) >= 35 &&
+        _toInt(materiaImpulsiva['preguntas']) >= 5;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Acciones inteligentes',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (lentaValida)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  final materia = (materiaLenta['materia'] ?? '').toString().trim();
+                  Navigator.pop(
+                    context,
+                    _CoachVelocidadPracticaRequest(
+                      cantidad: _sugerirCantidad(materiaLenta),
+                      tiempoMinutos: _sugerirTiempo(
+                        _toDouble(materiaLenta['promedio_segundos']),
+                      ),
+                      materia: materia.isEmpty ? null : materia,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0B5A45),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Practicar materia más lenta'),
+              ),
+            ),
+          if (impulsivaValida)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    final materia = (materiaImpulsiva['materia'] ?? '')
+                        .toString()
+                        .trim();
+                    Navigator.pop(
+                      context,
+                      _CoachVelocidadPracticaRequest(
+                        cantidad: _sugerirCantidad(materiaImpulsiva),
+                        tiempoMinutos: 25,
+                        materia: materia.isEmpty ? null : materia,
+                      ),
+                    );
+                  },
+                  child: const Text('Corregir impulsividad ahora'),
+                ),
+              ),
+            ),
+          if (!lentaValida && !impulsivaValida)
+            Text(
+              'Buen ritmo general. Mantén sesiones cortas y constantes para sostener la precisión.',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMateriaItem(Map<String, dynamic> materia) {
+    final nombre = (materia['materia'] ?? 'Materia').toString();
+    final promedio = _toDouble(materia['promedio_segundos']);
+    final preguntas = _toInt(materia['preguntas']);
+    final acierto = _toDouble(materia['tasa_acierto']);
+    final imp = _toDouble(materia['pct_impulsiva']);
+    final len = _toDouble(materia['pct_lenta']);
+    final clasificacion = (materia['clasificacion'] ?? _clasificacionPorPromedio(promedio))
+        .toString();
+    final color = _colorClasificacion(clasificacion);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  nombre,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${promedio.toStringAsFixed(1)} seg/preg',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '$preguntas preguntas · Acierto ${acierto.toStringAsFixed(1)}% · Impulsiva ${imp.toStringAsFixed(1)}% · Lenta ${len.toStringAsFixed(1)}%',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                final materiaNombre = nombre.trim();
+                Navigator.pop(
+                  context,
+                  _CoachVelocidadPracticaRequest(
+                    cantidad: _sugerirCantidad(materia),
+                    tiempoMinutos: _sugerirTiempo(promedio),
+                    materia: materiaNombre.isEmpty ? null : materiaNombre,
+                  ),
+                );
+              },
+              child: const Text('Practicar esta materia'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Coach de Velocidad',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800),
+        ),
+      ),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: _cargando
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'No pude cargar el coach de velocidad.',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _cargar,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildResumen(),
+                  const SizedBox(height: 12),
+                  _buildAccionesInteligentes(),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Mapa de velocidad por materias',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_materias.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        (_card['resumen'] ?? 'Aun no hay datos de velocidad para mostrar.')
+                            .toString(),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    )
+                  else
+                    ..._materias.map(_buildMateriaItem),
+                ],
+              ),
+            ),
     );
   }
 }
