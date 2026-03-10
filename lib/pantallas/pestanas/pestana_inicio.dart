@@ -713,13 +713,13 @@ class _TarjetaInicioCuadricula extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 34,
-                height: 34,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: item.color.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(item.icono, color: item.color, size: 20),
+                child: Icon(item.icono, color: item.color, size: 24),
               ),
               const SizedBox(height: 7),
               Text(

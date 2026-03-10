@@ -1,13 +1,23 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'servicio_preguntas.dart';
 import 'supabase_service.dart';
 
 class TutorIAPersonalService {
   // Ya no inicializamos el cliente est?ticamente aqu?para evitar el crash al cargar la clase
   SupabaseClient get _supabase => SupabaseService.client;
   static const bool _habilitarSqlDirecto = false;
+  static const String _rpcCoachVelocidadDashboard =
+      'fn_tutor_velocidad_dashboard';
+  static const int _ventanaRespuestasVelocidad = 1200;
+  static const int _ventanaRespuestasCoachMemoria = 6000;
+  static const int _diasAlertaSinRepaso = 10;
+  static const List<int> _ciclosRepasoMemoriaDias = <int>[1, 3, 7, 15];
+  static const int _muestraMinimaVelocidad = 10;
+  static const double _halfLifeRecenciaDias = 14.0;
 
   /// 1.1 ??An?lisis Completo del Perfil
   /// Analiza el perfil completo del usuario y genera un diagn?stico detallado.
@@ -17,7 +27,7 @@ class TutorIAPersonalService {
   }) async {
     if (!SupabaseService.isInitialized) {
       debugPrint(
-        'ADVERTENCIA: Supabase no inicializado. Usando datos Mock para el Tutor.',
+        'ADVERTENCIA: Supabase no inicializado. Devolviendo estado sin datos verificables del Tutor.',
       );
       return _generarDatosMockEmergencia();
     }
@@ -50,14 +60,8 @@ class TutorIAPersonalService {
         debugPrint('TutorIA: error leyendo dominio_materia: $e');
       }
 
-      // 3) exposicion_pregunta (preguntas dominadas)
-      final totalDominadasResponse = await _supabase
-          .from('exposicion_pregunta')
-          .select('id')
-          .eq('usuario_id', userId)
-          .eq('estado_dominio', 'dominada')
-          .count();
-      final totalDominadas = totalDominadasResponse.count;
+      // 3) exposicion_pregunta (preguntas dominadas verificadas por pregunta)
+      final totalDominadas = await _contarPreguntasDominadasUsuario(userId);
 
       // 4) respuesta_usuario (acierto real + velocidad real)
       final List<dynamic> respuestasResponse = await _supabase
@@ -245,18 +249,20 @@ class TutorIAPersonalService {
         functionName: 'fn_calcular_progreso_dinamico',
         params: params,
       );
-      final probabilidad = await _rpcComoMapa(
-        functionName: 'fn_calcular_probabilidad_aprobacion_dinamica',
-        params: params,
-      );
 
       final progresoHoy = await _obtenerProgresoHoy(usuario);
       final metaHoy = await _obtenerMetaDiariaHoy(usuario);
+      final proyeccionDetalle = await obtenerProyeccionTiempoDetalle(
+        userId: usuario,
+        categoriaUsuario: (perfilUsuario['categoria'] ?? '').toString(),
+        progresoBase: progreso,
+        planBase: plan,
+      );
       final planHoy = await obtenerResumenPlanDiarioEstructurado(
         userId: usuario,
         planBase: plan,
         progresoBase: progreso,
-        probabilidadBase: probabilidad,
+        proyeccionBase: proyeccionDetalle,
       );
       final queEstudiar = await obtenerResumenQueEstudiarEstructurado(
         userId: usuario,
@@ -265,7 +271,9 @@ class TutorIAPersonalService {
       final velocidad = await obtenerAnalisisVelocidadEstructurado(
         userId: usuario,
       );
-      final riesgos = await obtenerMateriasRiesgoEstructurado(userId: usuario);
+      final coachMemoria = await obtenerCoachMemoriaEstructurado(
+        userId: usuario,
+      );
       final olvido = await obtenerPrediccionOlvidoEstructurado(userId: usuario);
 
       final preguntasObjetivo = _resolverPreguntasObjetivo(
@@ -281,26 +289,25 @@ class TutorIAPersonalService {
       final minutosCompletados = _toInt(progresoHoy['minutos']);
       final dominadasHoy = _toInt(progresoHoy['correctas']);
       final aprobacion =
-          _toDouble(probabilidad?['probabilidad_aprobacion']) ??
+          _toDouble(proyeccionDetalle['probabilidad_aprobacion']) ??
           _toDouble(analisis['tasa_acierto']) ??
           0.0;
       final racha = _toInt(analisis['racha_dias']);
       final nivel = (analisis['nivel_global'] ?? 'INICIAL').toString();
 
-      final totalDominadas = _toInt(progreso?['preguntas_dominadas']);
-      final faltantes = (3000 - totalDominadas).clamp(0, 3000);
-      final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
-      final diasEstimados = ritmoActual > 0
-          ? (faltantes / ritmoActual).ceil()
-          : 0;
+      final resumenProyeccion = (proyeccionDetalle['resumen'] ?? '')
+          .toString()
+          .trim();
+      final detalleProyeccion = (proyeccionDetalle['detalle'] ?? '')
+          .toString()
+          .trim();
       final proyeccionTiempo = {
         'id': 'proyeccion_tiempo',
         'titulo': 'Proyeccion de Tiempo para Completar',
-        'resumen': diasEstimados > 0
-            ? 'A este ritmo te tomaria ~$diasEstimados dias completar tus faltantes.'
-            : 'Aun no hay ritmo suficiente para proyectar tiempo real.',
-        'detalle':
-            'Dominadas: $totalDominadas/3000. Faltantes: $faltantes. Ritmo actual: ${ritmoActual.toStringAsFixed(2)} preguntas/dia.',
+        'resumen': resumenProyeccion.isEmpty
+            ? 'No se pudo calcular la proyeccion en este momento.'
+            : resumenProyeccion,
+        'detalle': detalleProyeccion,
         'prompt': 'dame mi plan diario',
         'cta': 'Ver proyeccion',
         'color': '#93C5FD',
@@ -349,7 +356,7 @@ class TutorIAPersonalService {
           },
           planHoy,
           queEstudiar,
-          riesgos,
+          coachMemoria,
           velocidad,
           proyeccionTiempo,
           olvido,
@@ -368,11 +375,397 @@ class TutorIAPersonalService {
     }
   }
 
+  Future<Map<String, dynamic>> obtenerProyeccionTiempoDetalle({
+    required String userId,
+    String? categoriaUsuario,
+    Map<String, dynamic>? progresoBase,
+    Map<String, dynamic>? planBase,
+    Map<String, dynamic>? probabilidadBase,
+    Map<String, dynamic>? diasBase,
+    Map<String, dynamic>? perfilBase,
+  }) async {
+    int? toOptionalInt(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
+    double? toOptionalDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    Map<String, dynamic> fallback({
+      required String estado,
+      required String resumen,
+      String detalle = '',
+      bool sesionValida = false,
+    }) {
+      return {
+        'estado': estado,
+        'sesion_valida': sesionValida,
+        'resumen': resumen,
+        'detalle': detalle,
+        'total_preguntas_objetivo': null,
+        'preguntas_dominadas': 0,
+        'preguntas_faltantes': null,
+        'porcentaje_completado': null,
+        'ritmo_actual_dia': null,
+        'ritmo_necesario_dia': null,
+        'brecha_dia': null,
+        'dias_estimados_completar': null,
+        'fecha_estimada_listo': '',
+        'fecha_estimada_listo_iso': '',
+        'fecha_examen': '',
+        'fecha_examen_iso': '',
+        'dias_restantes_examen': null,
+        'semaforo_avance': 'sin_datos',
+        'label_semaforo': 'Sin datos',
+        'probabilidad_aprobacion': null,
+        'ritmo_suficiente': false,
+      };
+    }
+
+    final usuario = userId.trim();
+    if (!SupabaseService.isInitialized || _sesionInvalida(usuario)) {
+      return fallback(
+        estado: 'sin_sesion',
+        resumen:
+            'Inicia sesion para ver tu proyeccion de tiempo con datos reales.',
+        detalle:
+            'Necesito una sesion valida para calcular ritmo y fecha estimada.',
+      );
+    }
+
+    try {
+      final params = <String, dynamic>{'p_usuario_id': usuario};
+      final progreso =
+          progresoBase ??
+          await _rpcComoMapa(
+            functionName: 'fn_calcular_progreso_dinamico',
+            params: params,
+          );
+      final dias =
+          diasBase ??
+          await _rpcComoMapa(
+            functionName: 'fn_calcular_dias_disponibles',
+            params: params,
+          );
+
+      final perfil = perfilBase ?? await _obtenerPerfilUsuarioBasico(usuario);
+      final categoriaResuelta =
+          (categoriaUsuario ??
+                  perfil['categoria'] ??
+                  perfil['categoria_usuario'] ??
+                  '')
+              .toString()
+              .trim();
+
+      final totalObjetivo = await _contarTotalPreguntasObjetivoReal(
+        categoriaUsuario: categoriaResuelta.isEmpty ? null : categoriaResuelta,
+      );
+
+      final dominadasVerificadas = await _contarPreguntasDominadasUsuario(
+        usuario,
+      );
+      var dominadasFinal = dominadasVerificadas > 0
+          ? dominadasVerificadas
+          : _toInt(progreso?['preguntas_dominadas']);
+      if (dominadasFinal < 0) dominadasFinal = 0;
+      if (totalObjetivo != null && totalObjetivo >= 0) {
+        dominadasFinal = dominadasFinal.clamp(0, totalObjetivo);
+      }
+
+      final faltantes = (totalObjetivo != null && totalObjetivo >= 0)
+          ? math.max(totalObjetivo - dominadasFinal, 0)
+          : null;
+
+      final porcentajeCompletado = (totalObjetivo != null && totalObjetivo > 0)
+          ? ((dominadasFinal * 100.0) / totalObjetivo).clamp(0.0, 100.0)
+          : null;
+
+      var ritmoActual = toOptionalDouble(progreso?['ritmo_actual_dia']);
+      if (ritmoActual == null) {
+        final diasTranscurridos =
+            toOptionalInt(progreso?['dias_transcurridos']) ??
+            toOptionalInt(dias?['dias_transcurridos']);
+        if (diasTranscurridos != null && diasTranscurridos > 0) {
+          ritmoActual = dominadasFinal / diasTranscurridos;
+        }
+      }
+
+      var diasRestantesExamen =
+          toOptionalInt(progreso?['dias_restantes']) ??
+          toOptionalInt(dias?['dias_restantes']);
+
+      final ritmoNecesario =
+          (faltantes != null &&
+              diasRestantesExamen != null &&
+              diasRestantesExamen > 0)
+          ? (faltantes / diasRestantesExamen)
+          : null;
+
+      final brechaDia = (ritmoNecesario != null && ritmoActual != null)
+          ? math.max(ritmoNecesario - ritmoActual, 0)
+          : null;
+
+      int? diasEstimadosCompletar;
+      DateTime? fechaEstimadaListo;
+      if (faltantes != null && faltantes <= 0) {
+        diasEstimadosCompletar = 0;
+        fechaEstimadaListo = DateTime.now();
+      } else if (faltantes != null &&
+          ritmoActual != null &&
+          ritmoActual > 0 &&
+          faltantes > 0) {
+        diasEstimadosCompletar = (faltantes / ritmoActual).ceil();
+        fechaEstimadaListo = DateTime.now().add(
+          Duration(days: diasEstimadosCompletar),
+        );
+      }
+
+      final fechaExamen =
+          _parseFechaFlexible(progreso?['fecha_examen']) ??
+          _parseFechaFlexible(dias?['fecha_examen']);
+      if (diasRestantesExamen == null && fechaExamen != null) {
+        final hoy = DateTime.now();
+        final baseHoy = DateTime(hoy.year, hoy.month, hoy.day);
+        final baseExamen = DateTime(
+          fechaExamen.year,
+          fechaExamen.month,
+          fechaExamen.day,
+        );
+        diasRestantesExamen = baseExamen.difference(baseHoy).inDays;
+      }
+
+      final tasaAcierto = _toDouble(perfil['tasa_acierto_global']);
+      final rachaDias = _toInt(perfil['dias_consecutivos_estudio']);
+      final materiasCriticas = await _contarMateriasCriticasUsuario(usuario);
+      final probabilidadAprobacion =
+          (totalObjetivo != null && totalObjetivo > 0 && tasaAcierto != null)
+          ? _calcularProbabilidadAprobacionReal(
+              dominadas: dominadasFinal,
+              totalObjetivo: totalObjetivo,
+              tasaAcierto: tasaAcierto,
+              materiasCriticas: materiasCriticas,
+              rachaDias: rachaDias,
+              ritmoActual: ritmoActual ?? 0.0,
+              ritmoNecesario: ritmoNecesario,
+            )
+          : null;
+
+      late final String semaforoAvance;
+      late final String labelSemaforo;
+      if (totalObjetivo == null || totalObjetivo <= 0) {
+        semaforoAvance = 'sin_datos';
+        labelSemaforo = 'Sin datos';
+      } else if (faltantes != null && faltantes <= 0) {
+        semaforoAvance = 'completado';
+        labelSemaforo = 'Objetivo completado';
+      } else if (ritmoActual == null ||
+          ritmoActual <= 0 ||
+          ritmoNecesario == null) {
+        semaforoAvance = 'sin_datos';
+        labelSemaforo = 'Sin datos';
+      } else if (ritmoActual >= ritmoNecesario) {
+        semaforoAvance = 'en_ritmo';
+        labelSemaforo = 'En ritmo';
+      } else if (ritmoActual >= (ritmoNecesario * 0.85)) {
+        semaforoAvance = 'justo';
+        labelSemaforo = 'Justo';
+      } else {
+        semaforoAvance = 'atrasado';
+        labelSemaforo = 'Atrasado';
+      }
+
+      late final String resumen;
+      if (totalObjetivo == null || totalObjetivo <= 0) {
+        resumen =
+            'No pude verificar tu total real de preguntas objetivo en este momento.';
+      } else if (faltantes != null && faltantes <= 0) {
+        resumen =
+            'Ya completaste tu objetivo real de $totalObjetivo preguntas disponibles.';
+      } else if (diasEstimadosCompletar != null) {
+        resumen =
+            'A este ritmo te tomaria ~$diasEstimadosCompletar dias completar tus faltantes reales.';
+      } else {
+        resumen = 'Aun no hay ritmo suficiente para proyectar tiempo real.';
+      }
+
+      String ritmoEnteroTexto(double? valor, {bool redondearArriba = false}) {
+        if (valor == null) return '--';
+        final entero = redondearArriba ? valor.ceil() : valor.round();
+        return '$entero';
+      }
+
+      final detalle = (totalObjetivo == null || totalObjetivo <= 0)
+          ? 'Dominadas verificadas: $dominadasFinal. Total objetivo real: no disponible.'
+          : 'Dominadas: $dominadasFinal/$totalObjetivo. Faltantes: ${faltantes ?? '--'}. Ritmo actual: ${ritmoEnteroTexto(ritmoActual)}/dia. Ritmo necesario: ${ritmoEnteroTexto(ritmoNecesario, redondearArriba: true)}/dia.';
+
+      return {
+        'estado': 'ok',
+        'sesion_valida': true,
+        'resumen': resumen,
+        'detalle': detalle,
+        'total_preguntas_objetivo': totalObjetivo,
+        'preguntas_dominadas': dominadasFinal,
+        'preguntas_faltantes': faltantes,
+        'porcentaje_completado': porcentajeCompletado,
+        'ritmo_actual_dia': ritmoActual,
+        'ritmo_necesario_dia': ritmoNecesario,
+        'brecha_dia': brechaDia,
+        'dias_estimados_completar': diasEstimadosCompletar,
+        'fecha_estimada_listo': fechaEstimadaListo == null
+            ? ''
+            : _formatearFecha(fechaEstimadaListo),
+        'fecha_estimada_listo_iso': fechaEstimadaListo?.toIso8601String() ?? '',
+        'fecha_examen': fechaExamen == null ? '' : _formatearFecha(fechaExamen),
+        'fecha_examen_iso': fechaExamen?.toIso8601String() ?? '',
+        'dias_restantes_examen': diasRestantesExamen,
+        'semaforo_avance': semaforoAvance,
+        'label_semaforo': labelSemaforo,
+        'probabilidad_aprobacion': probabilidadAprobacion,
+        'ritmo_suficiente': (ritmoActual ?? 0) > 0,
+      };
+    } catch (e) {
+      debugPrint('obtenerProyeccionTiempoDetalle error: $e');
+      return fallback(
+        estado: 'error',
+        resumen: 'No se pudo cargar la proyeccion de tiempo en este momento.',
+        detalle: 'Intenta actualizar en unos segundos.',
+        sesionValida: true,
+      );
+    }
+  }
+
+  Future<int?> _contarTotalPreguntasObjetivoReal({
+    String? categoriaUsuario,
+  }) async {
+    try {
+      final servicioPreguntas = ServicioPreguntas();
+      final categoria = (categoriaUsuario ?? '').trim();
+      if (categoria.isEmpty) {
+        return null;
+      }
+      final total = await servicioPreguntas.contarPreguntasDisponibles(
+        categoria: categoria,
+      );
+      return total;
+    } catch (e) {
+      debugPrint('_contarTotalPreguntasObjetivoReal error: $e');
+      return null;
+    }
+  }
+
+  Future<int> _contarPreguntasDominadasUsuario(String userId) async {
+    try {
+      final List<dynamic> response = await _supabase
+          .from('exposicion_pregunta')
+          .select('pregunta_id')
+          .eq('usuario_id', userId)
+          .eq('estado_dominio', 'dominada');
+      final ids = response
+          .whereType<Map>()
+          .map((row) {
+            final map = Map<String, dynamic>.from(row);
+            return map['pregunta_id']?.toString() ?? '';
+          })
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      return ids.length;
+    } catch (e) {
+      debugPrint('_contarPreguntasDominadasUsuario error: $e');
+      return 0;
+    }
+  }
+
+  Future<int> _contarMateriasCriticasUsuario(String userId) async {
+    try {
+      final response = await _supabase
+          .from('dominio_materia')
+          .select('materia_id')
+          .eq('usuario_id', userId)
+          .lt('tasa_dominio', 60)
+          .count();
+      return response.count;
+    } catch (e) {
+      debugPrint('_contarMateriasCriticasUsuario error: $e');
+      return 0;
+    }
+  }
+
+  Future<Map<String, dynamic>> _obtenerPerfilUsuarioBasico(
+    String userId,
+  ) async {
+    try {
+      final row = await _supabase
+          .from('perfil_usuario')
+          .select('categoria, tasa_acierto_global, dias_consecutivos_estudio')
+          .eq('usuario_id', userId)
+          .maybeSingle();
+      if (row is Map) return Map<String, dynamic>.from(row as Map);
+      return const <String, dynamic>{};
+    } catch (e) {
+      debugPrint('_obtenerPerfilUsuarioBasico error: $e');
+      return const <String, dynamic>{};
+    }
+  }
+
+  double _calcularProbabilidadAprobacionReal({
+    required int dominadas,
+    required int totalObjetivo,
+    required double tasaAcierto,
+    required int materiasCriticas,
+    required int rachaDias,
+    required double ritmoActual,
+    required double? ritmoNecesario,
+  }) {
+    var probabilidad = 50.0;
+
+    // Factor 1: Progreso actual (40%)
+    probabilidad += (((dominadas / totalObjetivo) * 100.0 - 50.0) * 0.4);
+
+    // Factor 2: Tasa de acierto (25%)
+    probabilidad += ((tasaAcierto - 50.0) * 0.25);
+
+    // Factor 3: Ritmo (20%)
+    if (ritmoNecesario == null || ritmoNecesario <= 0) {
+      probabilidad += dominadas >= totalObjetivo ? 20.0 : 0.0;
+    } else if (ritmoActual >= ritmoNecesario) {
+      probabilidad += 20.0;
+    } else if (ritmoActual >= (ritmoNecesario * 0.8)) {
+      probabilidad += 10.0;
+    } else if (ritmoActual >= (ritmoNecesario * 0.6)) {
+      probabilidad += 0.0;
+    } else {
+      probabilidad -= 10.0;
+    }
+
+    // Factor 4: Materias críticas (-15% máx aprox)
+    probabilidad -= (materiasCriticas * 3.0);
+
+    // Factor 5: Racha de estudio (+15%)
+    if (rachaDias >= 30) {
+      probabilidad += 15.0;
+    } else if (rachaDias >= 14) {
+      probabilidad += 10.0;
+    } else if (rachaDias >= 7) {
+      probabilidad += 5.0;
+    }
+
+    return probabilidad.clamp(0.0, 100.0);
+  }
+
   Future<Map<String, dynamic>> obtenerResumenPlanDiarioEstructurado({
     required String userId,
     Map<String, dynamic>? planBase,
     Map<String, dynamic>? progresoBase,
     Map<String, dynamic>? probabilidadBase,
+    Map<String, dynamic>? proyeccionBase,
   }) async {
     if (_sesionInvalida(userId)) {
       return _cardFallback(
@@ -396,11 +789,12 @@ class TutorIAPersonalService {
           functionName: 'fn_calcular_progreso_dinamico',
           params: params,
         );
-    final probabilidad =
-        probabilidadBase ??
-        await _rpcComoMapa(
-          functionName: 'fn_calcular_probabilidad_aprobacion_dinamica',
-          params: params,
+    final proyeccion =
+        proyeccionBase ??
+        await obtenerProyeccionTiempoDetalle(
+          userId: userId,
+          progresoBase: progreso,
+          planBase: plan,
         );
 
     if (plan == null) {
@@ -428,11 +822,21 @@ class TutorIAPersonalService {
     final materiasPrioritariasIds = _toStringList(
       plan['materias_prioritarias'],
     );
-    final diasRestantes = _toInt(plan['dias_restantes']);
-    final faltantes = _toInt(plan['preguntas_faltantes']);
-    final prob = _toDouble(probabilidad?['probabilidad_aprobacion']) ?? 0;
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0;
+    final diasRestantes = _toInt(
+      proyeccion['dias_restantes_examen'] ?? plan['dias_restantes'],
+    );
+    final faltantes = _toInt(
+      proyeccion['preguntas_faltantes'] ?? plan['preguntas_faltantes'],
+    );
+    final prob = _toDouble(proyeccion['probabilidad_aprobacion']) ?? 0;
+    final ritmoActual =
+        _toDouble(proyeccion['ritmo_actual_dia']) ??
+        _toDouble(progreso?['ritmo_actual_dia']) ??
+        0;
+    final ritmoNecesario =
+        _toDouble(proyeccion['ritmo_necesario_dia']) ??
+        _toDouble(progreso?['ritmo_necesario_dia']) ??
+        0;
 
     return {
       'id': 'plan_hoy',
@@ -689,16 +1093,22 @@ class TutorIAPersonalService {
       );
     }
 
+    final desdeRpc = await _obtenerAnalisisVelocidadDesdeRpc(userId: userId);
+    if (desdeRpc != null) {
+      return desdeRpc;
+    }
+
     try {
+      final nowUtc = DateTime.now().toUtc();
       final List<dynamic> raw = await _supabase
           .from('respuesta_usuario')
           .select(
-            'pregunta_id, tiempo_total_respuesta, fue_omitida, es_correcta, '
+            'pregunta_id, tiempo_total_respuesta, fue_omitida, es_correcta, respondida_at, '
             'pregunta:pregunta_id(materia:materia_id(nombre))',
           )
           .eq('usuario_id', userId)
           .order('respondida_at', ascending: false)
-          .limit(400);
+          .limit(_ventanaRespuestasVelocidad);
 
       final rows = raw
           .whereType<Map>()
@@ -712,15 +1122,119 @@ class TutorIAPersonalService {
           prompt: 'analisis de velocidad',
           color: '#BBF7D0',
           icono: 'bolt',
-          resumen: 'Aun no hay tiempos validos para evaluar tu velocidad.',
+          resumen: 'Aun no hay respuestas validas para evaluar tu velocidad.',
         );
       }
 
-      final tiempos = rows
-          .map((r) => _toDouble(r['tiempo_total_respuesta']) ?? 0)
-          .where((t) => t > 0)
-          .toList();
-      if (tiempos.isEmpty) {
+      double globalPeso = 0.0;
+      double globalTiempoPonderado = 0.0;
+      double globalImpPeso = 0.0;
+      double globalOptPeso = 0.0;
+      double globalLenPeso = 0.0;
+      int globalMuestraTiempo = 0;
+      int globalValidasAcierto = 0;
+      int globalCorrectasAcierto = 0;
+
+      final Map<String, Map<String, dynamic>> statsPorMateria = {};
+      final Map<String, Map<String, dynamic>> tiemposPorPregunta = {};
+
+      for (final row in rows) {
+        final esCorrecta = row['es_correcta'] == true;
+        final pregunta = _asMap(row['pregunta']);
+        final materia = _asMap(pregunta['materia']);
+        final nombreMateria = (materia['nombre'] ?? '').toString().trim();
+        if (nombreMateria.isEmpty) continue;
+
+        final materiaStats = statsPorMateria.putIfAbsent(
+          nombreMateria,
+          () => <String, dynamic>{
+            'muestra_tiempo': 0,
+            'respuestas_validas': 0,
+            'correctas_validas': 0,
+            'peso_total': 0.0,
+            'tiempo_ponderado': 0.0,
+            'impulsiva_peso': 0.0,
+            'optima_peso': 0.0,
+            'lenta_peso': 0.0,
+          },
+        );
+
+        materiaStats['respuestas_validas'] =
+            _toInt(materiaStats['respuestas_validas']) + 1;
+        globalValidasAcierto += 1;
+        if (esCorrecta) {
+          materiaStats['correctas_validas'] =
+              _toInt(materiaStats['correctas_validas']) + 1;
+          globalCorrectasAcierto += 1;
+        }
+
+        final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0.0;
+        if (tiempo <= 0) continue;
+
+        final respondedAt = DateTime.tryParse(
+          (row['respondida_at'] ?? '').toString(),
+        )?.toUtc();
+        final peso = _pesoRecenciaRespuesta(
+          respondedAtUtc: respondedAt,
+          referenciaUtc: nowUtc,
+        );
+
+        globalPeso += peso;
+        globalTiempoPonderado += tiempo * peso;
+        globalMuestraTiempo += 1;
+        if (tiempo < 8) {
+          globalImpPeso += peso;
+        } else if (tiempo <= 20) {
+          globalOptPeso += peso;
+        } else {
+          globalLenPeso += peso;
+        }
+
+        materiaStats['muestra_tiempo'] =
+            _toInt(materiaStats['muestra_tiempo']) + 1;
+        materiaStats['peso_total'] =
+            (_toDouble(materiaStats['peso_total']) ?? 0) + peso;
+        materiaStats['tiempo_ponderado'] =
+            (_toDouble(materiaStats['tiempo_ponderado']) ?? 0) +
+            (tiempo * peso);
+        if (tiempo < 8) {
+          materiaStats['impulsiva_peso'] =
+              (_toDouble(materiaStats['impulsiva_peso']) ?? 0) + peso;
+        } else if (tiempo <= 20) {
+          materiaStats['optima_peso'] =
+              (_toDouble(materiaStats['optima_peso']) ?? 0) + peso;
+        } else {
+          materiaStats['lenta_peso'] =
+              (_toDouble(materiaStats['lenta_peso']) ?? 0) + peso;
+        }
+
+        final preguntaId = (row['pregunta_id'] ?? pregunta['id'])
+            .toString()
+            .trim();
+        if (preguntaId.isEmpty) continue;
+        final preguntaBucket = tiemposPorPregunta.putIfAbsent(
+          preguntaId,
+          () => <String, dynamic>{
+            'pregunta_id': preguntaId,
+            'materia': nombreMateria,
+            'intentos': 0,
+            'suma': 0.0,
+            'correctas': 0,
+            'incorrectas': 0,
+          },
+        );
+        preguntaBucket['intentos'] = _toInt(preguntaBucket['intentos']) + 1;
+        preguntaBucket['suma'] =
+            (_toDouble(preguntaBucket['suma']) ?? 0.0) + tiempo;
+        if (esCorrecta) {
+          preguntaBucket['correctas'] = _toInt(preguntaBucket['correctas']) + 1;
+        } else {
+          preguntaBucket['incorrectas'] =
+              _toInt(preguntaBucket['incorrectas']) + 1;
+        }
+      }
+
+      if (globalMuestraTiempo <= 0 || globalPeso <= 0) {
         return _cardFallback(
           id: 'coach_velocidad',
           titulo: 'Coach de Velocidad',
@@ -731,149 +1245,113 @@ class TutorIAPersonalService {
         );
       }
 
-      final promedio = _promedio(tiempos);
-      final impulsiva = tiempos.where((t) => t < 8).length;
-      final optimas = tiempos.where((t) => t >= 8 && t <= 20).length;
-      final lentas = tiempos.where((t) => t > 20).length;
-      final pctImpulsiva = tiempos.isEmpty
-          ? 0
-          : (impulsiva * 100.0 / tiempos.length);
-      final pctOptima = tiempos.isEmpty
-          ? 0
-          : (optimas * 100.0 / tiempos.length);
-      final pctLenta = tiempos.isEmpty ? 0 : (lentas * 100.0 / tiempos.length);
+      final promedio = globalTiempoPonderado / globalPeso;
+      final pctImpulsiva = (globalImpPeso * 100.0) / globalPeso;
+      final pctOptima = (globalOptPeso * 100.0) / globalPeso;
+      final pctLenta = (globalLenPeso * 100.0) / globalPeso;
       final clasificacion = promedio < 8
           ? 'Impulsivo'
           : (promedio <= 20 ? 'Optimo' : 'Lento');
-      final recomendacion = promedio < 8
-          ? 'Baja un poco la velocidad y relee palabras clave (NO/EXCEPTO).'
-          : (promedio <= 20
-                ? 'Tu ritmo es saludable. Mantiene precision con lectura activa.'
-                : 'Acelera descarte de opciones para ganar tiempo por pregunta.');
+      final confianzaGlobal = _etiquetaConfianzaMuestra(globalMuestraTiempo);
 
-      final Map<String, Map<String, dynamic>> tiemposPorMateria = {};
-      final Map<String, Map<String, dynamic>> tiemposPorPregunta = {};
-      for (final row in rows) {
-        final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0;
-        if (tiempo <= 0) continue;
+      final recomendacion = globalMuestraTiempo < _muestraMinimaVelocidad
+          ? 'Aun hay poca muestra para decisiones finas. Continua practicando para mejorar precision del coach.'
+          : (promedio < 8
+                ? 'Baja un poco la velocidad y relee palabras clave (NO/EXCEPTO).'
+                : (promedio <= 20
+                      ? 'Tu ritmo es saludable. Mantiene precision con lectura activa.'
+                      : 'Acelera descarte de opciones para ganar tiempo por pregunta.'));
 
-        final pregunta = _asMap(row['pregunta']);
-        final materia = _asMap(pregunta['materia']);
-        final nombre = (materia['nombre'] ?? '').toString().trim();
-        if (nombre.isEmpty) continue;
-        final bucket = tiemposPorMateria.putIfAbsent(
-          nombre,
-          () => <String, dynamic>{
-            'total': 0,
-            'suma': 0.0,
-            'impulsivas': 0,
-            'optimas': 0,
-            'lentas': 0,
-            'correctas': 0,
-          },
-        );
-        bucket['total'] = _toInt(bucket['total']) + 1;
-        bucket['suma'] = (_toDouble(bucket['suma']) ?? 0) + tiempo;
-        if (tiempo < 8) {
-          bucket['impulsivas'] = _toInt(bucket['impulsivas']) + 1;
-        } else if (tiempo <= 20) {
-          bucket['optimas'] = _toInt(bucket['optimas']) + 1;
-        } else {
-          bucket['lentas'] = _toInt(bucket['lentas']) + 1;
-        }
-        if (row['es_correcta'] == true) {
-          bucket['correctas'] = _toInt(bucket['correctas']) + 1;
-        }
-
-        final preguntaId = (row['pregunta_id'] ?? pregunta['id'])
-            .toString()
-            .trim();
-        if (preguntaId.isEmpty) continue;
-
-        final preguntaBucket = tiemposPorPregunta.putIfAbsent(
-          preguntaId,
-          () => <String, dynamic>{
-            'pregunta_id': preguntaId,
-            'materia': nombre,
-            'intentos': 0,
-            'suma': 0.0,
-            'correctas': 0,
-            'incorrectas': 0,
-          },
-        );
-        preguntaBucket['intentos'] = _toInt(preguntaBucket['intentos']) + 1;
-        preguntaBucket['suma'] =
-            (_toDouble(preguntaBucket['suma']) ?? 0) + tiempo;
-        if (row['es_correcta'] == true) {
-          preguntaBucket['correctas'] = _toInt(preguntaBucket['correctas']) + 1;
-        } else {
-          preguntaBucket['incorrectas'] =
-              _toInt(preguntaBucket['incorrectas']) + 1;
-        }
-      }
+      final tasaAciertoGlobal = globalValidasAcierto > 0
+          ? (globalCorrectasAcierto * 100.0 / globalValidasAcierto)
+          : 0.0;
 
       final rankingMaterias =
-          tiemposPorMateria.entries.map((entry) {
-            final stats = entry.value;
-            final totalPreguntas = _toInt(stats['total']);
-            final total = _toDouble(stats['suma']) ?? 0;
-            final prom = totalPreguntas > 0 ? (total / totalPreguntas) : 0.0;
-            final imp = _toInt(stats['impulsivas']);
-            final opt = _toInt(stats['optimas']);
-            final len = _toInt(stats['lentas']);
-            final cor = _toInt(stats['correctas']);
-            final pctImp = totalPreguntas > 0
-                ? (imp * 100.0 / totalPreguntas)
-                : 0.0;
-            final pctOpt = totalPreguntas > 0
-                ? (opt * 100.0 / totalPreguntas)
-                : 0.0;
-            final pctLen = totalPreguntas > 0
-                ? (len * 100.0 / totalPreguntas)
-                : 0.0;
-            final tasaAcierto = totalPreguntas > 0
-                ? (cor * 100.0 / totalPreguntas)
-                : 0.0;
-            final clase = prom < 8
-                ? 'Impulsivo'
-                : (prom <= 20 ? 'Optimo' : 'Lento');
-            return <String, dynamic>{
-              'materia': entry.key,
-              'promedio_segundos': prom,
-              'total_segundos': total,
-              'preguntas': totalPreguntas,
-              'pct_impulsiva': pctImp,
-              'pct_optima': pctOpt,
-              'pct_lenta': pctLen,
-              'tasa_acierto': tasaAcierto,
-              'clasificacion': clase,
-            };
-          }).toList()..sort((a, b) {
-            final aProm = _toDouble(a['promedio_segundos']) ?? 0;
-            final bProm = _toDouble(b['promedio_segundos']) ?? 0;
-            if (bProm != aProm) return bProm.compareTo(aProm);
-            final aTotal = _toDouble(a['total_segundos']) ?? 0;
-            final bTotal = _toDouble(b['total_segundos']) ?? 0;
-            return bTotal.compareTo(aTotal);
-          });
+          statsPorMateria.entries
+              .map((entry) {
+                final stats = entry.value;
+                final muestraTiempo = _toInt(stats['muestra_tiempo']);
+                final respuestasValidas = _toInt(stats['respuestas_validas']);
+                final correctasValidas = _toInt(stats['correctas_validas']);
+                final pesoTotal = _toDouble(stats['peso_total']) ?? 0.0;
+                final tiempoPonderado =
+                    _toDouble(stats['tiempo_ponderado']) ?? 0.0;
+                if (muestraTiempo <= 0 ||
+                    pesoTotal <= 0 ||
+                    respuestasValidas <= 0) {
+                  return <String, dynamic>{};
+                }
+
+                final prom = tiempoPonderado / pesoTotal;
+                final impPeso = _toDouble(stats['impulsiva_peso']) ?? 0.0;
+                final optPeso = _toDouble(stats['optima_peso']) ?? 0.0;
+                final lenPeso = _toDouble(stats['lenta_peso']) ?? 0.0;
+                final pctImp = (impPeso * 100.0) / pesoTotal;
+                final pctOpt = (optPeso * 100.0) / pesoTotal;
+                final pctLen = (lenPeso * 100.0) / pesoTotal;
+                final tasaAcierto =
+                    (correctasValidas * 100.0) / respuestasValidas;
+
+                final promAjustado =
+                    ((prom * muestraTiempo) + (promedio * 20.0)) /
+                    (muestraTiempo + 20.0);
+                final confiabilidad = _factorConfiabilidadMuestra(
+                  muestraTiempo,
+                );
+                final scoreRanking = promAjustado * confiabilidad;
+
+                final clase = prom < 8
+                    ? 'Impulsivo'
+                    : (prom <= 20 ? 'Optimo' : 'Lento');
+
+                return <String, dynamic>{
+                  'materia': entry.key,
+                  'promedio_segundos': prom,
+                  'promedio_ajustado': promAjustado,
+                  'score_ranking': scoreRanking,
+                  'preguntas': muestraTiempo,
+                  'muestra_valida': muestraTiempo,
+                  'respuestas_validas': respuestasValidas,
+                  'pct_impulsiva': pctImp,
+                  'pct_optima': pctOpt,
+                  'pct_lenta': pctLen,
+                  'tasa_acierto': tasaAcierto,
+                  'clasificacion': clase,
+                  'confianza_muestra': _etiquetaConfianzaMuestra(muestraTiempo),
+                };
+              })
+              .where((m) => m.isNotEmpty)
+              .where(
+                (m) => _toInt(m['muestra_valida']) >= _muestraMinimaVelocidad,
+              )
+              .toList()
+            ..sort((a, b) {
+              final scoreA = _toDouble(a['score_ranking']) ?? 0.0;
+              final scoreB = _toDouble(b['score_ranking']) ?? 0.0;
+              final byScore = scoreB.compareTo(scoreA);
+              if (byScore != 0) return byScore;
+              final muestraA = _toInt(a['muestra_valida']);
+              final muestraB = _toInt(b['muestra_valida']);
+              return muestraB.compareTo(muestraA);
+            });
 
       final topMaterias = rankingMaterias.take(3).toList();
       final resumenMaterias = topMaterias
           .map((item) {
             final nombre = (item['materia'] ?? 'Materia').toString();
-            final prom = _toDouble(item['promedio_segundos']) ?? 0;
-            return '$nombre ${prom.toStringAsFixed(1)}s';
+            final prom = _toDouble(item['promedio_segundos']) ?? 0.0;
+            final n = _toInt(item['muestra_valida']);
+            return '$nombre ${prom.toStringAsFixed(1)}s (n=$n)';
           })
           .join(', ');
 
       final detalleMaterias = topMaterias
           .map((item) {
             final nombre = (item['materia'] ?? 'Materia').toString();
-            final prom = _toDouble(item['promedio_segundos']) ?? 0;
-            final totalSeg = _toDouble(item['total_segundos']) ?? 0;
-            final preguntas = _toInt(item['preguntas']);
-            final totalMin = totalSeg / 60.0;
-            return '$nombre: ${prom.toStringAsFixed(1)} seg/preg en $preguntas preg (${totalMin.toStringAsFixed(1)} min).';
+            final prom = _toDouble(item['promedio_segundos']) ?? 0.0;
+            final n = _toInt(item['muestra_valida']);
+            final conf = (item['confianza_muestra'] ?? '').toString();
+            return '$nombre: ${prom.toStringAsFixed(1)} seg/preg, muestra $n ($conf).';
           })
           .join(' ');
 
@@ -904,8 +1382,9 @@ class TutorIAPersonalService {
               .where((item) {
                 final id = (item['pregunta_id'] ?? '').toString().trim();
                 final intentos = _toInt(item['intentos']);
-                final promedio = _toDouble(item['promedio_segundos']) ?? 0.0;
-                return id.isNotEmpty && intentos > 0 && promedio > 0;
+                final promedioPregunta =
+                    _toDouble(item['promedio_segundos']) ?? 0.0;
+                return id.isNotEmpty && intentos > 0 && promedioPregunta > 0;
               })
               .toList()
             ..sort((a, b) {
@@ -986,7 +1465,7 @@ class TutorIAPersonalService {
             ? 'Mas tiempo por materia: $resumenMaterias.'
             : 'Promedio ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion.',
         'detalle':
-            'Promedio general: ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion. Impulsividad (<8s): ${pctImpulsiva.toStringAsFixed(1)}%. ${detalleMaterias.isNotEmpty ? 'Materias mas lentas: $detalleMaterias ' : ''}Recomendacion: $recomendacion',
+            'Promedio general: ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion. Confianza: $confianzaGlobal. Acierto global: ${tasaAciertoGlobal.toStringAsFixed(1)}%. ${detalleMaterias.isNotEmpty ? 'Materias mas lentas: $detalleMaterias ' : ''}Recomendacion: $recomendacion',
         'prompt': 'analisis de velocidad',
         'cta': 'Ver analisis de velocidad',
         'color': '#BBF7D0',
@@ -995,16 +1474,21 @@ class TutorIAPersonalService {
         'metricas_velocidad': {
           'promedio_segundos': promedio,
           'clasificacion': clasificacion,
-          'total_respuestas': tiempos.length,
-          'impulsivas': impulsiva,
-          'optimas': optimas,
-          'lentas': lentas,
+          'total_respuestas': globalMuestraTiempo,
+          'respuestas_validas_acierto': globalValidasAcierto,
+          'tasa_acierto_global': tasaAciertoGlobal,
+          'impulsivas': ((pctImpulsiva * globalMuestraTiempo) / 100).round(),
+          'optimas': ((pctOptima * globalMuestraTiempo) / 100).round(),
+          'lentas': ((pctLenta * globalMuestraTiempo) / 100).round(),
           'pct_impulsiva': pctImpulsiva,
           'pct_optima': pctOptima,
           'pct_lenta': pctLenta,
           'rango_optimo_min': 8,
           'rango_optimo_max': 20,
           'recomendacion': recomendacion,
+          'confianza_muestra': confianzaGlobal,
+          'muestra_minima_recomendada': _muestraMinimaVelocidad,
+          'ventana_respuestas': _ventanaRespuestasVelocidad,
         },
         if (rankingMaterias.isNotEmpty) 'materias_tiempo': rankingMaterias,
         if (topPreguntas.isNotEmpty) 'preguntas_lentas': topPreguntas,
@@ -1026,98 +1510,790 @@ class TutorIAPersonalService {
     }
   }
 
-  Future<Map<String, dynamic>> obtenerMateriasRiesgoEstructurado({
+  Future<Map<String, dynamic>?> _obtenerAnalisisVelocidadDesdeRpc({
+    required String userId,
+  }) async {
+    try {
+      final dynamic raw = await _supabase.rpc(
+        _rpcCoachVelocidadDashboard,
+        params: {
+          'p_usuario_id': userId,
+          'p_ventana': _ventanaRespuestasVelocidad,
+          'p_muestra_minima': _muestraMinimaVelocidad,
+          'p_half_life_dias': _halfLifeRecenciaDias,
+        },
+      );
+
+      Map<String, dynamic>? payload;
+      if (raw is Map) {
+        payload = Map<String, dynamic>.from(raw);
+      } else if (raw is String) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          payload = Map<String, dynamic>.from(decoded);
+        }
+      }
+      if (payload == null || payload.isEmpty) return null;
+
+      final metricasRaw = payload['metricas_velocidad'];
+      final metricas = metricasRaw is Map
+          ? Map<String, dynamic>.from(metricasRaw)
+          : <String, dynamic>{};
+      if (metricas.isEmpty) return null;
+
+      final materiasRaw = payload['materias_tiempo'];
+      final materias = materiasRaw is List
+          ? materiasRaw
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : <Map<String, dynamic>>[];
+
+      final preguntasRaw = payload['preguntas_lentas'];
+      final preguntas = preguntasRaw is List
+          ? preguntasRaw
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : <Map<String, dynamic>>[];
+
+      final promedio = _toDouble(metricas['promedio_segundos']) ?? 0.0;
+      final clasificacion = (metricas['clasificacion'] ?? 'Sin datos')
+          .toString()
+          .trim();
+      final recomendacion = (metricas['recomendacion'] ?? '').toString().trim();
+      final confianzaGlobal = (metricas['confianza_muestra'] ?? 'Sin datos')
+          .toString()
+          .trim();
+      final tasaAciertoGlobal = _toDouble(metricas['tasa_acierto_global']) ?? 0;
+
+      final topMaterias = materias.take(3).toList();
+      final resumenMaterias = topMaterias
+          .map((item) {
+            final nombre = (item['materia'] ?? 'Materia').toString();
+            final prom = _toDouble(item['promedio_segundos']) ?? 0.0;
+            final n = _toInt(item['muestra_valida']);
+            return '$nombre ${prom.toStringAsFixed(1)}s (n=$n)';
+          })
+          .join(', ');
+      final detalleMaterias = topMaterias
+          .map((item) {
+            final nombre = (item['materia'] ?? 'Materia').toString();
+            final prom = _toDouble(item['promedio_segundos']) ?? 0.0;
+            final n = _toInt(item['muestra_valida']);
+            final conf = (item['confianza_muestra'] ?? '').toString();
+            return '$nombre: ${prom.toStringAsFixed(1)} seg/preg, muestra $n ($conf).';
+          })
+          .join(' ');
+
+      final preguntasIds = (payload['preguntas_lentas_ids'] is List)
+          ? (payload['preguntas_lentas_ids'] as List)
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
+          : preguntas
+                .map((e) => (e['pregunta_id'] ?? '').toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+
+      return {
+        'id': 'coach_velocidad',
+        'titulo': 'Coach de Velocidad',
+        'resumen': resumenMaterias.isNotEmpty
+            ? 'Mas tiempo por materia: $resumenMaterias.'
+            : 'Promedio ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion.',
+        'detalle':
+            'Promedio general: ${promedio.toStringAsFixed(1)} seg/preg. Clasificacion: $clasificacion. Confianza: $confianzaGlobal. Acierto global: ${tasaAciertoGlobal.toStringAsFixed(1)}%. ${detalleMaterias.isNotEmpty ? 'Materias mas lentas: $detalleMaterias ' : ''}Recomendacion: $recomendacion',
+        'prompt': 'analisis de velocidad',
+        'cta': 'Ver analisis de velocidad',
+        'color': '#BBF7D0',
+        'icono': 'bolt',
+        'expandable': true,
+        'metricas_velocidad': metricas,
+        if (materias.isNotEmpty) 'materias_tiempo': materias,
+        if (preguntas.isNotEmpty) 'preguntas_lentas': preguntas,
+        if (preguntasIds.isNotEmpty) 'preguntas_lentas_ids': preguntasIds,
+        'fuente_datos': 'rpc',
+      };
+    } catch (e) {
+      debugPrint(
+        'TutorIA: RPC coach velocidad no disponible, fallback app: $e',
+      );
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> obtenerCoachMemoriaEstructurado({
     required String userId,
   }) async {
     if (_sesionInvalida(userId)) {
       return _cardFallback(
-        id: 'radar_riesgo',
-        titulo: 'Radar de Riesgo por Materias',
-        prompt: 'cuales son mis materias en riesgo',
+        id: 'coach_memoria',
+        titulo: 'Coach de Memoria',
+        prompt: 'coach de memoria',
         color: '#FECACA',
-        icono: 'radar',
-        resumen: 'Inicia sesion para detectar materias en riesgo.',
+        icono: 'memory',
+        resumen: 'Inicia sesion para activar tu coach de memoria.',
       );
     }
 
     try {
+      final detalle = await obtenerCoachMemoriaDetalle(userId: userId);
+      final estado = (detalle['estado'] ?? '').toString().trim().toLowerCase();
+      final indice = _toDouble(detalle['indice_memoria']) ?? 0.0;
+      final interpretacion = (detalle['interpretacion_indice'] ?? '')
+          .toString()
+          .trim();
+      final plan = _asMap(detalle['plan_diario']);
+      final totalCriticas = _toInt(detalle['total_criticas']);
+      final totalVencidas = _toInt(detalle['total_repaso_vencidas']);
+      final recordatorio = (detalle['recordatorio_repaso'] ?? '')
+          .toString()
+          .trim();
+      final riesgosRaw = detalle['riesgos'];
+      final riesgos = riesgosRaw is List
+          ? riesgosRaw
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : <Map<String, dynamic>>[];
+      final preguntaIds = _toStringList(detalle['pregunta_ids_prioritarias']);
+      final cantidadSugerida = _toInt(plan['fallidas']) + _toInt(plan['repaso']);
+      final cantidadPractica = cantidadSugerida <= 0
+          ? 20
+          : cantidadSugerida.clamp(12, 80);
+      final tiempoPractica = (cantidadPractica * 1.6).round().clamp(15, 120);
+      final materiaTop = riesgos.isNotEmpty
+          ? (riesgos.first['materia'] ?? '').toString().trim()
+          : '';
+
+      if (estado == 'sin_datos') {
+        return {
+          'id': 'coach_memoria',
+          'titulo': 'Coach de Memoria',
+          'resumen':
+              'Aun no hay historial suficiente. Resuelve una practica para activar el coach.',
+          'detalle':
+              'El coach calcula repeticion de fallos, repaso 1-3-7-15 e indice de memoria usando tu historial real.',
+          'prompt': 'coach de memoria',
+          'cta': 'Abrir en chat',
+          'color': '#FECACA',
+          'icono': 'memory',
+          'expandable': true,
+          'riesgos': <Map<String, dynamic>>[],
+          'indice_memoria': 0.0,
+          'interpretacion_indice': 'Necesita repaso',
+          'cantidad_practica': 20,
+          'tiempo_practica': 25,
+        };
+      }
+
+      final resumenPartes = <String>[
+        'Indice de memoria ${indice.toStringAsFixed(1)}% ($interpretacion)',
+        'Criticas: $totalCriticas',
+        'Repaso vencido: $totalVencidas',
+      ];
+      if (recordatorio.isNotEmpty) {
+        resumenPartes.add(recordatorio);
+      }
+
+      final detallePlan =
+          'Plan de hoy: ${_toInt(plan['nuevas'])} nuevas, ${_toInt(plan['fallidas'])} fallidas y ${_toInt(plan['repaso'])} de repaso. '
+          'Repeticion espaciada: 1-3-7-15 dias (si falla, reinicia ciclo).';
+
+      return {
+        'id': 'coach_memoria',
+        'titulo': 'Coach de Memoria',
+        'resumen': resumenPartes.join('. '),
+        'detalle': detallePlan,
+        'prompt': 'coach de memoria',
+        'cta': 'Ver coach de memoria',
+        'color': '#FECACA',
+        'icono': 'memory',
+        'expandable': true,
+        'riesgos': riesgos,
+        'indice_memoria': indice,
+        'interpretacion_indice': interpretacion,
+        'plan_diario': plan,
+        'total_criticas': totalCriticas,
+        'total_repaso_vencidas': totalVencidas,
+        'recordatorio_repaso': recordatorio,
+        'cantidad_practica': cantidadPractica,
+        'tiempo_practica': tiempoPractica,
+        if (materiaTop.isNotEmpty) 'materia': materiaTop,
+        if (preguntaIds.isNotEmpty) 'pregunta_ids': preguntaIds,
+      };
+    } catch (_) {
+      return _cardFallback(
+        id: 'coach_memoria',
+        titulo: 'Coach de Memoria',
+        prompt: 'coach de memoria',
+        color: '#FECACA',
+        icono: 'memory',
+        resumen: 'No pude cargar tu coach de memoria ahora.',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> obtenerCoachMemoriaDetalle({
+    required String userId,
+  }) async {
+    if (_sesionInvalida(userId)) {
+      return {
+        'estado': 'sin_sesion',
+        'resumen':
+            'Inicia sesion para calcular tu coach de memoria con datos reales.',
+        'indice_memoria': 0.0,
+        'interpretacion_indice': 'Necesita repaso',
+        'plan_diario': {'nuevas': 0, 'fallidas': 0, 'repaso': 0},
+        'pregunta_ids_prioritarias': <String>[],
+        'preguntas_criticas': <Map<String, dynamic>>[],
+        'preguntas_dificiles': <Map<String, dynamic>>[],
+        'riesgos': <Map<String, dynamic>>[],
+      };
+    }
+
+    List<List<String>> trocearIds(List<String> ids, int tamano) {
+      final salida = <List<String>>[];
+      for (var i = 0; i < ids.length; i += tamano) {
+        final fin = (i + tamano) > ids.length ? ids.length : (i + tamano);
+        salida.add(ids.sublist(i, fin));
+      }
+      return salida;
+    }
+
+    try {
       final List<dynamic> raw = await _supabase
-          .from('dominio_materia')
+          .from('respuesta_usuario')
           .select(
-            'tasa_dominio, dominio_hace_7_dias, materia:materia_id(nombre)',
+            'pregunta_id, es_correcta, fue_omitida, tiempo_total_respuesta, respondida_at',
           )
           .eq('usuario_id', userId)
-          .lt('tasa_dominio', 60)
-          .order('tasa_dominio', ascending: true)
-          .limit(5);
+          .order('respondida_at', ascending: true)
+          .limit(_ventanaRespuestasCoachMemoria);
 
-      final rows = raw
+      final eventos = raw
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
+          .where((row) {
+            final omitida = row['fue_omitida'] == true;
+            final esCorrecta = row['es_correcta'];
+            final preguntaId = (row['pregunta_id'] ?? '').toString().trim();
+            return !omitida && esCorrecta is bool && preguntaId.isNotEmpty;
+          })
           .toList();
-      if (rows.isEmpty) {
+
+      if (eventos.isEmpty) {
         return {
-          'id': 'radar_riesgo',
-          'titulo': 'Radar de Riesgo por Materias',
-          'resumen': 'No detecto materias criticas (<60%) en este momento.',
-          'detalle':
-              'Mantienes un control aceptable. Revisa periodicamente para evitar retrocesos.',
-          'prompt': 'cuales son mis materias en riesgo',
-          'cta': 'Ver materias en riesgo',
-          'color': '#FECACA',
-          'icono': 'radar',
-          'expandable': true,
+          'estado': 'sin_datos',
+          'resumen':
+              'Aun no hay historial suficiente para activar el coach de memoria.',
+          'indice_memoria': 0.0,
+          'interpretacion_indice': 'Necesita repaso',
+          'plan_diario': {'nuevas': 20, 'fallidas': 10, 'repaso': 10},
+          'pregunta_ids_prioritarias': <String>[],
+          'preguntas_criticas': <Map<String, dynamic>>[],
+          'preguntas_dificiles': <Map<String, dynamic>>[],
           'riesgos': <Map<String, dynamic>>[],
         };
       }
 
-      final riesgos = rows.map((r) {
-        final materia = _asMap(r['materia']);
-        final nombre = (materia['nombre'] ?? 'Materia').toString();
-        final tasa = _toDouble(r['tasa_dominio']) ?? 0;
-        final hace7 = _toDouble(r['dominio_hace_7_dias']);
-        final delta = hace7 == null ? 0.0 : (tasa - hace7);
-        final tendencia = delta >= 1.5
-            ? 'mejorando'
-            : (delta <= -1.5 ? 'empeorando' : 'estable');
+      final preguntaIdsUnicos = eventos
+          .map((e) => (e['pregunta_id'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      final preguntaMetaPorId = <String, Map<String, dynamic>>{};
+      final materiaIdPorPregunta = <String, String>{};
+      for (final chunk in trocearIds(preguntaIdsUnicos, 150)) {
+        final List<dynamic> preguntasRaw = await _supabase
+            .from('pregunta')
+            .select('id, numero_oficial, codigo_pregunta, materia_id')
+            .inFilter('id', chunk);
+        for (final item in preguntasRaw.whereType<Map>()) {
+          final row = Map<String, dynamic>.from(item);
+          final id = (row['id'] ?? '').toString().trim();
+          if (id.isEmpty) continue;
+          final materiaId = (row['materia_id'] ?? '').toString().trim();
+          preguntaMetaPorId[id] = row;
+          if (materiaId.isNotEmpty) {
+            materiaIdPorPregunta[id] = materiaId;
+          }
+        }
+      }
+
+      final materiaIds = materiaIdPorPregunta.values.toSet().toList();
+      final materiaNombrePorId = <String, String>{};
+      for (final chunk in trocearIds(materiaIds, 150)) {
+        final List<dynamic> materiasRaw = await _supabase
+            .from('materia')
+            .select('id, nombre')
+            .inFilter('id', chunk);
+        for (final item in materiasRaw.whereType<Map>()) {
+          final row = Map<String, dynamic>.from(item);
+          final id = (row['id'] ?? '').toString().trim();
+          final nombre = (row['nombre'] ?? 'Materia').toString().trim();
+          if (id.isNotEmpty) {
+            materiaNombrePorId[id] = nombre.isEmpty ? 'Materia' : nombre;
+          }
+        }
+      }
+
+      final now = DateTime.now();
+      final porPregunta = <String, Map<String, dynamic>>{};
+      var totalCorrectas = 0;
+      var totalFallos = 0;
+      var reiniciosSpaced = 0;
+
+      for (var index = 0; index < eventos.length; index++) {
+        final row = eventos[index];
+        final preguntaId = (row['pregunta_id'] ?? '').toString().trim();
+        if (preguntaId.isEmpty) continue;
+        final esCorrecta = row['es_correcta'] == true;
+        final respondidaAt =
+            _parseFechaFlexible(row['respondida_at']) ??
+            now.subtract(Duration(seconds: eventos.length - index));
+        final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0.0;
+        final meta = _asMap(preguntaMetaPorId[preguntaId]);
+        final materiaId = (meta['materia_id'] ?? '').toString().trim();
+        final materiaNombre =
+            materiaNombrePorId[materiaId] ??
+            (meta['materia_nombre'] ?? 'Materia').toString().trim();
+
+        final item = porPregunta.putIfAbsent(
+          preguntaId,
+          () => <String, dynamic>{
+            'pregunta_id': preguntaId,
+            'numero_oficial': _toInt(meta['numero_oficial']),
+            'codigo_pregunta': (meta['codigo_pregunta'] ?? '').toString().trim(),
+            'materia': materiaNombre.isEmpty ? 'Materia' : materiaNombre,
+            'intentos': 0,
+            'correctas': 0,
+            'fallos': 0,
+            'tiempo_suma': 0.0,
+            'primera_vez': respondidaAt,
+            'ultima_vez': respondidaAt,
+            'ultima_correcta': false,
+            'alguna_correcta': false,
+            'eventos_olvido': 0,
+            'racha_correctas': 0,
+            'racha_fallos': 0,
+            'srs_nivel': 0,
+            'srs_ciclo_dias': _ciclosRepasoMemoriaDias.first,
+            'proxima_revision': respondidaAt.add(
+              Duration(days: _ciclosRepasoMemoriaDias.first),
+            ),
+            'repeticion_intervalo': 0,
+            'fallo_index': -1,
+          },
+        );
+
+        final algunaCorrectaAntes = item['alguna_correcta'] == true;
+        item['intentos'] = _toInt(item['intentos']) + 1;
+        item['ultima_vez'] = respondidaAt;
+        item['tiempo_suma'] = (_toDouble(item['tiempo_suma']) ?? 0.0) + tiempo;
+
+        if (esCorrecta) {
+          totalCorrectas++;
+          item['correctas'] = _toInt(item['correctas']) + 1;
+          item['alguna_correcta'] = true;
+          item['ultima_correcta'] = true;
+          item['racha_correctas'] = _toInt(item['racha_correctas']) + 1;
+          item['racha_fallos'] = 0;
+          final racha = _toInt(item['racha_correctas']);
+          final nivel = (racha - 1).clamp(0, _ciclosRepasoMemoriaDias.length - 1);
+          final ciclo = _ciclosRepasoMemoriaDias[nivel];
+          item['srs_nivel'] = nivel;
+          item['srs_ciclo_dias'] = ciclo;
+          item['proxima_revision'] = respondidaAt.add(Duration(days: ciclo));
+        } else {
+          totalFallos++;
+          item['fallos'] = _toInt(item['fallos']) + 1;
+          if (algunaCorrectaAntes) {
+            item['eventos_olvido'] = _toInt(item['eventos_olvido']) + 1;
+          }
+          if (_toInt(item['srs_nivel']) > 0 || algunaCorrectaAntes) {
+            reiniciosSpaced++;
+          }
+          item['ultima_correcta'] = false;
+          item['racha_correctas'] = 0;
+          item['racha_fallos'] = _toInt(item['racha_fallos']) + 1;
+          item['srs_nivel'] = 0;
+          item['srs_ciclo_dias'] = _ciclosRepasoMemoriaDias.first;
+          item['proxima_revision'] = respondidaAt.add(
+            Duration(days: _ciclosRepasoMemoriaDias.first),
+          );
+          final intervalo = _intervaloRepeticionInmediata(preguntaId);
+          item['repeticion_intervalo'] = intervalo;
+          item['fallo_index'] = index;
+        }
+      }
+
+      if (porPregunta.isEmpty) {
         return {
-          'materia': nombre,
+          'estado': 'sin_datos',
+          'resumen':
+              'Aun no hay historial suficiente para activar el coach de memoria.',
+          'indice_memoria': 0.0,
+          'interpretacion_indice': 'Necesita repaso',
+          'plan_diario': {'nuevas': 20, 'fallidas': 10, 'repaso': 10},
+          'pregunta_ids_prioritarias': <String>[],
+          'preguntas_criticas': <Map<String, dynamic>>[],
+          'preguntas_dificiles': <Map<String, dynamic>>[],
+          'riesgos': <Map<String, dynamic>>[],
+        };
+      }
+
+      String etiquetaPregunta(Map<String, dynamic> q) {
+        final numero = _toInt(q['numero_oficial']);
+        if (numero > 0) return numero.toString();
+        final codigo = (q['codigo_pregunta'] ?? '').toString().trim();
+        if (codigo.isNotEmpty) return codigo;
+        final id = (q['pregunta_id'] ?? '').toString().trim();
+        return id.length <= 8 ? id : id.substring(0, 8);
+      }
+
+      final topPrioridad = <Map<String, dynamic>>[];
+      final preguntasCriticas = <Map<String, dynamic>>[];
+      final preguntasDificiles = <Map<String, dynamic>>[];
+      final preguntasOlvido = <Map<String, dynamic>>[];
+      final preguntasRepasoVencido = <Map<String, dynamic>>[];
+      final preguntasSinRepaso = <Map<String, dynamic>>[];
+      final preguntasRepeticionInmediata = <Map<String, dynamic>>[];
+      final porMateria = <String, Map<String, dynamic>>{};
+
+      for (final rawItem in porPregunta.values) {
+        final item = Map<String, dynamic>.from(rawItem);
+        final intentos = _toInt(item['intentos']);
+        if (intentos <= 0) continue;
+
+        final correctas = _toInt(item['correctas']);
+        final fallos = _toInt(item['fallos']);
+        final tasaAcierto = intentos > 0 ? (correctas * 100.0) / intentos : 0.0;
+        final ultimaVez = _parseFechaFlexible(item['ultima_vez']);
+        final proximaRevision = _parseFechaFlexible(item['proxima_revision']);
+        final diasSinRepaso = ultimaVez == null
+            ? _diasAlertaSinRepaso
+            : now.difference(ultimaVez).inDays;
+        final repasoVencido =
+            proximaRevision != null && !proximaRevision.isAfter(now);
+        final eventosOlvido = _toInt(item['eventos_olvido']);
+        final riesgoOlvido = eventosOlvido > 0 ||
+            (_toInt(item['correctas']) > 0 && item['ultima_correcta'] != true);
+        final rachaFallos = _toInt(item['racha_fallos']);
+        final critica =
+            intentos >= 3 &&
+            (tasaAcierto <= 45 || rachaFallos >= 2 || (fallos >= 3 && correctas <= 1));
+        final dificil = intentos >= 3 && tasaAcierto < 60;
+        final intervalo = _toInt(item['repeticion_intervalo']);
+        final falloIndex = _toInt(item['fallo_index']);
+        final distanciaDesdeFallo = falloIndex >= 0
+            ? (eventos.length - 1 - falloIndex)
+            : 9999;
+        final faltanParaReaparecer = (intervalo - distanciaDesdeFallo).clamp(0, 999);
+        final repeticionInmediataPendiente =
+            falloIndex >= 0 &&
+            item['ultima_correcta'] != true &&
+            intervalo >= 10 &&
+            distanciaDesdeFallo < intervalo;
+
+        final avgTiempo = (_toDouble(item['tiempo_suma']) ?? 0.0) / intentos;
+        var prioridad = (100 - tasaAcierto) * 1.2;
+        prioridad += critica ? 35 : 0;
+        prioridad += riesgoOlvido ? 24 : 0;
+        prioridad += repasoVencido ? 20 : 0;
+        prioridad += repeticionInmediataPendiente ? 22 : 0;
+        prioridad += math.min(diasSinRepaso.toDouble(), 20);
+        prioridad += math.min(fallos.toDouble(), 8) * 1.8;
+
+        final resumenPregunta = <String, dynamic>{
+          'pregunta_id': (item['pregunta_id'] ?? '').toString().trim(),
+          'numero_oficial': _toInt(item['numero_oficial']),
+          'codigo_pregunta': (item['codigo_pregunta'] ?? '').toString().trim(),
+          'etiqueta': etiquetaPregunta(item),
+          'materia': (item['materia'] ?? 'Materia').toString().trim(),
+          'intentos': intentos,
+          'correctas': correctas,
+          'fallos': fallos,
+          'tasa_acierto': tasaAcierto,
+          'tiempo_promedio_segundos': avgTiempo,
+          'dias_sin_repaso': diasSinRepaso < 0 ? 0 : diasSinRepaso,
+          'en_riesgo_olvido': riesgoOlvido,
+          'eventos_olvido': eventosOlvido,
+          'es_critica': critica,
+          'es_dificil': dificil,
+          'repaso_vencido': repasoVencido,
+          'repeticion_inmediata_pendiente': repeticionInmediataPendiente,
+          'faltan_para_reaparicion': faltanParaReaparecer,
+          'srs_nivel': _toInt(item['srs_nivel']),
+          'srs_ciclo_dias': _toInt(item['srs_ciclo_dias']),
+          'proxima_revision': proximaRevision?.toIso8601String() ?? '',
+          'proxima_revision_legible': proximaRevision == null
+              ? ''
+              : _formatearFecha(proximaRevision),
+          'prioridad_score': prioridad,
+        };
+
+        topPrioridad.add(resumenPregunta);
+        if (critica) preguntasCriticas.add(resumenPregunta);
+        if (dificil) preguntasDificiles.add(resumenPregunta);
+        if (riesgoOlvido) preguntasOlvido.add(resumenPregunta);
+        if (repasoVencido) preguntasRepasoVencido.add(resumenPregunta);
+        if (diasSinRepaso >= _diasAlertaSinRepaso) {
+          preguntasSinRepaso.add(resumenPregunta);
+        }
+        if (repeticionInmediataPendiente) {
+          preguntasRepeticionInmediata.add(resumenPregunta);
+        }
+
+        final materia = (resumenPregunta['materia'] ?? 'Materia').toString().trim();
+        final acc = porMateria.putIfAbsent(
+          materia.isEmpty ? 'Materia' : materia,
+          () => <String, dynamic>{
+            'materia': materia.isEmpty ? 'Materia' : materia,
+            'intentos': 0,
+            'correctas': 0,
+            'criticas': 0,
+            'olvido': 0,
+          },
+        );
+        acc['intentos'] = _toInt(acc['intentos']) + intentos;
+        acc['correctas'] = _toInt(acc['correctas']) + correctas;
+        if (critica) acc['criticas'] = _toInt(acc['criticas']) + 1;
+        if (riesgoOlvido) acc['olvido'] = _toInt(acc['olvido']) + 1;
+      }
+
+      topPrioridad.sort((a, b) {
+        final scoreA = _toDouble(a['prioridad_score']) ?? 0.0;
+        final scoreB = _toDouble(b['prioridad_score']) ?? 0.0;
+        final byScore = scoreB.compareTo(scoreA);
+        if (byScore != 0) return byScore;
+        return _toInt(b['fallos']).compareTo(_toInt(a['fallos']));
+      });
+
+      preguntasCriticas.sort((a, b) {
+        final tasaA = _toDouble(a['tasa_acierto']) ?? 0.0;
+        final tasaB = _toDouble(b['tasa_acierto']) ?? 0.0;
+        final byTasa = tasaA.compareTo(tasaB);
+        if (byTasa != 0) return byTasa;
+        return _toInt(b['fallos']).compareTo(_toInt(a['fallos']));
+      });
+
+      preguntasDificiles.sort((a, b) {
+        final tasaA = _toDouble(a['tasa_acierto']) ?? 0.0;
+        final tasaB = _toDouble(b['tasa_acierto']) ?? 0.0;
+        final byTasa = tasaA.compareTo(tasaB);
+        if (byTasa != 0) return byTasa;
+        return _toInt(b['intentos']).compareTo(_toInt(a['intentos']));
+      });
+
+      preguntasSinRepaso.sort(
+        (a, b) => _toInt(b['dias_sin_repaso']).compareTo(_toInt(a['dias_sin_repaso'])),
+      );
+      preguntasRepasoVencido.sort(
+        (a, b) {
+          final scoreA = _toDouble(a['prioridad_score']) ?? 0.0;
+          final scoreB = _toDouble(b['prioridad_score']) ?? 0.0;
+          return scoreB.compareTo(scoreA);
+        },
+      );
+
+      final riesgos = porMateria.values.map((raw) {
+        final item = Map<String, dynamic>.from(raw);
+        final intentos = _toInt(item['intentos']);
+        final correctas = _toInt(item['correctas']);
+        final tasa = intentos > 0 ? (correctas * 100.0) / intentos : 0.0;
+        final criticas = _toInt(item['criticas']);
+        final olvido = _toInt(item['olvido']);
+        final tendencia = (olvido > 0 || criticas > 0)
+            ? 'empeorando'
+            : (tasa >= 75 ? 'mejorando' : 'estable');
+        final scoreRiesgo = (100 - tasa) + (criticas * 8) + (olvido * 5);
+        return <String, dynamic>{
+          'materia': item['materia'],
           'tasa': tasa,
           'tendencia': tendencia,
           'semaforo': _semaforoPorTasa(tasa),
+          'score_riesgo': scoreRiesgo,
         };
-      }).toList();
+      }).toList()
+        ..sort((a, b) {
+          final scoreA = _toDouble(a['score_riesgo']) ?? 0.0;
+          final scoreB = _toDouble(b['score_riesgo']) ?? 0.0;
+          return scoreB.compareTo(scoreA);
+        });
 
-      final topTxt = riesgos
-          .take(3)
-          .map(
-            (e) =>
-                '${e['materia']} ${(_toDouble(e['tasa']) ?? 0).toStringAsFixed(1)}%',
+      final preguntasVistas = porPregunta.length;
+      final totalIntentos = totalCorrectas + totalFallos;
+      final tasaGlobal = totalIntentos > 0
+          ? (totalCorrectas * 100.0) / totalIntentos
+          : 0.0;
+      final olvidoPorcentaje = preguntasVistas > 0
+          ? (preguntasOlvido.length * 100.0) / preguntasVistas
+          : 0.0;
+      final repasoAlDia = preguntasVistas > 0
+          ? (100.0 - ((preguntasRepasoVencido.length * 100.0) / preguntasVistas))
+                .clamp(0.0, 100.0)
+          : 0.0;
+
+      final indiceBase =
+          (tasaGlobal * 0.55) + ((100.0 - olvidoPorcentaje) * 0.25) + (repasoAlDia * 0.20);
+      final penalizacionCriticas =
+          math.min(preguntasCriticas.length * 1.5, 18).toDouble();
+      final penalizacionSinRepaso =
+          math.min(preguntasSinRepaso.length * 0.25, 12).toDouble();
+      final indiceMemoria = (indiceBase - penalizacionCriticas - penalizacionSinRepaso)
+          .clamp(0.0, 100.0);
+
+      final interpretacionIndice = indiceMemoria >= 90
+          ? 'Excelente'
+          : (indiceMemoria >= 70 ? 'Bueno' : 'Necesita repaso');
+
+      final perfil = await _obtenerPerfilUsuarioBasico(userId);
+      final categoriaUsuario = (perfil['categoria'] ?? '').toString().trim();
+      final totalObjetivo =
+          await _contarTotalPreguntasObjetivoReal(categoriaUsuario: categoriaUsuario);
+      final totalBanco = (totalObjetivo != null && totalObjetivo > 0)
+          ? totalObjetivo
+          : 3000;
+      final pendientesNuevas = math.max(totalBanco - preguntasVistas, 0);
+
+      var nuevas = indiceMemoria >= 90
+          ? 35
+          : (indiceMemoria >= 70 ? 30 : 20);
+      if (pendientesNuevas < nuevas) nuevas = pendientesNuevas;
+
+      var fallidas = (preguntasRepeticionInmediata.length + preguntasCriticas.length)
+          .clamp(10, 25);
+      if (preguntasCriticas.length >= 8 && fallidas < 20) {
+        fallidas = 20;
+      }
+
+      var repaso = preguntasRepasoVencido.length.clamp(10, 25);
+      if (preguntasSinRepaso.length > repaso) {
+        repaso = preguntasSinRepaso.length.clamp(10, 25);
+      }
+
+      final idsFallidas = topPrioridad
+          .where(
+            (q) =>
+                q['es_critica'] == true ||
+                q['es_dificil'] == true ||
+                q['repeticion_inmediata_pendiente'] == true,
           )
-          .join(', ');
+          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty)
+          .toList();
+
+      final idsRepaso = topPrioridad
+          .where(
+            (q) =>
+                q['repaso_vencido'] == true ||
+                q['en_riesgo_olvido'] == true ||
+                _toInt(q['dias_sin_repaso']) >= _diasAlertaSinRepaso,
+          )
+          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty)
+          .toList();
+
+      final idsPrioritarias = <String>[];
+      final vistos = <String>{};
+      for (final id in [...idsFallidas, ...idsRepaso]) {
+        if (id.isEmpty) continue;
+        if (vistos.add(id)) idsPrioritarias.add(id);
+      }
+
+      final idsCriticas = preguntasCriticas
+          .map((q) => (q['pregunta_id'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty)
+          .take(25)
+          .toList();
+
+      final maxDiasSinRepaso = preguntasSinRepaso.isEmpty
+          ? 0
+          : preguntasSinRepaso
+                .map((q) => _toInt(q['dias_sin_repaso']))
+                .reduce((a, b) => a > b ? a : b);
+
+      final recordatorioRepaso = preguntasSinRepaso.isEmpty
+          ? 'No tienes preguntas atrasadas por mas de $_diasAlertaSinRepaso dias.'
+          : 'Tienes ${preguntasSinRepaso.length} preguntas que no repasas hace $maxDiasSinRepaso dias.';
+
+      final resumen =
+          'Indice de memoria ${indiceMemoria.toStringAsFixed(1)}% ($interpretacionIndice). '
+          'Plan de hoy: $nuevas nuevas, $fallidas fallidas y $repaso de repaso. '
+          'Criticas: ${preguntasCriticas.length}. Riesgo de olvido: ${preguntasOlvido.length}.';
 
       return {
-        'id': 'radar_riesgo',
-        'titulo': 'Radar de Riesgo por Materias',
-        'resumen': 'Materias en riesgo detectadas: $topTxt.',
-        'detalle':
-            'Umbral de riesgo aplicado: dominio < 60%. Prioriza la primera materia hoy.',
-        'prompt': 'cuales son mis materias en riesgo',
-        'cta': 'Ver materias en riesgo',
-        'color': '#FECACA',
-        'icono': 'radar',
-        'expandable': true,
-        'riesgos': riesgos,
+        'estado': 'ok',
+        'resumen': resumen,
+        'indice_memoria': indiceMemoria,
+        'interpretacion_indice': interpretacionIndice,
+        'plan_diario': {
+          'nuevas': nuevas,
+          'fallidas': fallidas,
+          'repaso': repaso,
+        },
+        'repeticion_fallidas': {
+          'intervalo_min': 10,
+          'intervalo_max': 20,
+          'pendientes': preguntasRepeticionInmediata.take(30).toList(),
+          'total_pendientes': preguntasRepeticionInmediata.length,
+        },
+        'repeticion_espaciada': {
+          'ciclos_dias': _ciclosRepasoMemoriaDias,
+          'total_vencidas': preguntasRepasoVencido.length,
+          'reinicios_por_fallo': reiniciosSpaced,
+        },
+        'detector_olvido': {
+          'total_en_riesgo': preguntasOlvido.length,
+          'preguntas': preguntasOlvido.take(50).toList(),
+        },
+        'preguntas_dificiles': preguntasDificiles.take(50).toList(),
+        'preguntas_criticas': preguntasCriticas.take(50).toList(),
+        'preguntas_criticas_ids': idsCriticas,
+        'recordatorio_repaso': recordatorioRepaso,
+        'total_sin_repaso': preguntasSinRepaso.length,
+        'total_criticas': preguntasCriticas.length,
+        'total_repaso_vencidas': preguntasRepasoVencido.length,
+        'total_preguntas_vistas': preguntasVistas,
+        'total_objetivo': totalBanco,
+        'total_pendientes_nuevas': pendientesNuevas,
+        'riesgos': riesgos.take(6).toList(),
+        'top_prioridad': topPrioridad.take(80).toList(),
+        'pregunta_ids_prioritarias': idsPrioritarias.take(80).toList(),
+        'pregunta_ids_fallidas': idsFallidas.take(80).toList(),
+        'pregunta_ids_repaso': idsRepaso.take(80).toList(),
+        'datos_base_guardados': const [
+          'id_pregunta',
+          'acierto_error',
+          'numero_intentos',
+          'ultima_vez_respondida',
+          'tiempo_respuesta_segundos',
+        ],
+        'metricas_generales': {
+          'total_intentos': totalIntentos,
+          'total_correctas': totalCorrectas,
+          'total_fallos': totalFallos,
+          'tasa_acierto_global': tasaGlobal,
+          'olvido_porcentaje': olvidoPorcentaje,
+          'repaso_al_dia': repasoAlDia,
+        },
       };
-    } catch (_) {
-      return _cardFallback(
-        id: 'radar_riesgo',
-        titulo: 'Radar de Riesgo por Materias',
-        prompt: 'cuales son mis materias en riesgo',
-        color: '#FECACA',
-        icono: 'radar',
-        resumen: 'No pude cargar tu radar de riesgo ahora.',
-      );
+    } catch (e) {
+      debugPrint('obtenerCoachMemoriaDetalle error: $e');
+      return {
+        'estado': 'error',
+        'resumen': 'No se pudo calcular el coach de memoria en este momento.',
+        'indice_memoria': 0.0,
+        'interpretacion_indice': 'Necesita repaso',
+        'plan_diario': {'nuevas': 20, 'fallidas': 10, 'repaso': 10},
+        'pregunta_ids_prioritarias': <String>[],
+        'preguntas_criticas': <Map<String, dynamic>>[],
+        'preguntas_dificiles': <Map<String, dynamic>>[],
+        'riesgos': <Map<String, dynamic>>[],
+      };
     }
   }
 
@@ -1613,7 +2789,10 @@ class TutorIAPersonalService {
         }
 
         if (encontrada != null) {
-          baseMateria = construirDesdeMateriaBase(encontrada, estado: 'ok_base');
+          baseMateria = construirDesdeMateriaBase(
+            encontrada,
+            estado: 'ok_base',
+          );
         }
       }
     } catch (_) {
@@ -1713,7 +2892,8 @@ class TutorIAPersonalService {
         return baseMateria ??
             vacio(
               estado: 'sin_datos',
-              resumen: 'No se encontraron preguntas con riesgo para esta materia.',
+              resumen:
+                  'No se encontraron preguntas con riesgo para esta materia.',
               ids: preguntaIdsPreferidas,
             );
       }
@@ -1722,7 +2902,12 @@ class TutorIAPersonalService {
       var maxProb = 0.0;
       var urgentes = 0;
       DateTime? proximaRevision;
-      final dist = <String, int>{'critica': 0, 'alta': 0, 'media': 0, 'baja': 0};
+      final dist = <String, int>{
+        'critica': 0,
+        'alta': 0,
+        'media': 0,
+        'baja': 0,
+      };
       final idsPorUrg = <String, List<String>>{
         'critica': <String>[],
         'alta': <String>[],
@@ -1735,7 +2920,9 @@ class TutorIAPersonalService {
         suma += prob;
         if (prob > maxProb) maxProb = prob;
 
-        final urg = _normalizarTexto((row['urgencia_revision'] ?? '').toString());
+        final urg = _normalizarTexto(
+          (row['urgencia_revision'] ?? '').toString(),
+        );
         final esUrgente =
             row['requiere_revision_inmediata'] == true ||
             urg.contains('alta') ||
@@ -1794,7 +2981,8 @@ class TutorIAPersonalService {
       return baseMateria ??
           vacio(
             estado: 'error',
-            resumen: 'No se pudo cargar el detalle de prediccion para esta materia.',
+            resumen:
+                'No se pudo cargar el detalle de prediccion para esta materia.',
             ids: preguntaIdsPreferidas,
           );
     }
@@ -1803,21 +2991,42 @@ class TutorIAPersonalService {
   Map<String, dynamic> construirMensajeMotivacionalEstructurado({
     Map<String, dynamic>? progreso,
     Map<String, dynamic>? probabilidad,
+    Map<String, dynamic>? proyeccion,
   }) {
-    final dominadas = _toInt(progreso?['preguntas_dominadas']);
-    final porcentaje = _toDouble(progreso?['porcentaje_completado']) ?? 0;
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0;
-    final probAprobacion = _toDouble(probabilidad?['probabilidad_aprobacion']);
+    final dominadas = _toInt(
+      proyeccion?['preguntas_dominadas'] ?? progreso?['preguntas_dominadas'],
+    );
+    final porcentaje =
+        _toDouble(proyeccion?['porcentaje_completado']) ??
+        _toDouble(progreso?['porcentaje_completado']) ??
+        0;
+    final ritmoActual =
+        _toDouble(proyeccion?['ritmo_actual_dia']) ??
+        _toDouble(progreso?['ritmo_actual_dia']) ??
+        0;
+    final ritmoNecesario =
+        _toDouble(proyeccion?['ritmo_necesario_dia']) ??
+        _toDouble(progreso?['ritmo_necesario_dia']) ??
+        0;
+    final probAprobacion =
+        _toDouble(proyeccion?['probabilidad_aprobacion']) ??
+        _toDouble(probabilidad?['probabilidad_aprobacion']);
+    final semaforo = (proyeccion?['semaforo_avance'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
 
     late final String resumen;
     late final String detalle;
-    if (progreso?['esta_adelantado'] == true) {
+    if (semaforo == 'completado' ||
+        semaforo == 'en_ritmo' ||
+        progreso?['esta_adelantado'] == true) {
       resumen =
           'Excelente ritmo: vas adelantado con ${porcentaje.toStringAsFixed(1)}% completado.';
       detalle =
           'Sigue con la misma constancia para ganar margen de repaso antes del examen.';
-    } else if (progreso?['esta_atrasado'] == true ||
+    } else if (semaforo == 'atrasado' ||
+        progreso?['esta_atrasado'] == true ||
         progreso?['debe_acelerar'] == true) {
       resumen =
           'Es momento de acelerar: ${ritmoActual.toStringAsFixed(1)}/dia vs ${ritmoNecesario.toStringAsFixed(1)}/dia.';
@@ -2325,8 +3534,8 @@ $instrucciones
       return await _resolverConsultaPatronesError(userId: userId);
     }
 
-    if (_esConsultaMateriasRiesgo(mensaje)) {
-      return await _resolverConsultaMateriasRiesgo(userId: userId);
+    if (_esConsultaCoachMemoria(mensaje)) {
+      return await _resolverConsultaCoachMemoria(userId: userId);
     }
 
     if (_esConsultaPrediccionOlvido(mensaje)) {
@@ -2459,10 +3668,23 @@ $instrucciones
     ]);
   }
 
-  bool _esConsultaMateriasRiesgo(String mensaje) {
+  bool _esConsultaCoachMemoria(String mensaje) {
     final t = _normalizarConsultaTexto(mensaje);
     if (t.isEmpty) return false;
     return _contieneAlgunaFrase(t, const [
+      'coach de memoria',
+      'coach memoria',
+      'activar coach de memoria',
+      'indice de memoria',
+      'memoria',
+      'repeticion espaciada',
+      'preguntas criticas',
+      'preguntas dificiles',
+      'preguntas olvidadas',
+      'plan diario de memoria',
+      'recordatorio de repaso',
+      'focos de memoria',
+      'entrenar memoria',
       'materias en riesgo',
       'materias criticas',
       'materias debiles',
@@ -2547,10 +3769,6 @@ $instrucciones
       functionName: 'fn_calcular_progreso_dinamico',
       params: params,
     );
-    final probabilidad = await _rpcComoMapa(
-      functionName: 'fn_calcular_probabilidad_aprobacion_dinamica',
-      params: params,
-    );
     final plan = await _rpcComoMapa(
       functionName: 'fn_generar_plan_adaptativo',
       params: params,
@@ -2560,36 +3778,67 @@ $instrucciones
       params: params,
     );
 
-    if (progreso == null && probabilidad == null) {
+    if (progreso == null) {
       return null;
     }
 
-    final preguntasDominadas = _toInt(progreso?['preguntas_dominadas']);
-    final faltantes = (3000 - preguntasDominadas).clamp(0, 3000).toInt();
+    final perfilBasico = await _obtenerPerfilUsuarioBasico(userId);
+    final categoriaUsuario = (perfilBasico['categoria'] ?? '')
+        .toString()
+        .trim();
+    final proyeccion = await obtenerProyeccionTiempoDetalle(
+      userId: userId,
+      categoriaUsuario: categoriaUsuario.isEmpty ? null : categoriaUsuario,
+      progresoBase: progreso,
+      planBase: plan,
+      diasBase: dias,
+      perfilBase: perfilBasico,
+    );
+    final totalObjetivoRaw = proyeccion['total_preguntas_objetivo'];
+    final totalObjetivoReal = totalObjetivoRaw is num
+        ? totalObjetivoRaw.toInt()
+        : int.tryParse((totalObjetivoRaw ?? '').toString());
+
+    final preguntasDominadas = _toInt(
+      proyeccion['preguntas_dominadas'] ?? progreso['preguntas_dominadas'],
+    );
+    final faltantes = (totalObjetivoReal != null && totalObjetivoReal >= 0)
+        ? math.max(totalObjetivoReal - preguntasDominadas, 0)
+        : (proyeccion['preguntas_faltantes'] is num
+              ? (proyeccion['preguntas_faltantes'] as num).toInt()
+              : int.tryParse(
+                  (proyeccion['preguntas_faltantes'] ?? '').toString(),
+                ));
     final porcentajeCompletado =
-        _toDouble(progreso?['porcentaje_completado']) ?? 0.0;
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0.0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0.0;
-    final diasRestantes = _toInt(progreso?['dias_restantes']);
+        (totalObjetivoReal != null && totalObjetivoReal > 0)
+        ? ((preguntasDominadas * 100.0) / totalObjetivoReal).clamp(0.0, 100.0)
+        : (_toDouble(proyeccion['porcentaje_completado']) ?? 0.0);
+    final ritmoActual =
+        _toDouble(proyeccion['ritmo_actual_dia']) ??
+        _toDouble(progreso['ritmo_actual_dia']) ??
+        0.0;
+    final diasRestantes = _toInt(
+      proyeccion['dias_restantes_examen'] ?? progreso['dias_restantes'],
+    );
+    final ritmoNecesario = (faltantes != null && diasRestantes > 0)
+        ? (faltantes / diasRestantes)
+        : (_toDouble(proyeccion['ritmo_necesario_dia']) ??
+              _toDouble(progreso['ritmo_necesario_dia']) ??
+              0.0);
     final recomendacionPreguntasDia = _toInt(
-      progreso?['recomendacion_preguntas_dia'],
+      progreso['recomendacion_preguntas_dia'],
     );
 
-    final probAprobacion = _toDouble(probabilidad?['probabilidad_aprobacion']);
-    final puntajeEstimado = _toDouble(probabilidad?['puntaje_estimado']);
-    final nivelConfianza = (probabilidad?['nivel_confianza'] ?? '')
-        .toString()
-        .trim()
-        .replaceAll('_', ' ');
+    final probAprobacion = _toDouble(proyeccion['probabilidad_aprobacion']);
 
     final fechaExamen =
-        _parseFechaFlexible(progreso?['fecha_examen']) ??
+        _parseFechaFlexible(progreso['fecha_examen']) ??
         _parseFechaFlexible(dias?['fecha_examen']);
 
     DateTime? fechaEstimadaListo;
-    if (faltantes <= 0) {
+    if (faltantes != null && faltantes <= 0) {
       fechaEstimadaListo = DateTime.now();
-    } else if (ritmoActual > 0) {
+    } else if (faltantes != null && ritmoActual > 0) {
       final diasParaCompletar = (faltantes / ritmoActual).ceil();
       fechaEstimadaListo = DateTime.now().add(
         Duration(days: diasParaCompletar),
@@ -2626,9 +3875,15 @@ $instrucciones
       );
     }
 
-    partes.add(
-      'Hoy vas $preguntasDominadas/3000 (${porcentajeCompletado.toStringAsFixed(1)}%) con ritmo actual de ${ritmoActual.toStringAsFixed(2)} preguntas por dia.',
-    );
+    if (totalObjetivoReal != null && totalObjetivoReal > 0) {
+      partes.add(
+        'Hoy vas $preguntasDominadas/$totalObjetivoReal (${porcentajeCompletado.toStringAsFixed(1)}%) con ritmo actual de ${ritmoActual.toStringAsFixed(2)} preguntas por dia.',
+      );
+    } else {
+      partes.add(
+        'Hoy llevas $preguntasDominadas preguntas dominadas con ritmo actual de ${ritmoActual.toStringAsFixed(2)} preguntas por dia.',
+      );
+    }
 
     if (ritmoNecesario > 0) {
       if (ritmoActual >= ritmoNecesario) {
@@ -2643,20 +3898,10 @@ $instrucciones
       }
     }
 
-    if (probAprobacion != null || puntajeEstimado != null) {
-      final probTxt = probAprobacion == null
-          ? null
-          : '${probAprobacion.toStringAsFixed(1)}%';
-      final puntajeTxt = puntajeEstimado?.toStringAsFixed(1);
-      if (probTxt != null && puntajeTxt != null) {
-        partes.add(
-          'Tu probabilidad estimada de aprobacion es $probTxt (confianza $nivelConfianza) con puntaje proyectado de $puntajeTxt.',
-        );
-      } else if (probTxt != null) {
-        partes.add(
-          'Tu probabilidad estimada de aprobacion es $probTxt (confianza $nivelConfianza).',
-        );
-      }
+    if (probAprobacion != null) {
+      partes.add(
+        'Tu probabilidad estimada de aprobacion actual es ${probAprobacion.toStringAsFixed(1)}%.',
+      );
     }
 
     if (totalPlan > 0) {
@@ -2724,9 +3969,15 @@ $instrucciones
       functionName: 'fn_calcular_progreso_dinamico',
       params: params,
     );
-    final probabilidad = await _rpcComoMapa(
-      functionName: 'fn_calcular_probabilidad_aprobacion_dinamica',
-      params: params,
+    final perfilBasico = await _obtenerPerfilUsuarioBasico(userId);
+    final categoriaUsuario = (perfilBasico['categoria'] ?? '')
+        .toString()
+        .trim();
+    final proyeccion = await obtenerProyeccionTiempoDetalle(
+      userId: userId,
+      categoriaUsuario: categoriaUsuario.isEmpty ? null : categoriaUsuario,
+      progresoBase: progreso,
+      planBase: plan,
     );
 
     if (plan == null) return null;
@@ -2734,8 +3985,12 @@ $instrucciones
     final totalDia = _toInt(plan['total_preguntas_dia']);
     final nuevas = _toInt(plan['cantidad_nuevas']);
     final repaso = _toInt(plan['cantidad_repaso']);
-    final diasRestantes = _toInt(plan['dias_restantes']);
-    final faltantes = _toInt(plan['preguntas_faltantes']);
+    final diasRestantes = _toInt(
+      proyeccion['dias_restantes_examen'] ?? plan['dias_restantes'],
+    );
+    final faltantes = _toInt(
+      proyeccion['preguntas_faltantes'] ?? plan['preguntas_faltantes'],
+    );
     final mensajeIa = (plan['mensaje_ia'] ?? '').toString().trim();
 
     final idsMaterias = _toStringList(plan['materias_prioritarias']);
@@ -2746,9 +4001,15 @@ $instrucciones
         ? 'Sin materias criticas detectadas por ahora.'
         : materiasPrioritarias.take(3).join(', ');
 
-    final prob = _toDouble(probabilidad?['probabilidad_aprobacion']);
-    final ritmoActual = _toDouble(progreso?['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso?['ritmo_necesario_dia']) ?? 0;
+    final prob = _toDouble(proyeccion['probabilidad_aprobacion']);
+    final ritmoActual =
+        _toDouble(proyeccion['ritmo_actual_dia']) ??
+        _toDouble(progreso?['ritmo_actual_dia']) ??
+        0;
+    final ritmoNecesario =
+        _toDouble(proyeccion['ritmo_necesario_dia']) ??
+        _toDouble(progreso?['ritmo_necesario_dia']) ??
+        0;
 
     final partes = <String>[
       'Plan del dia: $totalDia preguntas ($nuevas nuevas y $repaso de repaso).',
@@ -3303,56 +4564,79 @@ $instrucciones
     }
   }
 
-  Future<String?> _resolverConsultaMateriasRiesgo({
+  Future<String?> _resolverConsultaCoachMemoria({
     required String? userId,
   }) async {
     if (_sesionInvalida(userId)) {
-      return 'Para detectar materias en riesgo necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
+      return 'Para activar tu coach de memoria necesito tu sesion activa. Cierra sesion, vuelve a ingresar y consultame de nuevo.';
     }
 
     try {
-      final List<dynamic> raw = await _supabase
-          .from('dominio_materia')
-          .select(
-            'tasa_dominio, dominio_hace_7_dias, tiempo_recomendado_minutos, '
-            'total_preguntas_vistas, total_incorrectas, '
-            'materia:materia_id(nombre, total_preguntas_banco)',
-          )
-          .eq('usuario_id', userId!)
-          .lt('tasa_dominio', 60)
-          .order('tasa_dominio', ascending: true)
-          .limit(10);
-
-      final rows = raw
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-      if (rows.isEmpty) {
-        return 'No detecto materias en riesgo critico (<60%) en este momento.';
+      final data = await obtenerCoachMemoriaDetalle(userId: userId!);
+      final estado = (data['estado'] ?? '').toString().trim().toLowerCase();
+      if (estado == 'sin_datos') {
+        return 'Aun no tengo historial suficiente para tu coach de memoria. Resuelve una practica y vuelvo a calcularlo.';
+      }
+      if (estado == 'error') {
+        return (data['resumen'] ?? 'No pude calcular tu coach de memoria ahora.')
+            .toString()
+            .trim();
       }
 
-      final resumen = rows
-          .take(3)
-          .map((r) {
-            final materia = _asMap(r['materia']);
-            final nombre = (materia['nombre'] ?? 'Materia').toString();
-            final tasa = _toDouble(r['tasa_dominio']) ?? 0;
-            final hace7 = _toDouble(r['dominio_hace_7_dias']);
-            final delta = hace7 == null ? 0.0 : (tasa - hace7);
-            final tendencia = delta >= 1.5
-                ? 'mejorando'
-                : (delta <= -1.5 ? 'empeorando' : 'estable');
-            final totalBanco = _toInt(materia['total_preguntas_banco']);
-            final vistas = _toInt(r['total_preguntas_vistas']);
-            final pendientes = totalBanco > 0
-                ? (totalBanco - vistas).clamp(0, totalBanco)
-                : 0;
-            final tiempo = _toInt(r['tiempo_recomendado_minutos']);
-            return '$nombre ${tasa.toStringAsFixed(1)}% (tendencia $tendencia, pendientes $pendientes, sugerido ${tiempo > 0 ? tiempo : 25} min/dia)';
-          })
-          .join('; ');
+      final indice = _toDouble(data['indice_memoria']) ?? 0.0;
+      final interpretacion = (data['interpretacion_indice'] ?? '')
+          .toString()
+          .trim();
+      final plan = _asMap(data['plan_diario']);
+      final riesgos = data['riesgos'] is List
+          ? (data['riesgos'] as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : <Map<String, dynamic>>[];
+      final criticas = data['preguntas_criticas'] is List
+          ? (data['preguntas_criticas'] as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : <Map<String, dynamic>>[];
+      final repeticion = _asMap(data['repeticion_fallidas']);
+      final espaciada = _asMap(data['repeticion_espaciada']);
+      final recordatorio = (data['recordatorio_repaso'] ?? '').toString().trim();
 
-      return 'Materias en riesgo detectadas: $resumen.';
+      final topMaterias = riesgos
+          .take(3)
+          .map((m) {
+            final nombre = (m['materia'] ?? 'Materia').toString().trim();
+            final tasa = _toDouble(m['tasa']) ?? 0.0;
+            return '$nombre ${tasa.toStringAsFixed(1)}%';
+          })
+          .where((txt) => txt.trim().isNotEmpty)
+          .join(', ');
+
+      final criticasTxt = criticas
+          .take(4)
+          .map((q) => (q['etiqueta'] ?? '').toString().trim())
+          .where((e) => e.isNotEmpty)
+          .join(', ');
+
+      final ciclos = (espaciada['ciclos_dias'] is List)
+          ? (espaciada['ciclos_dias'] as List).map((e) => '$e').join('-')
+          : '1-3-7-15';
+
+      final totalPendientes = _toInt(repeticion['total_pendientes']);
+      final nuevas = _toInt(plan['nuevas']);
+      final fallidas = _toInt(plan['fallidas']);
+      final repaso = _toInt(plan['repaso']);
+      final vencidas = _toInt(espaciada['total_vencidas']);
+
+      return 'Indice de memoria: ${indice.toStringAsFixed(1)}% ($interpretacion). '
+          'Plan de hoy: $nuevas nuevas, $fallidas fallidas y $repaso de repaso. '
+          'Repeticion inmediata de falladas (10-20 preguntas): pendientes $totalPendientes. '
+          'Repeticion espaciada activa ($ciclos dias), vencidas: $vencidas. '
+          '${recordatorio.isEmpty ? '' : '$recordatorio '}'
+          '${topMaterias.isEmpty ? '' : 'Materias con mas riesgo: $topMaterias. '}'
+          '${criticasTxt.isEmpty ? '' : 'Preguntas criticas: $criticasTxt.'}';
     } catch (_) {
       return null;
     }
@@ -3433,25 +4717,46 @@ $instrucciones
       functionName: 'fn_calcular_progreso_dinamico',
       params: params,
     );
-    final probabilidad = await _rpcComoMapa(
-      functionName: 'fn_calcular_probabilidad_aprobacion_dinamica',
-      params: params,
-    );
     if (progreso == null) return null;
 
-    final dominadas = _toInt(progreso['preguntas_dominadas']);
+    final perfilBasico = await _obtenerPerfilUsuarioBasico(userId);
+    final categoriaUsuario = (perfilBasico['categoria'] ?? '')
+        .toString()
+        .trim();
+    final proyeccion = await obtenerProyeccionTiempoDetalle(
+      userId: userId,
+      categoriaUsuario: categoriaUsuario.isEmpty ? null : categoriaUsuario,
+      progresoBase: progreso,
+      perfilBase: perfilBasico,
+    );
+
+    final dominadas = _toInt(
+      proyeccion['preguntas_dominadas'] ?? progreso['preguntas_dominadas'],
+    );
     final diasTranscurridos = _toInt(progreso['dias_transcurridos']);
-    final ritmoActual = _toDouble(progreso['ritmo_actual_dia']) ?? 0;
-    final ritmoNecesario = _toDouble(progreso['ritmo_necesario_dia']) ?? 0;
-    final porcentaje = _toDouble(progreso['porcentaje_completado']) ?? 0;
-    final probAprobacion = _toDouble(probabilidad?['probabilidad_aprobacion']);
+    final ritmoActual =
+        _toDouble(proyeccion['ritmo_actual_dia']) ??
+        _toDouble(progreso['ritmo_actual_dia']) ??
+        0;
+    final ritmoNecesario =
+        _toDouble(proyeccion['ritmo_necesario_dia']) ??
+        _toDouble(progreso['ritmo_necesario_dia']) ??
+        0;
+    final porcentaje =
+        _toDouble(proyeccion['porcentaje_completado']) ??
+        _toDouble(progreso['porcentaje_completado']) ??
+        0;
+    final probAprobacion = _toDouble(proyeccion['probabilidad_aprobacion']);
+    final semaforo = (proyeccion['semaforo_avance'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
 
     late final String mensaje;
-    if (progreso['esta_adelantado'] == true) {
+    if (semaforo == 'completado' || semaforo == 'en_ritmo') {
       mensaje =
           'Excelente trabajo: vas adelantado con $dominadas preguntas dominadas en $diasTranscurridos dias (${porcentaje.toStringAsFixed(1)}%). Manteniendo este ritmo, llegaras con margen para repasar.';
-    } else if (progreso['esta_atrasado'] == true ||
-        progreso['debe_acelerar'] == true) {
+    } else if (semaforo == 'atrasado') {
       final objetivo = ritmoNecesario > 0
           ? ritmoNecesario.toStringAsFixed(1)
           : 'tu objetivo';
@@ -4080,7 +5385,7 @@ $instrucciones
           )
           .eq('usuario_id', userId)
           .order('respondida_at', ascending: false)
-          .limit(2000);
+          .limit(_ventanaRespuestasVelocidad);
 
       final objetivo = _normalizarTexto(materia);
       final Map<String, Map<String, dynamic>> agg = {};
@@ -4176,7 +5481,7 @@ $instrucciones
           )
           .eq('usuario_id', userId)
           .order('respondida_at', ascending: false)
-          .limit(2500);
+          .limit(_ventanaRespuestasVelocidad);
 
       final objetivo = _normalizarTexto(materia);
       final Map<String, Map<String, dynamic>> agg = {};
@@ -4285,6 +5590,140 @@ $instrucciones
     }
   }
 
+  Future<List<Map<String, dynamic>>> obtenerPreguntasImpulsivasPorMateria({
+    required String userId,
+    required String materia,
+    int limit = 25,
+  }) async {
+    if (!SupabaseService.isInitialized) return [];
+
+    try {
+      final List<dynamic> rows = await _supabase
+          .from('respuesta_usuario')
+          .select(
+            'pregunta_id, tiempo_total_respuesta, es_correcta, fue_omitida, '
+            'pregunta:pregunta_id(id, numero_oficial, codigo_pregunta, enunciado, materia:materia_id(nombre))',
+          )
+          .eq('usuario_id', userId)
+          .order('respondida_at', ascending: false)
+          .limit(_ventanaRespuestasVelocidad);
+
+      final objetivo = _normalizarTexto(materia);
+      final Map<String, Map<String, dynamic>> agg = {};
+
+      for (final raw in rows) {
+        if (raw is! Map) continue;
+        final row = Map<String, dynamic>.from(raw);
+        if (row['fue_omitida'] == true) continue;
+
+        final tiempo = _toDouble(row['tiempo_total_respuesta']) ?? 0.0;
+        if (tiempo <= 0) continue;
+
+        final esCorrecta = row['es_correcta'];
+        if (esCorrecta is! bool) continue;
+
+        final pregunta = row['pregunta'];
+        if (pregunta is! Map) continue;
+        final preguntaMap = Map<String, dynamic>.from(pregunta);
+        final materiaMap = _asMap(preguntaMap['materia']);
+        final nombreMateria = (materiaMap['nombre'] ?? '').toString().trim();
+        if (!_materiaCoincide(nombreMateria, objetivo)) continue;
+
+        final preguntaId = (row['pregunta_id'] ?? preguntaMap['id'])
+            .toString()
+            .trim();
+        if (preguntaId.isEmpty) continue;
+
+        final actual = agg.putIfAbsent(
+          preguntaId,
+          () => <String, dynamic>{
+            'pregunta_id': preguntaId,
+            'materia': nombreMateria,
+            'numero': _toInt(preguntaMap['numero_oficial']),
+            'codigo_pregunta': (preguntaMap['codigo_pregunta'] ?? '')
+                .toString()
+                .trim(),
+            'texto': _resumirTextoError(
+              (preguntaMap['enunciado'] ?? '').toString(),
+              max: 130,
+            ),
+            'intentos': 0,
+            'impulsivos': 0,
+            'suma_tiempo': 0.0,
+            'correctas': 0,
+            'incorrectas': 0,
+          },
+        );
+
+        actual['intentos'] = _toInt(actual['intentos']) + 1;
+        actual['suma_tiempo'] =
+            (_toDouble(actual['suma_tiempo']) ?? 0.0) + tiempo;
+        if (tiempo < 8) {
+          actual['impulsivos'] = _toInt(actual['impulsivos']) + 1;
+        }
+        if (esCorrecta) {
+          actual['correctas'] = _toInt(actual['correctas']) + 1;
+        } else {
+          actual['incorrectas'] = _toInt(actual['incorrectas']) + 1;
+        }
+      }
+
+      final lista = agg.values
+          .map((item) {
+            final intentos = _toInt(item['intentos']);
+            final impulsivos = _toInt(item['impulsivos']);
+            final sumaTiempo = _toDouble(item['suma_tiempo']) ?? 0.0;
+            final promedio = intentos > 0 ? sumaTiempo / intentos : 0.0;
+            final incorrectas = _toInt(item['incorrectas']);
+            final correctas = _toInt(item['correctas']);
+            final pctImpulsiva = intentos > 0
+                ? (impulsivos * 100.0 / intentos)
+                : 0.0;
+            final tasaError = intentos > 0
+                ? (incorrectas * 100.0 / intentos)
+                : 0.0;
+            final tasaAcierto = intentos > 0
+                ? (correctas * 100.0 / intentos)
+                : 0.0;
+            return {
+              ...item,
+              'promedio_segundos': promedio,
+              'pct_impulsiva': pctImpulsiva,
+              'tasa_error': tasaError,
+              'tasa_acierto': tasaAcierto,
+            };
+          })
+          .where((item) => _toInt(item['impulsivos']) > 0)
+          .toList();
+
+      lista.sort((a, b) {
+        final impA = _toInt(a['impulsivos']);
+        final impB = _toInt(b['impulsivos']);
+        final byImp = impB.compareTo(impA);
+        if (byImp != 0) return byImp;
+
+        final pctA = _toDouble(a['pct_impulsiva']) ?? 0.0;
+        final pctB = _toDouble(b['pct_impulsiva']) ?? 0.0;
+        final byPct = pctB.compareTo(pctA);
+        if (byPct != 0) return byPct;
+
+        final promA = _toDouble(a['promedio_segundos']) ?? 0.0;
+        final promB = _toDouble(b['promedio_segundos']) ?? 0.0;
+        final byProm = promA.compareTo(promB);
+        if (byProm != 0) return byProm;
+
+        final errA = _toDouble(a['tasa_error']) ?? 0.0;
+        final errB = _toDouble(b['tasa_error']) ?? 0.0;
+        return errB.compareTo(errA);
+      });
+
+      return lista.take(limit).toList();
+    } catch (e) {
+      debugPrint('Error obteniendo preguntas impulsivas por materia: $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> obtenerDetalleMateria({
     required String userId,
     required String materia,
@@ -4360,7 +5799,7 @@ $instrucciones
           )
           .eq('usuario_id', userId)
           .order('respondida_at', ascending: false)
-          .limit(2000);
+          .limit(_ventanaRespuestasVelocidad);
 
       final respuestas = respuestasRaw
           .whereType<Map>()
@@ -5727,6 +7166,28 @@ REGLAS:
     return valores.reduce((a, b) => a + b) / valores.length;
   }
 
+  double _pesoRecenciaRespuesta({
+    required DateTime? respondedAtUtc,
+    required DateTime referenciaUtc,
+  }) {
+    if (respondedAtUtc == null) return 0.4;
+    final delta = referenciaUtc.difference(respondedAtUtc).inMinutes;
+    final dias = delta <= 0 ? 0.0 : (delta / 1440.0);
+    final factor = math.exp(-math.ln2 * dias / _halfLifeRecenciaDias);
+    return factor.clamp(0.2, 1.0);
+  }
+
+  String _etiquetaConfianzaMuestra(int muestra) {
+    if (muestra < _muestraMinimaVelocidad) return 'Baja';
+    if (muestra < (_muestraMinimaVelocidad * 3)) return 'Media';
+    return 'Alta';
+  }
+
+  double _factorConfiabilidadMuestra(int muestra) {
+    final factor = math.sqrt((muestra / 30.0).clamp(0.0, 1.0));
+    return factor.clamp(0.45, 1.0);
+  }
+
   double _tasaAcierto(List<Map<String, dynamic>> respuestas) {
     final validas = respuestas.where((r) {
       final esCorrecta = r['es_correcta'];
@@ -5743,7 +7204,6 @@ REGLAS:
     required String nivelActual,
   }) {
     final porcentaje = porcentajeActual.clamp(0, 100);
-    final probActual = (porcentaje * 0.9).clamp(5, 95);
     return {
       'info_basica': {
         'nombre': materia,
@@ -5777,10 +7237,10 @@ REGLAS:
         'delta_tendencia': 0.0,
       },
       'prediccion': {
-        'probabilidad_actual': probActual,
-        'proyeccion_7_dias': (probActual + 5).clamp(5, 99),
-        'proyeccion_14_dias': (probActual + 9).clamp(5, 99),
-        'proyeccion_30_dias': (probActual + 14).clamp(5, 99),
+        'probabilidad_actual': null,
+        'proyeccion_7_dias': null,
+        'proyeccion_14_dias': null,
+        'proyeccion_30_dias': null,
       },
       'fallidas': {
         'total': 0,
@@ -5795,35 +7255,27 @@ REGLAS:
         'nivel_usuario': nivelActual.toUpperCase(),
       },
       'recomendaciones': {
-        'tiempo_diario_sugerido': porcentaje < 50 ? 30 : 20,
-        'tema_prioritario': 'Fundamentos de $materia',
-        'objetivo': 'Alcanzar 80% en 10 dias',
+        'tiempo_diario_sugerido': null,
+        'tema_prioritario': 'Sin datos verificables',
+        'objetivo': 'Completa mas sesiones para habilitar recomendaciones.',
       },
     };
   }
 
   Map<String, dynamic> _generarDatosMockEmergencia() {
     return {
-      'nivel_global': 'CALCULANDO...',
-      'fortalezas': ['Analisis en proceso...'],
-      'debilidades': ['Analisis en proceso...'],
-      'analisis_materias': [
-        {
-          'materia': 'Derechos Humanos',
-          'porcentaje': 60.0,
-          'nivel': 'INTERMEDIO',
-          'tipo': 'debilidad',
-        },
-      ],
+      'nivel_global': 'SIN_DATOS',
+      'fortalezas': <String>[],
+      'debilidades': <String>[],
+      'analisis_materias': <Map<String, dynamic>>[],
       'resumen_materias':
-          'Tienes 0 materias fuertes y 1 en mejora. Pulsa Revisar para ver el detalle por materia.',
-      'materias_criticas': [],
+          'No hay datos verificables suficientes para generar un resumen de materias.',
+      'materias_criticas': <Map<String, dynamic>>[],
       'preguntas_dominadas': 0,
       'tasa_acierto': 0.0,
       'velocidad_promedio': 0.0,
-      'diagnostico':
-          'El sistema esta recopilando tus primeros datos. Vuelve pronto.',
-      'panel_ia': _panelBasico('CALCULANDO...', ['Analisis en proceso...']),
+      'diagnostico': 'No se pudo verificar informacion real en este momento.',
+      'panel_ia': _panelBasico('SIN_DATOS', ['Sin datos verificables']),
     };
   }
 
@@ -5833,7 +7285,8 @@ REGLAS:
       'que estudiar hoy',
       'analiza mi ultima sesion',
       'analisis de velocidad',
-      'cuales son mis materias en riesgo',
+      'activa mi coach de memoria',
+      'indice de memoria',
       'prediccion de olvido',
       'dame un mensaje motivacional',
     ];
@@ -5855,12 +7308,12 @@ REGLAS:
         'racha_dias': racha,
       },
       'mision_diaria': {
-        'preguntas_objetivo': 20,
-        'minutos_objetivo': 30,
+        'preguntas_objetivo': 0,
+        'minutos_objetivo': 0,
         'preguntas_completadas': 0,
         'minutos_completados': 0,
-        'cantidad_practica': 20,
-        'tiempo_practica': 30,
+        'cantidad_practica': 0,
+        'tiempo_practica': 0,
         'resumen': mensaje,
         'cta_habilitada': false,
       },
@@ -6008,6 +7461,13 @@ REGLAS:
       'icono': icono,
       'expandable': true,
     };
+  }
+
+  int _intervaloRepeticionInmediata(String preguntaId) {
+    final id = preguntaId.trim();
+    if (id.isEmpty) return 10;
+    final hash = id.codeUnits.fold<int>(0, (acc, ch) => (acc + ch) % 997);
+    return 10 + (hash % 11); // 10..20
   }
 
   String _semaforoPorTasa(double tasa) {

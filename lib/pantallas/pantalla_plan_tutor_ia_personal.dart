@@ -316,7 +316,7 @@ class _PantallaPlanTutorIAPersonalState
     final planHoy = _insightPorId('plan_hoy');
     final materiaPrioritaria = _insightPorId('materia_prioritaria');
     final coach = _insightPorId('coach_velocidad');
-    final riesgo = _insightPorId('radar_riesgo');
+    final coachMemoria = _insightPorId('coach_memoria');
 
     List<String> idsUnicos(Iterable<String> ids) {
       final salida = <String>[];
@@ -378,10 +378,11 @@ class _PantallaPlanTutorIAPersonalState
       };
     }
 
-    final materiaRiesgo = (riesgo != null && riesgo.riesgos.isNotEmpty)
-        ? riesgo.riesgos.first.materia
+    final materiaMemoria =
+        (coachMemoria != null && coachMemoria.riesgos.isNotEmpty)
+        ? coachMemoria.riesgos.first.materia
         : null;
-    final materiasRiesgo = (riesgo?.riesgos ?? const <TutorRiskItem>[])
+    final materiasMemoria = (coachMemoria?.riesgos ?? const <TutorRiskItem>[])
         .map((e) => e.materia.trim())
         .where((e) => e.isNotEmpty)
         .toList();
@@ -400,7 +401,7 @@ class _PantallaPlanTutorIAPersonalState
         insight: planHoy,
         fallbackMessage:
             'Sesion recomendada para hoy segun tu rendimiento y objetivo diario.',
-        fallbackMaterias: materiasRiesgo,
+        fallbackMaterias: materiasMemoria,
       ),
       cardPracticaDesdeInsight(
         title: 'Materia prioritaria',
@@ -408,21 +409,21 @@ class _PantallaPlanTutorIAPersonalState
         fallbackMessage:
             'Revisa primero la materia mas prioritaria para subir tu nivel hoy.',
         fallbackMateria: materiaPrioritaria?.materia,
-        fallbackMaterias: materiasRiesgo,
+        fallbackMaterias: materiasMemoria,
       ),
       cardPracticaDesdeInsight(
         title: 'Mejora de velocidad',
         insight: coach,
         fallbackMessage: 'Refuerza tu precision y ritmo con practica dirigida.',
-        fallbackMaterias: materiasRiesgo,
+        fallbackMaterias: materiasMemoria,
       ),
       cardPracticaDesdeInsight(
-        title: 'Foco de riesgo',
-        insight: riesgo,
+        title: 'Coach de memoria',
+        insight: coachMemoria,
         fallbackMessage:
-            'Atiende primero tus materias con mayor riesgo para no perder avance.',
-        fallbackMateria: materiaRiesgo ?? materiaPrioritaria?.materia,
-        fallbackMaterias: materiasRiesgo,
+            'Refuerza primero tus materias mas sensibles para consolidar memoria.',
+        fallbackMateria: materiaMemoria ?? materiaPrioritaria?.materia,
+        fallbackMaterias: materiasMemoria,
       ),
       {
         'type': 'failed',
@@ -443,7 +444,7 @@ class _PantallaPlanTutorIAPersonalState
           fallbackMessage:
               'Repasa ahora las preguntas con mayor riesgo de olvido.',
           fallbackMateria: materiaPrioritaria?.materia,
-          fallbackMaterias: materiasRiesgo,
+          fallbackMaterias: materiasMemoria,
           fallbackPreguntaIds: planHoy.preguntasRepasoIds,
           excluirIdsInsight: true,
         ),
@@ -459,7 +460,7 @@ class _PantallaPlanTutorIAPersonalState
           fallbackMessage:
               'Avanza en preguntas nuevas de alta importancia para tu meta.',
           fallbackMateria: materiaPrioritaria?.materia,
-          fallbackMaterias: materiasRiesgo,
+          fallbackMaterias: materiasMemoria,
           fallbackPreguntaIds: planHoy.preguntasNuevasIds,
           excluirIdsInsight: true,
         ),
@@ -834,8 +835,8 @@ class _PantallaPlanTutorIAPersonalState
       if (materiaPrioritaria.isNotEmpty) {
         materiasObjetivo.add(materiaPrioritaria);
       }
-      final radar = _insightPorId('radar_riesgo');
-      for (final riesgo in (radar?.riesgos ?? const <TutorRiskItem>[])) {
+      final coachMemoria = _insightPorId('coach_memoria');
+      for (final riesgo in (coachMemoria?.riesgos ?? const <TutorRiskItem>[])) {
         final materia = riesgo.materia.trim();
         if (materia.isNotEmpty) {
           materiasObjetivo.add(materia);
@@ -1442,6 +1443,8 @@ class _PantallaPlanTutorIAPersonalState
         return Icons.history_rounded;
       case 'favorite':
         return Icons.favorite_rounded;
+      case 'memory':
+        return Icons.psychology_alt_rounded;
       case 'radar':
         return Icons.radar_rounded;
       case 'schedule':
@@ -1837,6 +1840,32 @@ class _PantallaPlanTutorIAPersonalState
     );
   }
 
+  Future<void> _abrirCoachMemoria(TutorInsightCard card) async {
+    if (!mounted) return;
+    final req = await Navigator.push<_CoachVelocidadPracticaRequest>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _PantallaCoachMemoria(
+          userId: _userId,
+          iaService: _iaService,
+          card: card,
+        ),
+      ),
+    );
+
+    if (!mounted || req == null) return;
+    await _iniciarPractica(
+      cantidad: req.cantidad,
+      tiempoLimite: req.tiempoMinutos,
+      materia: req.materia,
+      preguntaIdsPrioritarias: req.preguntaIdsPrioritarias,
+      esPracticaGuiada: req.esPracticaGuiada,
+      registrarSesionEnHistorial: req.registrarSesionEnHistorial,
+      seleccionarAleatorio: req.seleccionarAleatorio,
+      tiempoLimiteSegundosPersonalizado: req.tiempoLimiteSegundosPersonalizado,
+    );
+  }
+
   Future<void> _abrirPanelPrediccionOlvido(TutorInsightCard card) async {
     if (!mounted) return;
     final req = await Navigator.push<_CoachVelocidadPracticaRequest>(
@@ -1863,6 +1892,21 @@ class _PantallaPlanTutorIAPersonalState
     );
   }
 
+  Future<void> _abrirPanelProyeccionTiempo(TutorInsightCard card) async {
+    if (!mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _PantallaProyeccionTiempo(
+          userId: _userId,
+          categoriaUsuario: _categoriaUsuario,
+          iaService: _iaService,
+          card: card,
+        ),
+      ),
+    );
+  }
+
   Future<void> _ejecutarInsightCard(TutorInsightCard card) async {
     final id = card.id.toLowerCase().trim();
     if (id == 'analisis_perfil') {
@@ -1875,8 +1919,18 @@ class _PantallaPlanTutorIAPersonalState
       return;
     }
 
+    if (id == 'coach_memoria') {
+      await _abrirCoachMemoria(card);
+      return;
+    }
+
     if (id == 'prediccion_olvido') {
       await _abrirPanelPrediccionOlvido(card);
+      return;
+    }
+
+    if (id == 'proyeccion_tiempo') {
+      await _abrirPanelProyeccionTiempo(card);
       return;
     }
 
@@ -2291,7 +2345,7 @@ class _ChatTutorSheetState extends State<_ChatTutorSheet> {
     _mensajes.add(
       const _MensajeChatTutor(
         texto:
-            'Soy Tutor IA Personal. Pideme plan diario, que estudiar hoy, analisis de sesion, velocidad, horario, patrones de error, materias en riesgo o prediccion de olvido.',
+            'Soy Tutor IA Personal. Pideme plan diario, que estudiar hoy, analisis de sesion, velocidad, horario, patrones de error, coach de memoria, indice de memoria o prediccion de olvido.',
         esUsuario: false,
       ),
     );
@@ -2668,7 +2722,7 @@ class _ProgresoDetalladoCard extends StatelessWidget {
         children: [
           _RowProgreso(
             label: "Preguntas Dominadas",
-            value: "${analisis['preguntas_dominadas']}/3000",
+            value: "${analisis['preguntas_dominadas']}",
             icon: Icons.check_circle_rounded,
             color: Colors.green,
           ),
@@ -3551,6 +3605,620 @@ class _PantallaMapaTemasSemaforo extends StatelessWidget {
   }
 }
 
+class _PantallaProyeccionTiempo extends StatefulWidget {
+  final String userId;
+  final String? categoriaUsuario;
+  final TutorIAPersonalService iaService;
+  final TutorInsightCard card;
+
+  const _PantallaProyeccionTiempo({
+    required this.userId,
+    this.categoriaUsuario,
+    required this.iaService,
+    required this.card,
+  });
+
+  @override
+  State<_PantallaProyeccionTiempo> createState() =>
+      _PantallaProyeccionTiempoState();
+}
+
+class _PantallaProyeccionTiempoState extends State<_PantallaProyeccionTiempo> {
+  bool _cargando = true;
+  String? _error;
+  Map<String, dynamic> _data = const <String, dynamic>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  int _toInt(dynamic value, [int fallback = 0]) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  int? _toOptionalInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  double? _toOptionalDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  String _formatearRitmoEntero(double? valor, {bool redondearArriba = false}) {
+    if (valor == null) return '--';
+    final entero = redondearArriba ? valor.ceil() : valor.round();
+    return '$entero/dia';
+  }
+
+  Future<void> _cargar() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+
+    try {
+      final data = await widget.iaService.obtenerProyeccionTiempoDetalle(
+        userId: widget.userId,
+        categoriaUsuario: widget.categoriaUsuario,
+      );
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _cargando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _cargando = false;
+      });
+    }
+  }
+
+  Color _colorSemaforo(String estado) {
+    switch (estado) {
+      case 'completado':
+        return const Color(0xFF0B5A45);
+      case 'en_ritmo':
+        return const Color(0xFF237D57);
+      case 'justo':
+        return const Color(0xFFB54708);
+      case 'atrasado':
+        return const Color(0xFFC63D4D);
+      case 'sin_datos':
+      default:
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  IconData _iconSemaforo(String estado) {
+    switch (estado) {
+      case 'completado':
+        return Icons.task_alt_rounded;
+      case 'en_ritmo':
+        return Icons.trending_up_rounded;
+      case 'justo':
+        return Icons.timelapse_rounded;
+      case 'atrasado':
+        return Icons.warning_amber_rounded;
+      case 'sin_datos':
+      default:
+        return Icons.help_outline_rounded;
+    }
+  }
+
+  String _descripcionSemaforo(String estado) {
+    switch (estado) {
+      case 'completado':
+        return 'Ya alcanzaste el objetivo global de preguntas dominadas.';
+      case 'en_ritmo':
+        return 'Tu ritmo actual alcanza o supera el ritmo necesario.';
+      case 'justo':
+        return 'Vas cerca del ritmo objetivo, pero con poco margen.';
+      case 'atrasado':
+        return 'Tu ritmo actual esta por debajo de lo requerido.';
+      case 'sin_datos':
+      default:
+        return 'Aun no hay ritmo calculable para una proyeccion confiable.';
+    }
+  }
+
+  Widget _buildMetrica({
+    required String titulo,
+    required String valor,
+    Color? colorValor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            titulo.toUpperCase(),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade600,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            valor,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: colorValor ?? const Color(0xFF111827),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final resumen = (_data['resumen'] ?? widget.card.resumen).toString().trim();
+    final detalle = (_data['detalle'] ?? widget.card.detalle).toString().trim();
+    final totalObjetivo = _toOptionalInt(_data['total_preguntas_objetivo']);
+    final dominadas = _toInt(_data['preguntas_dominadas']);
+    final faltantes = _toOptionalInt(_data['preguntas_faltantes']);
+    final porcentaje = _toOptionalDouble(_data['porcentaje_completado']);
+    final ritmoActual = _toOptionalDouble(_data['ritmo_actual_dia']);
+    final ritmoNecesario = _toOptionalDouble(_data['ritmo_necesario_dia']);
+    final brecha = _toOptionalDouble(_data['brecha_dia']);
+    final diasEstimados = _toOptionalInt(_data['dias_estimados_completar']);
+    final fechaEstimada = (_data['fecha_estimada_listo'] ?? '')
+        .toString()
+        .trim();
+    final fechaExamen = (_data['fecha_examen'] ?? '').toString().trim();
+    final diasRestantesExamen = _toOptionalInt(_data['dias_restantes_examen']);
+    final probAprob = _toOptionalDouble(_data['probabilidad_aprobacion']);
+    final ritmoSuficiente = _data['ritmo_suficiente'] == true;
+    final semaforo = (_data['semaforo_avance'] ?? 'sin_datos')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final labelSemaforo = (_data['label_semaforo'] ?? 'Sin datos')
+        .toString()
+        .trim();
+    final colorSemaforo = _colorSemaforo(semaforo);
+    final progreso = ((porcentaje ?? 0.0) / 100).clamp(0.0, 1.0);
+    final colorHeader =
+        Theme.of(context).appBarTheme.backgroundColor ??
+        Theme.of(context).colorScheme.primary;
+    final colorResumenInicio =
+        Color.lerp(colorHeader, Colors.white, 0.32) ?? colorHeader;
+    final colorResumenFin =
+        Color.lerp(colorHeader, Colors.black, 0.04) ?? colorHeader;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Proyeccion de Tiempo',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _cargar,
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
+      backgroundColor: const Color(0xFFECEFF3),
+      body: _cargando
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      size: 30,
+                      color: Colors.red.shade300,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No se pudo cargar la proyeccion de tiempo.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _cargar,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [colorResumenInicio, colorResumenFin],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorHeader.withValues(alpha: 0.22),
+                          blurRadius: 12,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Proyeccion de tiempo para completar',
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          resumen.isEmpty
+                              ? 'Aun no hay datos suficientes para proyectar.'
+                              : resumen,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            height: 1.35,
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: colorSemaforo.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _iconSemaforo(semaforo),
+                                size: 16,
+                                color: colorSemaforo,
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                'Semaforo: $labelSemaforo',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: colorSemaforo,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (detalle.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      detalle,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Avance total',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF111827),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              porcentaje == null
+                                  ? '--'
+                                  : '${porcentaje.toStringAsFixed(1)}%',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF0B5A45),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: progreso,
+                            minHeight: 8,
+                            backgroundColor: const Color(0xFFE5E7EB),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF0B5A45),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!ritmoSuficiente && (faltantes ?? 0) > 0) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Text(
+                        'Aun no hay ritmo suficiente para calcular una fecha estimada confiable.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          color: const Color(0xFF92400E),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Text(
+                    'Metricas clave',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.grey.shade700,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const spacing = 10.0;
+                      final width = (constraints.maxWidth - spacing) / 2;
+                      return Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: [
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Fecha estimada',
+                              valor: fechaEstimada.isEmpty
+                                  ? '--'
+                                  : fechaEstimada,
+                            ),
+                          ),
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Dias estimados',
+                              valor: diasEstimados == null
+                                  ? '--'
+                                  : '$diasEstimados dias',
+                            ),
+                          ),
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Dominadas',
+                              valor:
+                                  (totalObjetivo != null && totalObjetivo > 0)
+                                  ? '$dominadas/$totalObjetivo'
+                                  : '$dominadas',
+                              colorValor: const Color(0xFF237D57),
+                            ),
+                          ),
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Faltantes',
+                              valor: faltantes == null ? '--' : '$faltantes',
+                              colorValor: const Color(0xFFB54708),
+                            ),
+                          ),
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Ritmo actual',
+                              valor: _formatearRitmoEntero(ritmoActual),
+                            ),
+                          ),
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Ritmo necesario',
+                              valor: _formatearRitmoEntero(
+                                ritmoNecesario,
+                                redondearArriba: true,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Brecha diaria',
+                              valor: _formatearRitmoEntero(brecha),
+                              colorValor: (brecha ?? 0) > 0
+                                  ? const Color(0xFFC63D4D)
+                                  : const Color(0xFF237D57),
+                            ),
+                          ),
+                          SizedBox(
+                            width: width,
+                            child: _buildMetrica(
+                              titulo: 'Probabilidad',
+                              valor: probAprob == null
+                                  ? '--'
+                                  : '${probAprob.toStringAsFixed(1)}%',
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  if (fechaExamen.isNotEmpty ||
+                      diasRestantesExamen != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Examen objetivo',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            fechaExamen.isEmpty
+                                ? 'Fecha no registrada'
+                                : 'Fecha: $fechaExamen',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                          Text(
+                            diasRestantesExamen == null
+                                ? 'Dias restantes: --'
+                                : 'Dias restantes: $diasRestantesExamen',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorSemaforo.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorSemaforo.withValues(alpha: 0.38),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          _iconSemaforo(semaforo),
+                          color: colorSemaforo,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Estado: $labelSemaforo',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: colorSemaforo,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _descripcionSemaforo(semaforo),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  color: Colors.grey.shade800,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
 class _PantallaPrediccionOlvido extends StatefulWidget {
   final String userId;
   final TutorIAPersonalService iaService;
@@ -3596,9 +4264,12 @@ class _PantallaPrediccionOlvidoState extends State<_PantallaPrediccionOlvido> {
   }
 
   Color _colorRiesgo(double maxProb) {
-    if (maxProb >= 90) return const Color(0xFFAD3636);
-    if (maxProb >= 75) return const Color(0xFFB68B2E);
-    return const Color(0xFF237D57);
+    // Misma paleta y orden semantico que la leyenda:
+    // Critica (rojo), Alta (naranja), Media (amarillo), Baja (verde).
+    if (maxProb >= 85) return const Color(0xFFC63D4D);
+    if (maxProb >= 70) return const Color(0xFFE86C32);
+    if (maxProb >= 55) return const Color(0xFFCA9A36);
+    return const Color(0xFF26A269);
   }
 
   String _estadoRiesgo(double maxProb) {
@@ -4172,7 +4843,8 @@ class _PantallaDetallePrediccionOlvidoMateriaState
         'media': _toInt(map['media']),
         'baja': _toInt(map['baja']),
       };
-      final total = (dist['critica'] ?? 0) +
+      final total =
+          (dist['critica'] ?? 0) +
           (dist['alta'] ?? 0) +
           (dist['media'] ?? 0) +
           (dist['baja'] ?? 0);
@@ -4301,7 +4973,9 @@ class _PantallaDetallePrediccionOlvidoMateriaState
 
     if (!mounted) return;
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
     if (preguntas.isEmpty) {
@@ -4550,17 +5224,11 @@ class _PantallaDetallePrediccionOlvidoMateriaState
           Row(
             children: [
               Expanded(
-                child: _miniDatoHero(
-                  titulo: 'Preguntas',
-                  valor: '$total',
-                ),
+                child: _miniDatoHero(titulo: 'Preguntas', valor: '$total'),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _miniDatoHero(
-                  titulo: 'Urgentes',
-                  valor: '$urgentes',
-                ),
+                child: _miniDatoHero(titulo: 'Urgentes', valor: '$urgentes'),
               ),
             ],
           ),
@@ -4721,10 +5389,12 @@ class _PantallaDetallePrediccionOlvidoMateriaState
     final alta = dist['alta'] ?? 0;
     final media = dist['media'] ?? 0;
     final baja = dist['baja'] ?? 0;
-    final maxValue = [critica, alta, media, baja].fold<int>(
-      0,
-      (a, b) => a > b ? a : b,
-    );
+    final maxValue = [
+      critica,
+      alta,
+      media,
+      baja,
+    ].fold<int>(0, (a, b) => a > b ? a : b);
 
     return Container(
       width: double.infinity,
@@ -4848,6 +5518,612 @@ class _PantallaDetallePrediccionOlvidoMateriaState
                       child: const Text('Repasar'),
                     ),
                   ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+class _PantallaCoachMemoria extends StatefulWidget {
+  final String userId;
+  final TutorIAPersonalService iaService;
+  final TutorInsightCard card;
+
+  const _PantallaCoachMemoria({
+    required this.userId,
+    required this.iaService,
+    required this.card,
+  });
+
+  @override
+  State<_PantallaCoachMemoria> createState() => _PantallaCoachMemoriaState();
+}
+
+class _PantallaCoachMemoriaState extends State<_PantallaCoachMemoria> {
+  bool _cargando = true;
+  String? _error;
+  Map<String, dynamic> _data = const <String, dynamic>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  int _toInt(dynamic value, [int fallback = 0]) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  double _toDouble(dynamic value, [double fallback = 0.0]) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is! List) return const <Map<String, dynamic>>[];
+    return value
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  List<String> _toStringList(dynamic value) {
+    if (value is! List) return const <String>[];
+    return value
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  List<String> _idsUnicos(Iterable<String> ids) {
+    final salida = <String>[];
+    final vistos = <String>{};
+    for (final raw in ids) {
+      final id = raw.trim();
+      if (id.isEmpty) continue;
+      if (vistos.add(id)) salida.add(id);
+    }
+    return salida;
+  }
+
+  Future<void> _cargar() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+
+    try {
+      final data = await widget.iaService.obtenerCoachMemoriaDetalle(
+        userId: widget.userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _cargando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _cargando = false;
+      });
+    }
+  }
+
+  Color _colorIndice(double indice) {
+    if (indice >= 90) return const Color(0xFF166534);
+    if (indice >= 70) return const Color(0xFF0B5A45);
+    return const Color(0xFFB54708);
+  }
+
+  void _enviarPractica({
+    required List<String> ids,
+    required int cantidad,
+    required int tiempoMinutos,
+  }) {
+    final cantidadFinal = cantidad <= 0 ? 15 : cantidad.clamp(10, 100);
+    final tiempoFinal = tiempoMinutos <= 0
+        ? (cantidadFinal * 1.6).round().clamp(15, 120)
+        : tiempoMinutos.clamp(15, 120);
+    Navigator.pop(
+      context,
+      _CoachVelocidadPracticaRequest(
+        cantidad: cantidadFinal,
+        tiempoMinutos: tiempoFinal,
+        preguntaIdsPrioritarias: _idsUnicos(ids),
+      ),
+    );
+  }
+
+  void _iniciarPlanHoy() {
+    final plan = _asMap(_data['plan_diario']);
+    final nuevas = _toInt(plan['nuevas']);
+    final fallidas = _toInt(plan['fallidas']);
+    final repaso = _toInt(plan['repaso']);
+    final baseNuevas = nuevas > 0 ? (nuevas < 10 ? nuevas : 10) : 0;
+    final cantidad = (fallidas + repaso + baseNuevas).clamp(15, 100);
+    final ids = _toStringList(_data['pregunta_ids_prioritarias']);
+    _enviarPractica(
+      ids: ids,
+      cantidad: cantidad,
+      tiempoMinutos: (cantidad * 1.6).round(),
+    );
+  }
+
+  void _iniciarBloqueCriticas() {
+    final ids = _toStringList(_data['preguntas_criticas_ids']);
+    final cantidad = ids.isEmpty ? 15 : ids.length.clamp(10, 45);
+    _enviarPractica(ids: ids, cantidad: cantidad, tiempoMinutos: 30);
+  }
+
+  void _iniciarBloqueFallidas() {
+    final ids = _toStringList(_data['pregunta_ids_fallidas']);
+    final cantidad = ids.isEmpty ? 18 : ids.length.clamp(10, 50);
+    _enviarPractica(ids: ids, cantidad: cantidad, tiempoMinutos: 30);
+  }
+
+  void _iniciarBloqueRepaso() {
+    final ids = _toStringList(_data['pregunta_ids_repaso']);
+    final cantidad = ids.isEmpty ? 15 : ids.length.clamp(10, 45);
+    _enviarPractica(ids: ids, cantidad: cantidad, tiempoMinutos: 25);
+  }
+
+  Widget _chipDato({
+    required IconData icono,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icono, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            '$label: $value',
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHero() {
+    final indice = _toDouble(_data['indice_memoria']);
+    final interpretacion = (_data['interpretacion_indice'] ?? 'Necesita repaso')
+        .toString()
+        .trim();
+    final totalObjetivo = _toInt(_data['total_objetivo'], 3000);
+    final vistas = _toInt(_data['total_preguntas_vistas']);
+    final colorIndice = _colorIndice(indice);
+    final resumen = (_data['resumen'] ?? widget.card.resumen).toString().trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0B5A45), Color(0xFF084434)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Coach de Memoria',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Text(
+                '${indice.toStringAsFixed(1)}%',
+                style: GoogleFonts.robotoMono(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorIndice.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: colorIndice.withValues(alpha: 0.45)),
+                ),
+                child: Text(
+                  interpretacion.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: (indice / 100).clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.24),
+              valueColor: AlwaysStoppedAnimation<Color>(colorIndice),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _chipDato(
+                icono: Icons.help_outline_rounded,
+                label: 'Vistas',
+                value: '$vistas/$totalObjetivo',
+              ),
+              _chipDato(
+                icono: Icons.priority_high_rounded,
+                label: 'Criticas',
+                value: '${_toInt(_data['total_criticas'])}',
+              ),
+              _chipDato(
+                icono: Icons.schedule_rounded,
+                label: 'Vencidas',
+                value: '${_toInt(_data['total_repaso_vencidas'])}',
+              ),
+            ],
+          ),
+          if (resumen.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              resumen,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                color: Colors.white.withValues(alpha: 0.94),
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanDiario() {
+    final plan = _asMap(_data['plan_diario']);
+    final nuevas = _toInt(plan['nuevas']);
+    final fallidas = _toInt(plan['fallidas']);
+    final repaso = _toInt(plan['repaso']);
+    final total = (nuevas + fallidas + repaso).clamp(0, 300);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Plan diario de memoria',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$nuevas nuevas, $fallidas fallidas, $repaso repaso (total $total).',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: const Color(0xFF334155),
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _iniciarPlanHoy,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0B5A45),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Iniciar plan de hoy'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _iniciarBloqueCriticas,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0B5A45),
+                    side: const BorderSide(color: Color(0xFF0B5A45)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Solo criticas'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _iniciarBloqueFallidas,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF7C2D12),
+                    side: const BorderSide(color: Color(0xFF7C2D12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Fallidas'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _iniciarBloqueRepaso,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1D4ED8),
+                    side: const BorderSide(color: Color(0xFF1D4ED8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Repaso'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordatorio() {
+    final txt = (_data['recordatorio_repaso'] ?? '').toString().trim();
+    if (txt.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFDBA74)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.notifications_active_rounded, color: Color(0xFFB45309)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              txt,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF7C2D12),
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreguntaItem(Map<String, dynamic> pregunta) {
+    final etiqueta = (pregunta['etiqueta'] ?? 'Pregunta').toString().trim();
+    final materia = (pregunta['materia'] ?? 'Materia').toString().trim();
+    final acierto = _toDouble(pregunta['tasa_acierto']);
+    final fallos = _toInt(pregunta['fallos']);
+    final dias = _toInt(pregunta['dias_sin_repaso']);
+    final ciclo = _toInt(pregunta['srs_ciclo_dias']);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            etiqueta,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$materia · Acierto ${acierto.toStringAsFixed(1)}% · Fallos $fallos · Sin repaso $dias dias · Ciclo $ciclo',
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              color: const Color(0xFF475569),
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLista({
+    required String titulo,
+    required List<Map<String, dynamic>> items,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$titulo (${items.length})',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (items.isEmpty)
+            Text(
+              'Sin elementos para mostrar.',
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                color: Colors.grey.shade600,
+              ),
+            )
+          else
+            ...items.take(8).map(_buildPreguntaItem),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final detector = _asMap(_data['detector_olvido']);
+    final repeticion = _asMap(_data['repeticion_fallidas']);
+    final criticas = _asMapList(_data['preguntas_criticas']);
+    final dificiles = _asMapList(_data['preguntas_dificiles']);
+    final olvido = _asMapList(detector['preguntas']);
+    final repeticionPendiente = _asMapList(repeticion['pendientes']);
+    final estado = (_data['estado'] ?? '').toString().trim().toLowerCase();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Coach de Memoria',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _cargar,
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
+      backgroundColor: const Color(0xFFECEFF3),
+      body: _cargando
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'No se pudo cargar el coach.\n$_error',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(color: Colors.grey.shade700),
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _cargar,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                children: [
+                  _buildHero(),
+                  const SizedBox(height: 12),
+                  _buildPlanDiario(),
+                  const SizedBox(height: 12),
+                  _buildRecordatorio(),
+                  if (estado == 'sin_datos') ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFD1D5DB)),
+                      ),
+                      child: Text(
+                        'Aun no hay suficiente historial para recomendaciones avanzadas. Resuelve una practica para activar el plan completo.',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 12),
+                    _buildLista(
+                      titulo: 'Repeticion inmediata (falladas 10-20)',
+                      items: repeticionPendiente,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildLista(
+                      titulo: 'Preguntas criticas',
+                      items: criticas,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildLista(
+                      titulo: 'Preguntas dificiles',
+                      items: dificiles,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildLista(
+                      titulo: 'En riesgo de olvido',
+                      items: olvido,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -5089,6 +6365,9 @@ class _PantallaCoachVelocidadState extends State<_PantallaCoachVelocidad> {
     final pctImp = _toDouble(_metricas['pct_impulsiva']);
     final pctOpt = _toDouble(_metricas['pct_optima']);
     final pctLen = _toDouble(_metricas['pct_lenta']);
+    final confianza = (_metricas['confianza_muestra'] ?? 'Sin datos')
+        .toString()
+        .trim();
     final recomendacion = (_metricas['recomendacion'] ?? '').toString().trim();
     final verdeBase =
         Theme.of(context).appBarTheme.backgroundColor ??
@@ -5142,7 +6421,7 @@ class _PantallaCoachVelocidadState extends State<_PantallaCoachVelocidad> {
               border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             ),
             child: Text(
-              'Muestra reciente: $total respuestas. Rango óptimo: 8 a 20 segundos por pregunta.',
+              'Muestra reciente: $total respuestas validas. Confianza: $confianza. Rango óptimo: 8 a 20 segundos por pregunta.',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 color: Colors.white,
@@ -5278,17 +6557,37 @@ class _PantallaCoachVelocidadState extends State<_PantallaCoachVelocidad> {
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final materia = (materiaImpulsiva['materia'] ?? '')
                         .toString()
                         .trim();
-                    final idsMateria = _preguntasLentasIdsPorMateria(materia);
+                    if (materia.isEmpty) return;
+                    final impulsivas = await widget.iaService
+                        .obtenerPreguntasImpulsivasPorMateria(
+                          userId: widget.userId,
+                          materia: materia,
+                          limit: 25,
+                        );
+                    if (!mounted) return;
+                    final idsMateria = _idsUnicos(
+                      impulsivas.map(
+                        (e) => (e['pregunta_id'] ?? '').toString().trim(),
+                      ),
+                    ).take(25).toList();
+                    if (idsMateria.length < 25) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Aun no hay 25 preguntas impulsivas para esta materia.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     Navigator.pop(
                       context,
                       _CoachVelocidadPracticaRequest(
-                        cantidad: idsMateria.isNotEmpty
-                            ? idsMateria.length
-                            : _sugerirCantidad(materiaImpulsiva),
+                        cantidad: 25,
                         tiempoMinutos: 25,
                         materia: materia.isEmpty ? null : materia,
                         preguntaIdsPrioritarias: idsMateria,
@@ -5836,8 +7135,6 @@ class _PantallaDetalleVelocidadMateriaState
   bool _cargando = true;
   String? _error;
   List<Map<String, dynamic>> _preguntasLentas = const <Map<String, dynamic>>[];
-  List<Map<String, dynamic>> _preguntasFalladas =
-      const <Map<String, dynamic>>[];
 
   @override
   void initState() {
@@ -5898,16 +7195,10 @@ class _PantallaDetalleVelocidadMateriaState
         materia: widget.materiaNombre,
         limit: 10,
       );
-      final falladas = await widget.iaService.obtenerPreguntasQueBajanMateria(
-        userId: widget.userId,
-        materia: widget.materiaNombre,
-        limit: 10,
-      );
 
       if (!mounted) return;
       setState(() {
         _preguntasLentas = lentas.isNotEmpty ? lentas : _preguntasLentas;
-        _preguntasFalladas = falladas;
         _cargando = false;
       });
     } catch (e) {
@@ -6098,105 +7389,6 @@ class _PantallaDetalleVelocidadMateriaState
     );
   }
 
-  Widget _buildListaFalladas() {
-    if (_preguntasFalladas.isEmpty) {
-      return Text(
-        'No hay preguntas falladas suficientes en esta materia por ahora.',
-        style: GoogleFonts.inter(fontSize: 12.5, color: Colors.grey.shade700),
-      );
-    }
-
-    return Column(
-      children: _preguntasFalladas.asMap().entries.map((entry) {
-        final index = entry.key;
-        final item = entry.value;
-        final numero = _toInt(item['numero']);
-        final texto = (item['texto'] ?? 'Pregunta').toString().trim();
-        final fallos = _toInt(item['fallos']);
-        final intentos = _toInt(item['intentos']);
-        final tasaError = _toDouble(item['tasa_error']);
-
-        return Container(
-          margin: EdgeInsets.only(
-            bottom: index == _preguntasFalladas.length - 1 ? 0 : 8,
-          ),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFFECACA)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '#${index + 1}',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFFB91C1C),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      numero > 0 ? 'Pregunta $numero' : 'Pregunta',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF7F1D1D),
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '$fallos fallos',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFFB91C1C),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                texto,
-                style: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0F172A),
-                  height: 1.3,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '$intentos intentos - Error ${tasaError.toStringAsFixed(1)}%',
-                style: GoogleFonts.inter(
-                  fontSize: 11.5,
-                  color: const Color(0xFF7F1D1D),
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final verdeTema =
@@ -6223,10 +7415,7 @@ class _PantallaDetalleVelocidadMateriaState
     final idsLentas = _idsUnicos(
       _preguntasLentas.map((item) => (item['pregunta_id'] ?? '').toString()),
     );
-    final idsFalladas = _idsUnicos(
-      _preguntasFalladas.map((item) => (item['pregunta_id'] ?? '').toString()),
-    );
-    final idsCombinadas = _idsUnicos([...idsFalladas, ...idsLentas]);
+    final idsCombinadas = _idsUnicos([...idsLentas]);
 
     return Scaffold(
       appBar: AppBar(
@@ -6397,28 +7586,6 @@ class _PantallaDetalleVelocidadMateriaState
                     },
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    'Preguntas que mas tiempo te quitan',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF92400E),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildListaLentas(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Preguntas que mas fallas',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFFB91C1C),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildListaFalladas(),
-                  const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -6458,25 +7625,17 @@ class _PantallaDetalleVelocidadMateriaState
                       child: const Text('Practicar solo preguntas lentas'),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: idsFalladas.isEmpty
-                          ? null
-                          : () => _emitirPractica(
-                              preguntaIds: idsFalladas,
-                              soloSeleccion: true,
-                            ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: verdeTema,
-                        side: BorderSide(
-                          color: verdeTema.withValues(alpha: 0.45),
-                        ),
-                      ),
-                      child: const Text('Practicar solo preguntas falladas'),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Preguntas que mas tiempo te quitan',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF92400E),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  _buildListaLentas(),
                 ],
               ),
             ),
