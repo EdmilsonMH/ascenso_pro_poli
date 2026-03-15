@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -17,6 +18,8 @@ class ServicioPreguntas {
   // invitados regeneren su snapshot y no queden anclados a IDs antiguos.
   static const String _prefsGuestSnapshotPrefix =
       'guest_fixed_question_ids_v3_';
+  static const String _prefsConteoPorMateriaPrefix =
+      'conteo_por_materia_v1_';
   static List<Map<String, dynamic>>?_materiasActivasCache;
   static DateTime?_materiasActivasCacheAt;
   static List<Map<String, dynamic>>?_bancosActivosCache;
@@ -25,6 +28,8 @@ class ServicioPreguntas {
   static bool?_premiumCacheValue;
   static DateTime?_premiumCacheAt;
   static final Map<String, List<String>> _idsCachePorFiltro = {};
+  static final Map<String, Map<String, int>> _conteoPorMateriaCache = {};
+  static final Map<String, String> _conteoPorMateriaCacheFirma = {};
   static final Map<String, Map<String, List<String>>> _guestSnapshotCache = {};
   static final Map<String, Map<String, List<String>>>
   _registradoNoActivoSnapshotCache = {};
@@ -37,6 +42,119 @@ class ServicioPreguntas {
     final normalizada = _normalizar(categoria);
     if (normalizada.isEmpty) return 'ambos';
     return normalizada;
+  }
+
+  String _claveConteoPorMateria({
+    required String categoria,
+    required String segmentoUsuario,
+  }) {
+    final categoriaNormalizada = _normalizar(categoria);
+    final userId = AuthService.currentUser?.id.trim();
+    final id = (userId == null || userId.isEmpty) ? 'anon' : userId;
+    return '$segmentoUsuario|$id|$categoriaNormalizada';
+  }
+
+  String _clavePrefsConteoPorMateria(String cacheKey) {
+    return '$_prefsConteoPorMateriaPrefix$cacheKey';
+  }
+
+  Future<Map<String, int>?> _obtenerConteoCache({
+    required String cacheKey,
+    required String firmaVersionBancos,
+  }) async {
+    final cache = _conteoPorMateriaCache[cacheKey];
+    final firmaCache = _conteoPorMateriaCacheFirma[cacheKey];
+    if (cache != null && firmaCache == firmaVersionBancos) {
+      return Map<String, int>.from(cache);
+    }
+    if (cache != null && firmaCache != firmaVersionBancos) {
+      _conteoPorMateriaCache.remove(cacheKey);
+      _conteoPorMateriaCacheFirma.remove(cacheKey);
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final prefsKey = _clavePrefsConteoPorMateria(cacheKey);
+      final raw = prefs.getString(prefsKey);
+      if (raw == null || raw.trim().isEmpty) return null;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        await prefs.remove(prefsKey);
+        return null;
+      }
+
+      final firmaPersistida = (decoded['sig'] ?? '').toString().trim();
+      final data = decoded['data'];
+      if (firmaPersistida.isEmpty || data is! Map) {
+        await prefs.remove(prefsKey);
+        return null;
+      }
+
+      if (firmaPersistida != firmaVersionBancos) {
+        await prefs.remove(prefsKey);
+        return null;
+      }
+
+      final conteo = <String, int>{};
+      for (final entry in data.entries) {
+        final materia = entry.key.toString().trim();
+        final cantidad = _toInt(entry.value);
+        if (materia.isEmpty || cantidad == null || cantidad <= 0) continue;
+        conteo[materia] = cantidad;
+      }
+
+      if (conteo.isEmpty) {
+        await prefs.remove(prefsKey);
+        return null;
+      }
+
+      _conteoPorMateriaCache[cacheKey] = Map<String, int>.from(conteo);
+      _conteoPorMateriaCacheFirma[cacheKey] = firmaVersionBancos;
+      return conteo;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _guardarConteoCache({
+    required String cacheKey,
+    required Map<String, int> conteo,
+    required String firmaVersionBancos,
+  }) {
+    if (conteo.isEmpty) return;
+    final snapshot = Map<String, int>.from(conteo);
+    _conteoPorMateriaCache[cacheKey] = snapshot;
+    _conteoPorMateriaCacheFirma[cacheKey] = firmaVersionBancos;
+    unawaited(
+      _guardarConteoCachePersistente(
+        cacheKey: cacheKey,
+        conteo: snapshot,
+        firmaVersionBancos: firmaVersionBancos,
+      ),
+    );
+  }
+
+  Future<void> _guardarConteoCachePersistente(
+    {
+    required String cacheKey,
+    required Map<String, int> conteo,
+    required String firmaVersionBancos,
+  }
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final payload = <String, dynamic>{
+        'sig': firmaVersionBancos,
+        'data': conteo,
+      };
+      await prefs.setString(
+        _clavePrefsConteoPorMateria(cacheKey),
+        jsonEncode(payload),
+      );
+    } catch (_) {
+      // Ignorado: cache persistente es best-effort.
+    }
   }
 
   Map<String, List<String>> _snapshotDesdeJson(String raw) {
@@ -147,6 +265,46 @@ class ServicioPreguntas {
       );
     }
     return ids;
+  }
+
+  Future<String> _obtenerFirmaVersionBancosPorCategoria(String categoria) async {
+    if (!SupabaseService.isInitialized) return 'local';
+
+    final tipoBanco = _tipoBancoPorCategoria(categoria);
+    List<Map<String, dynamic>> bancos;
+    try {
+      final bancosRaw = await SupabaseService.client
+          .from('banco_de_pregunta')
+          .select('id, nombre, version, descripcion, activo')
+          .eq('activo', true);
+      bancos = (bancosRaw as List<dynamic>).map(_toMap).toList();
+    } catch (_) {
+      bancos = await _obtenerBancosActivosCached();
+    }
+
+    final bancosFiltrados = bancos.where((banco) {
+      if (tipoBanco == 'suboficial') return _esBancoSuboficial(banco);
+      if (tipoBanco == 'oficial') return _esBancoOficial(banco);
+      return true;
+    }).toList();
+
+    if (bancosFiltrados.isEmpty) {
+      final grupo = tipoBanco ?? 'todos';
+      return '$grupo|sin_bancos';
+    }
+
+    final partes = bancosFiltrados
+        .map((banco) {
+          final id = banco['id']?.toString().trim() ?? '';
+          final version = (banco['version'] ?? '').toString().trim();
+          return '$id:$version';
+        })
+        .where((item) => item.isNotEmpty)
+        .toList()
+      ..sort();
+
+    final grupo = tipoBanco ?? 'todos';
+    return '$grupo|${partes.join(';')}';
   }
 
   Future<Map<String, List<String>>> _generarSnapshotInvitadoPorMateria(
@@ -773,11 +931,30 @@ class ServicioPreguntas {
   Future<Map<String, int>> obtenerConteoPreguntasPorMateria({
     String categoria = 'Ambos',
   }) async {
+    final firmaVersionBancos = await _obtenerFirmaVersionBancosPorCategoria(
+      categoria,
+    );
+
     if (_esInvitadoConSupabase) {
+      final cacheKey = _claveConteoPorMateria(
+        categoria: categoria,
+        segmentoUsuario: 'invitado',
+      );
+      final cache = await _obtenerConteoCache(
+        cacheKey: cacheKey,
+        firmaVersionBancos: firmaVersionBancos,
+      );
+      if (cache != null) return cache;
       try {
         final idsFijos = await _obtenerIdsFijosInvitado(categoria: categoria);
         if (idsFijos.isEmpty) return const <String, int>{};
-        return _contarPorMateriaDesdeIds(idsFijos);
+        final conteo = await _contarPorMateriaDesdeIds(idsFijos);
+        _guardarConteoCache(
+          cacheKey: cacheKey,
+          conteo: conteo,
+          firmaVersionBancos: firmaVersionBancos,
+        );
+        return conteo;
       } catch (e) {
         debugPrint(
           'ServicioPreguntas.obtenerConteoPreguntasPorMateria invitado error: $e',
@@ -786,13 +963,29 @@ class ServicioPreguntas {
       }
     }
 
-    if (await _esRegistradoNoActivoConSupabase()) {
+    final esRegistradoNoActivo = await _esRegistradoNoActivoConSupabase();
+    if (esRegistradoNoActivo) {
+      final cacheKey = _claveConteoPorMateria(
+        categoria: categoria,
+        segmentoUsuario: 'no_activo',
+      );
+      final cache = await _obtenerConteoCache(
+        cacheKey: cacheKey,
+        firmaVersionBancos: firmaVersionBancos,
+      );
+      if (cache != null) return cache;
       try {
         final idsFijos = await _obtenerIdsFijosRegistradoNoActivo(
           categoria: categoria,
         );
         if (idsFijos.isEmpty) return const <String, int>{};
-        return _contarPorMateriaDesdeIds(idsFijos);
+        final conteo = await _contarPorMateriaDesdeIds(idsFijos);
+        _guardarConteoCache(
+          cacheKey: cacheKey,
+          conteo: conteo,
+          firmaVersionBancos: firmaVersionBancos,
+        );
+        return conteo;
       } catch (e) {
         debugPrint(
           'ServicioPreguntas.obtenerConteoPreguntasPorMateria no-activo error: $e',
@@ -801,12 +994,27 @@ class ServicioPreguntas {
       }
     }
 
+    final cacheKey = _claveConteoPorMateria(
+      categoria: categoria,
+      segmentoUsuario: SupabaseService.isInitialized ? 'activo' : 'local',
+    );
+    final cache = await _obtenerConteoCache(
+      cacheKey: cacheKey,
+      firmaVersionBancos: firmaVersionBancos,
+    );
+    if (cache != null) return cache;
+
     if (!SupabaseService.isInitialized) {
       final mock = await _obtenerPreguntasDesdeFuente(categoria: categoria);
       final conteo = <String, int>{};
       for (final pregunta in mock) {
         conteo[pregunta.materia] = (conteo[pregunta.materia] ??0) + 1;
       }
+      _guardarConteoCache(
+        cacheKey: cacheKey,
+        conteo: conteo,
+        firmaVersionBancos: firmaVersionBancos,
+      );
       return conteo;
     }
 
@@ -874,7 +1082,13 @@ class ServicioPreguntas {
         offset += pageSize;
       }
 
-      return _mapearConteoMateriaIdANombre(conteoPorMateriaId);
+      final conteo = await _mapearConteoMateriaIdANombre(conteoPorMateriaId);
+      _guardarConteoCache(
+        cacheKey: cacheKey,
+        conteo: conteo,
+        firmaVersionBancos: firmaVersionBancos,
+      );
+      return conteo;
     } catch (e) {
       debugPrint('ServicioPreguntas.obtenerConteoPreguntasPorMateria error: $e');
       return const <String, int>{};
@@ -1094,6 +1308,16 @@ class ServicioPreguntas {
         categoria: categoria,
         materia: materia,
       );
+    } catch (_) {
+      // Ignorado: es solo precalentamiento.
+    }
+  }
+
+  Future<void> precalentarConteoPreguntasPorMateria({
+    String categoria = 'Ambos',
+  }) async {
+    try {
+      await obtenerConteoPreguntasPorMateria(categoria: categoria);
     } catch (_) {
       // Ignorado: es solo precalentamiento.
     }

@@ -18,6 +18,7 @@ import '../pantalla_practica_guiada_config.dart';
 import '../pantalla_preguntas_acertadas.dart';
 import '../pantalla_preguntas_incorrectas.dart';
 import '../pantalla_registro.dart';
+import 'pestana_estudio.dart';
 
 class PestanaInicio extends StatefulWidget {
   final String categoriaUsuario;
@@ -59,6 +60,11 @@ class _PestanaInicioState extends State<PestanaInicio>
     _cargarDatosUsuario();
     unawaited(
       _servicioPreguntas.precalentarPreguntas(
+        categoria: widget.categoriaUsuario,
+      ),
+    );
+    unawaited(
+      _servicioPreguntas.precalentarConteoPreguntasPorMateria(
         categoria: widget.categoriaUsuario,
       ),
     );
@@ -334,6 +340,19 @@ class _PestanaInicioState extends State<PestanaInicio>
     );
   }
 
+  Future<void> _abrirBancoPreguntas() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PestanaEstudio(
+          categoriaUsuario: widget.categoriaUsuario,
+          modo: ModoPestanaEstudio.bancoCompleto,
+          permitirCerrarRutaEnVistaMaterias: true,
+        ),
+      ),
+    );
+  }
+
   void _copiarCodigoReferido() {
     if (_codigoReferido.isEmpty) return;
     Clipboard.setData(ClipboardData(text: _codigoReferido));
@@ -349,7 +368,7 @@ class _PestanaInicioState extends State<PestanaInicio>
         descripcion: 'Refuerza lo que mas te cuesta.',
         icono: Icons.menu_book_rounded,
         color: const Color(0xFF16A36D),
-        onTap: () async => _irTab(1),
+        onTap: _abrirBancoPreguntas,
       ),
       _TarjetaInicioItem(
         titulo: 'Simulador de examen',

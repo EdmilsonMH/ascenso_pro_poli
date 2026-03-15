@@ -15,9 +15,9 @@ class PantallaPractica extends StatefulWidget {
   final bool avanzarSoloConBotonEnPractica;
   final bool revisarRespuestaInmediata;
   final bool registrarSesionEnHistorial;
-  final Function(Pregunta, int)?onRespuestaIncorrecta;
-  final int?tiempoLimiteSegundos;
-  final List<String>?materiasIncluidasParaRegistro;
+  final Function(Pregunta, int)? onRespuestaIncorrecta;
+  final int? tiempoLimiteSegundos;
+  final List<String>? materiasIncluidasParaRegistro;
 
   const PantallaPractica({
     super.key,
@@ -50,8 +50,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
       {}; // Map<PreguntaID, IndiceOpcion>
   final Map<String, int> _tiempoPorPreguntaSegundos = {};
   final Map<String, int> _cambiosAlternativaPorPregunta = {};
-  String?_preguntaVisibleId;
-  DateTime?_preguntaVisibleInicio;
+  String? _preguntaVisibleId;
+  DateTime? _preguntaVisibleInicio;
   bool _modoRevision =
       false; // Si es true, muestra la lista completa para revisar
 
@@ -68,7 +68,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   bool get _sinLimiteTiempo => _practicaConRevisarInmediato;
 
   // Estado para Modo Práctica Rápida (Feedback inmediato)
-  int?_indiceOpcionSeleccionadaPractica;
+  int? _indiceOpcionSeleccionadaPractica;
   bool _respuestaRevisadaEnPregunta = false;
 
   // Estado general
@@ -87,7 +87,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
     if (_sinLimiteTiempo) {
       _segundosTranscurridos = 0;
     } else {
-      _segundosRestantes = widget.tiempoLimiteSegundos ??120 * 60;
+      _segundosRestantes = widget.tiempoLimiteSegundos ?? 120 * 60;
     }
     _iniciarTemporizador();
     _iniciarTrackingPreguntaActual();
@@ -137,7 +137,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
 
   int _segundosUsados() {
     if (_sinLimiteTiempo) return _segundosTranscurridos;
-    final int tiempoTotalSegundos = widget.tiempoLimiteSegundos ??120 * 60;
+    final int tiempoTotalSegundos = widget.tiempoLimiteSegundos ?? 120 * 60;
     return tiempoTotalSegundos - _segundosRestantes;
   }
 
@@ -156,7 +156,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
     if (elapsedMs > 0) {
       final segundos = (elapsedMs / 1000).ceil();
       _tiempoPorPreguntaSegundos[preguntaId] =
-          (_tiempoPorPreguntaSegundos[preguntaId] ??0) + segundos;
+          (_tiempoPorPreguntaSegundos[preguntaId] ?? 0) + segundos;
     }
 
     _preguntaVisibleId = null;
@@ -164,21 +164,21 @@ class _PantallaPracticaState extends State<PantallaPractica> {
   }
 
   int _tiempoPreguntaSegundos(String preguntaId) {
-    return _tiempoPorPreguntaSegundos[preguntaId] ??0;
+    return _tiempoPorPreguntaSegundos[preguntaId] ?? 0;
   }
 
   int _cambiosPregunta(String preguntaId) {
-    return _cambiosAlternativaPorPregunta[preguntaId] ??0;
+    return _cambiosAlternativaPorPregunta[preguntaId] ?? 0;
   }
 
   void _registrarCambioAlternativa({
     required String preguntaId,
-    required int?indicePrevio,
+    required int? indicePrevio,
     required int nuevoIndice,
   }) {
     if (indicePrevio == null || indicePrevio == nuevoIndice) return;
     _cambiosAlternativaPorPregunta[preguntaId] =
-        (_cambiosAlternativaPorPregunta[preguntaId] ??0) + 1;
+        (_cambiosAlternativaPorPregunta[preguntaId] ?? 0) + 1;
   }
 
   List<String> _resolverMateriasParaRegistro() {
@@ -286,6 +286,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
 
     // Calcular puntaje
     int respuestasCorrectas = 0;
+    int respuestasIncorrectas = 0;
+    int respuestasOmitidas = 0;
     _preguntasCorrectas.clear();
     _preguntasIncorrectas.clear();
 
@@ -297,6 +299,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
           respuestasCorrectas++;
           _preguntasCorrectas.add(pregunta);
         } else {
+          respuestasIncorrectas++;
           _preguntasIncorrectas.add(
             IntentoFallido(
               pregunta: pregunta,
@@ -318,8 +321,12 @@ class _PantallaPracticaState extends State<PantallaPractica> {
           numeroCambiosRespuesta: _cambiosPregunta(pregunta.id),
         );
       } else {
-        // Pregunta no respondida cuenta como incorrecta/vacía
-        // La agregamos a incorrectas o tracking de 'no respondidas'
+        respuestasOmitidas++;
+        _servicioProgreso.registrarIntentoOmitido(
+          preguntaId: pregunta.id,
+          tiempoSegundos: _tiempoPreguntaSegundos(pregunta.id),
+          numeroCambiosRespuesta: _cambiosPregunta(pregunta.id),
+        );
       }
     }
 
@@ -332,7 +339,8 @@ class _PantallaPracticaState extends State<PantallaPractica> {
       await _servicioProgreso.registrarSesion(
         totalPreguntas: widget.preguntas.length,
         correctas: _puntaje,
-        incorrectas: widget.preguntas.length - _puntaje,
+        incorrectas: respuestasIncorrectas,
+        omitidas: respuestasOmitidas,
         tiempoSegundos: segundosUsados,
         materiasIncluidas: materias,
         cuentaParaRanking: widget.esRanking,
@@ -501,12 +509,28 @@ class _PantallaPracticaState extends State<PantallaPractica> {
     final int segundosUsados = _segundosUsados();
 
     final materias = _resolverMateriasParaRegistro();
+    final respuestasIncorrectas = _preguntasIncorrectas.length;
+    final respondidasIds = <String>{
+      ..._preguntasCorrectas.map((p) => p.id),
+      ..._preguntasIncorrectas.map((i) => i.pregunta.id),
+    };
+    int respuestasOmitidas = 0;
+    for (final pregunta in widget.preguntas) {
+      if (respondidasIds.contains(pregunta.id)) continue;
+      respuestasOmitidas++;
+      _servicioProgreso.registrarIntentoOmitido(
+        preguntaId: pregunta.id,
+        tiempoSegundos: _tiempoPreguntaSegundos(pregunta.id),
+        numeroCambiosRespuesta: _cambiosPregunta(pregunta.id),
+      );
+    }
 
     try {
       await _servicioProgreso.registrarSesion(
         totalPreguntas: widget.preguntas.length,
         correctas: _puntaje,
-        incorrectas: widget.preguntas.length - _puntaje,
+        incorrectas: respuestasIncorrectas,
+        omitidas: respuestasOmitidas,
         tiempoSegundos: segundosUsados,
         materiasIncluidas: materias,
         cuentaParaRanking: widget.esRanking,
@@ -588,7 +612,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
             ),
             Text(
               _sinLimiteTiempo
-                  ?'Tiempo: ${_formatearTiempo(_segundosTranscurridos)}'
+                  ? 'Tiempo: ${_formatearTiempo(_segundosTranscurridos)}'
                   : _formatearTiempo(_segundosRestantes),
               style: GoogleFonts.inter(
                 fontSize: 14,
@@ -759,7 +783,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                       border: Border.all(
                         color: colorBorde,
                         width: usaSeleccionSimple
-                            ?(estaSeleccionado ?2 : 1)
+                            ? (estaSeleccionado ? 2 : 1)
                             : (estaSeleccionado ||
                                       (mostrarFeedback && esCorrecta)
                                   ? 2
@@ -852,6 +876,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
             pregunta.indiceRespuestaCorrecta < pregunta.opciones.length)
         ? pregunta.opciones[pregunta.indiceRespuestaCorrecta]
         : '';
+    final explicacion = pregunta.explicacion.trim();
 
     return Container(
       key: _feedbackRevisionKey,
@@ -871,10 +896,10 @@ class _PantallaPracticaState extends State<PantallaPractica> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            esCorrecta ?'Correcto' : 'Incorrecto',
+            esCorrecta ? 'Correcto' : 'Incorrecto',
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
-              color: esCorrecta ?paleta.success : scheme.error,
+              color: esCorrecta ? paleta.success : scheme.error,
             ),
           ),
           const SizedBox(height: 6),
@@ -883,26 +908,58 @@ class _PantallaPracticaState extends State<PantallaPractica> {
               'Tu respuesta: opcion $letraSeleccionada',
               style: GoogleFonts.inter(fontSize: 13, color: scheme.error),
             ),
-          Text(
-            textoCorrecto.trim().isEmpty
-                ?'Respuesta correcta: opcion $letraCorrecta'
-                : 'Respuesta correcta: opcion $letraCorrecta - $textoCorrecto',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: scheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (pregunta.explicacion.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Explicacion: ${pregunta.explicacion}',
+          RichText(
+            text: TextSpan(
               style: GoogleFonts.inter(
                 fontSize: 13,
-                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
               ),
+              children: [
+                TextSpan(
+                  text: 'Respuesta correcta: opcion $letraCorrecta',
+                  style: TextStyle(color: paleta.feedbackCorrectBorder),
+                ),
+                if (textoCorrecto.trim().isNotEmpty)
+                  TextSpan(
+                    text: ' - $textoCorrecto',
+                    style: TextStyle(color: scheme.onSurface),
+                  ),
+              ],
             ),
-          ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: scheme.surface.withValues(alpha: 0.52),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Explicacion:',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                if (explicacion.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    explicacion,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -915,7 +972,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
 
     final String etiquetaPrincipal = !_respuestaRevisadaEnPregunta
         ? 'Revisar'
-        : (esUltimaPregunta ?'Finalizar' : 'Siguiente');
+        : (esUltimaPregunta ? 'Finalizar' : 'Siguiente');
 
     return SafeArea(
       top: false,
@@ -935,7 +992,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
           width: double.infinity,
           child: ElevatedButton(
             onPressed: !_respuestaRevisadaEnPregunta
-                ?(tieneSeleccion ?_revisarRespuestaPracticaActual : null)
+                ? (tieneSeleccion ? _revisarRespuestaPracticaActual : null)
                 : (esUltimaPregunta
                       ? _mostrarDialogoResultados
                       : _siguientePreguntaPractica),
@@ -999,7 +1056,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
             const Spacer(),
             if (esUltimaPregunta) ...[
               OutlinedButton(
-                onPressed: tieneSeleccion ?_finalizarExamenRanking : null,
+                onPressed: tieneSeleccion ? _finalizarExamenRanking : null,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: TemaAplicacion.colorPrimario,
                   side: BorderSide(
@@ -1194,7 +1251,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                   Expanded(
                     child: Text(
                       _sinLimiteTiempo
-                          ?'Tiempo transcurrido: ${_formatearTiempo(_segundosTranscurridos)}'
+                          ? 'Tiempo transcurrido: ${_formatearTiempo(_segundosTranscurridos)}'
                           : 'Tiempo restante: ${_formatearTiempo(_segundosRestantes)}',
                       style: GoogleFonts.inter(
                         fontSize: 14,
@@ -1282,7 +1339,7 @@ class _PantallaPracticaState extends State<PantallaPractica> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        respondida ?'Respondida' : 'Pendiente',
+                                        respondida ? 'Respondida' : 'Pendiente',
                                         style: TextStyle(
                                           color: colorEstado,
                                           fontSize: 11,

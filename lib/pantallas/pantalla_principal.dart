@@ -93,6 +93,7 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
       PestanaEstudio(
         key: _pestanaEstudioKey,
         categoriaUsuario: widget.categoriaUsuario,
+        modo: ModoPestanaEstudio.estudiarSimple,
       ),
       PestanaPracticar(
         categoriaUsuario: widget.categoriaUsuario,

@@ -26,7 +26,7 @@ class ServicioProgreso {
   bool get _useSupabase =>
       SupabaseService.isInitialized && AuthService.currentUser != null;
 
-  String?get _usuarioId => AuthService.currentUser?.id;
+  String? get _usuarioId => AuthService.currentUser?.id;
 
   /// Migra el progreso local de invitado a Supabase cuando ya existe sesion.
   /// - Sesiones: se copian al historial como practicas migradas.
@@ -79,8 +79,8 @@ class ServicioProgreso {
     required String preguntaId,
     required String respuestaSeleccionada,
     required bool esCorrecta,
-    int?tiempoSegundos,
-    int?numeroCambiosRespuesta,
+    int? tiempoSegundos,
+    int? numeroCambiosRespuesta,
   }) async {
     final id = preguntaId.trim();
     if (id.isEmpty) return;
@@ -94,6 +94,7 @@ class ServicioProgreso {
         preguntaId: id,
         respuestaSeleccionada: letra,
         esCorrecta: esCorrecta,
+        fueOmitida: false,
         tiempoSegundos: tiempoSegundos,
         numeroCambiosRespuesta: numeroCambiosRespuesta,
         fechaIntento: DateTime.now(),
@@ -103,6 +104,35 @@ class ServicioProgreso {
     debugPrint(
       'ServicioProgreso.registrarIntento: pregunta=$id, '
       'correcta=$esCorrecta, pendientes=${_intentosPendientes.length}, '
+      'useSupabase=$_useSupabase, usuarioId=$_usuarioId',
+    );
+  }
+
+  /// Registra una pregunta omitida (sin alternativa seleccionada).
+  Future<void> registrarIntentoOmitido({
+    required String preguntaId,
+    int? tiempoSegundos,
+    int? numeroCambiosRespuesta,
+  }) async {
+    final id = preguntaId.trim();
+    if (id.isEmpty) return;
+
+    _intentosPendientes.removeWhere((x) => x.preguntaId == id);
+    _intentosPendientes.add(
+      _IntentoPendiente(
+        preguntaId: id,
+        respuestaSeleccionada: null,
+        esCorrecta: null,
+        fueOmitida: true,
+        tiempoSegundos: tiempoSegundos,
+        numeroCambiosRespuesta: numeroCambiosRespuesta,
+        fechaIntento: DateTime.now(),
+      ),
+    );
+
+    debugPrint(
+      'ServicioProgreso.registrarIntentoOmitido: pregunta=$id, '
+      'pendientes=${_intentosPendientes.length}, '
       'useSupabase=$_useSupabase, usuarioId=$_usuarioId',
     );
   }
@@ -215,7 +245,7 @@ class ServicioProgreso {
   /// si una pregunta llega a 3 aciertos consecutivos, el contador visible
   /// vuelve a 0 (`aciertosVisibles` en [EstadisticaPregunta]).
   Future<Map<String, EstadisticaPregunta>> obtenerEstadisticasPreguntas({
-    List<String>?preguntaIds,
+    List<String>? preguntaIds,
   }) async {
     final idsNormalizados = preguntaIds
         ?.map((e) => e.trim())
@@ -272,11 +302,11 @@ class ServicioProgreso {
       for (final row in rows) {
         final preguntaId = row['pregunta_id']?.toString();
         if (preguntaId == null || preguntaId.isEmpty) continue;
-        final totalAciertos = _toInt(row['total_veces_correcta']) ??0;
-        final totalFallos = _toInt(row['total_veces_incorrecta']) ??0;
-        final rachaAciertos = _toInt(row['racha_correctas_consecutivas']) ??0;
-        final rachaFallos = _toInt(row['racha_incorrectas_consecutivas']) ??0;
-        bool?ultimoResultado;
+        final totalAciertos = _toInt(row['total_veces_correcta']) ?? 0;
+        final totalFallos = _toInt(row['total_veces_incorrecta']) ?? 0;
+        final rachaAciertos = _toInt(row['racha_correctas_consecutivas']) ?? 0;
+        final rachaFallos = _toInt(row['racha_incorrectas_consecutivas']) ?? 0;
+        bool? ultimoResultado;
         if (rachaAciertos > 0) {
           ultimoResultado = true;
         } else if (rachaFallos > 0) {
@@ -371,6 +401,7 @@ class ServicioProgreso {
     required int totalPreguntas,
     required int correctas,
     required int incorrectas,
+    int omitidas = 0,
     required int tiempoSegundos,
     required List<String> materiasIncluidas,
     required bool cuentaParaRanking,
@@ -391,7 +422,8 @@ class ServicioProgreso {
     debugPrint(
       'ServicioProgreso.registrarSesion: useSupabase=$_useSupabase, '
       'usuarioId=$_usuarioId, intentosPendientes=${_intentosPendientes.length}, '
-      'total=$totalPreguntas, correctas=$correctas, incorrectas=$incorrectas',
+      'total=$totalPreguntas, correctas=$correctas, '
+      'incorrectas=$incorrectas, omitidas=$omitidas',
     );
 
     try {
@@ -400,7 +432,7 @@ class ServicioProgreso {
           final usuarioId = _usuarioId;
           if (usuarioId != null) {
             await _asegurarUsuarioBase();
-            String?sesionId;
+            String? sesionId;
             if (registrarHistorial) {
               final materiaIds = await _resolverMateriaIds(materiasIncluidas);
               final ahora = DateTime.now();
@@ -410,14 +442,16 @@ class ServicioProgreso {
                     .from('sesion_practica')
                     .insert({
                       'usuario_id': usuarioId,
-                      'tipo_sesion': cuentaParaRanking ?'ranking' : 'practica',
+                      'tipo_sesion': cuentaParaRanking ? 'ranking' : 'practica',
                       'nombre_sesion': cuentaParaRanking
                           ? 'Practica Ranking'
                           : 'Practica Personalizada',
                       'total_preguntas_planeadas': totalPreguntas,
-                      'preguntas_respondidas': correctas + incorrectas,
+                      'preguntas_respondidas':
+                          correctas + incorrectas + omitidas,
                       'preguntas_correctas': correctas,
                       'preguntas_incorrectas': incorrectas,
+                      'preguntas_omitidas': omitidas,
                       'fecha_inicio': inicio.toIso8601String(),
                       'fecha_fin': ahora.toIso8601String(),
                       'duracion_real_segundos': tiempoSegundos,
@@ -501,7 +535,7 @@ class ServicioProgreso {
 
   /// Obtiene el historial completo de sesiones de practica del usuario.
   Future<List<SesionPractica>> obtenerHistorialSesiones({
-    bool?soloRanking,
+    bool? soloRanking,
   }) async {
     if (!_useSupabase) {
       await _asegurarMockPersistidoCargado();
@@ -530,8 +564,8 @@ class ServicioProgreso {
         final totalPreguntas =
             _toInt(row['total_preguntas_planeadas']) ??
             _toInt(row['preguntas_respondidas']) ??
-            ((_toInt(row['preguntas_correctas']) ??0) +
-                (_toInt(row['preguntas_incorrectas']) ??0));
+            ((_toInt(row['preguntas_correctas']) ?? 0) +
+                (_toInt(row['preguntas_incorrectas']) ?? 0));
 
         final metadata = _toMap(row['metadata']);
         final tipoSesion = _normalizar(row['tipo_sesion']);
@@ -545,11 +579,11 @@ class ServicioProgreso {
 
         sesiones.add(
           SesionPractica(
-            id: row['id']?.toString() ??'',
+            id: row['id']?.toString() ?? '',
             totalPreguntas: totalPreguntas,
-            preguntasCorrectas: _toInt(row['preguntas_correctas']) ??0,
-            preguntasIncorrectas: _toInt(row['preguntas_incorrectas']) ??0,
-            tiempoSegundos: _toInt(row['duracion_real_segundos']) ??0,
+            preguntasCorrectas: _toInt(row['preguntas_correctas']) ?? 0,
+            preguntasIncorrectas: _toInt(row['preguntas_incorrectas']) ?? 0,
+            tiempoSegundos: _toInt(row['duracion_real_segundos']) ?? 0,
             cuentaParaRanking: esRanking,
             fechaCreacion:
                 _toDateTime(row['fecha_fin']) ??
@@ -692,7 +726,7 @@ class ServicioProgreso {
 
   Future<void> _persistirIntentosPendientes({
     required String usuarioId,
-    String?sesionId,
+    String? sesionId,
   }) async {
     if (_intentosPendientes.isEmpty) return;
 
@@ -741,18 +775,20 @@ class ServicioProgreso {
   Map<String, dynamic> _buildRespuestaPayload({
     required String usuarioId,
     required _IntentoPendiente intento,
-    String?sesionId,
+    String? sesionId,
   }) {
     final row = <String, dynamic>{
       'usuario_id': usuarioId,
       'pregunta_id': intento.preguntaId,
-      'letra_seleccionada': intento.respuestaSeleccionada,
       'es_correcta': intento.esCorrecta,
-      'fue_omitida': false,
-      'tiempo_total_respuesta': intento.tiempoSegundos ??0,
-      'numero_cambios_respuesta': intento.numeroCambiosRespuesta ??0,
+      'fue_omitida': intento.fueOmitida,
+      'tiempo_total_respuesta': intento.tiempoSegundos ?? 0,
+      'numero_cambios_respuesta': intento.numeroCambiosRespuesta ?? 0,
       'respondida_at': intento.fechaIntento.toIso8601String(),
     };
+    if (intento.respuestaSeleccionada != null) {
+      row['letra_seleccionada'] = intento.respuestaSeleccionada;
+    }
     if (sesionId != null && sesionId.isNotEmpty) {
       row['sesion_id'] = sesionId;
     }
@@ -770,7 +806,7 @@ class ServicioProgreso {
         .maybeSingle();
     if (existente != null) return;
 
-    final metadata = Map<String, dynamic>.from(user.userMetadata ??{});
+    final metadata = Map<String, dynamic>.from(user.userMetadata ?? {});
     final nombre = _resolverNombreUsuario(metadata, user.email);
     final grado = _resolverGradoUsuario(metadata);
 
@@ -785,7 +821,7 @@ class ServicioProgreso {
     });
   }
 
-  String _resolverNombreUsuario(Map<String, dynamic> metadata, String?email) {
+  String _resolverNombreUsuario(Map<String, dynamic> metadata, String? email) {
     final candidatos = [
       metadata['nombre_completo'],
       metadata['full_name'],
@@ -880,9 +916,9 @@ class ServicioProgreso {
         .eq('usuario_id', usuarioId)
         .maybeSingle();
 
-    Map<String, dynamic>?row;
+    Map<String, dynamic>? row;
     if (actual == null) {
-      final simulacros = simulacroValido ?1 : 0;
+      final simulacros = simulacroValido ? 1 : 0;
       try {
         await SupabaseService.client.from('ranking').insert({
           'usuario_id': usuarioId,
@@ -890,9 +926,9 @@ class ServicioProgreso {
           'puntos_mes_actual': puntosGanados,
           'puntos_semana_actual': puntosGanados,
           'simulacros_100_completados': simulacros,
-          'simulacros_aprobados': simulacroAprobado ?1 : 0,
-          'mejor_puntaje_simulacro': simulacroValido ?porcentaje.round() : 0,
-          'promedio_simulacros': simulacroValido ?porcentaje : 0,
+          'simulacros_aprobados': simulacroAprobado ? 1 : 0,
+          'mejor_puntaje_simulacro': simulacroValido ? porcentaje.round() : 0,
+          'promedio_simulacros': simulacroValido ? porcentaje : 0,
           'actualizado_at': nowIso,
           'calculo_ranking_at': nowIso,
         });
@@ -919,31 +955,31 @@ class ServicioProgreso {
       row = _toMap(actual);
     }
 
-    final prevSimulacros = _toInt(row['simulacros_100_completados']) ??0;
-    final prevPromedio = _toDouble(row['promedio_simulacros']) ??0;
-    final nuevoSimulacros = prevSimulacros + (simulacroValido ?1 : 0);
+    final prevSimulacros = _toInt(row['simulacros_100_completados']) ?? 0;
+    final prevPromedio = _toDouble(row['promedio_simulacros']) ?? 0;
+    final nuevoSimulacros = prevSimulacros + (simulacroValido ? 1 : 0);
     final nuevoPromedio = simulacroValido
         ? ((prevPromedio * prevSimulacros) + porcentaje) / nuevoSimulacros
         : prevPromedio;
 
-    final mejorPrevio = _toInt(row['mejor_puntaje_simulacro']) ??0;
+    final mejorPrevio = _toInt(row['mejor_puntaje_simulacro']) ?? 0;
     final nuevoMejor = simulacroValido
-        ?(porcentaje.round() > mejorPrevio ?porcentaje.round() : mejorPrevio)
+        ? (porcentaje.round() > mejorPrevio ? porcentaje.round() : mejorPrevio)
         : mejorPrevio;
 
     await SupabaseService.client
         .from('ranking')
         .update({
           'puntos_totales':
-              (_toInt(row['puntos_totales']) ??0) + puntosGanados,
+              (_toInt(row['puntos_totales']) ?? 0) + puntosGanados,
           'puntos_mes_actual':
-              (_toInt(row['puntos_mes_actual']) ??0) + puntosGanados,
+              (_toInt(row['puntos_mes_actual']) ?? 0) + puntosGanados,
           'puntos_semana_actual':
-              (_toInt(row['puntos_semana_actual']) ??0) + puntosGanados,
+              (_toInt(row['puntos_semana_actual']) ?? 0) + puntosGanados,
           'simulacros_100_completados': nuevoSimulacros,
           'simulacros_aprobados':
-              (_toInt(row['simulacros_aprobados']) ??0) +
-              (simulacroAprobado ?1 : 0),
+              (_toInt(row['simulacros_aprobados']) ?? 0) +
+              (simulacroAprobado ? 1 : 0),
           'mejor_puntaje_simulacro': nuevoMejor,
           'promedio_simulacros': nuevoPromedio,
           'actualizado_at': nowIso,
@@ -1047,8 +1083,8 @@ class ServicioProgreso {
         _mockSesiones.isNotEmpty;
   }
 
-  Future<void> _limpiarDatosMockPersistidos({SharedPreferences?prefs}) async {
-    final storage = prefs ??await SharedPreferences.getInstance();
+  Future<void> _limpiarDatosMockPersistidos({SharedPreferences? prefs}) async {
+    final storage = prefs ?? await SharedPreferences.getInstance();
     await storage.remove(_prefsGuestStatsKey);
     await storage.remove(_prefsGuestIncorrectMetaKey);
     await storage.remove(_prefsGuestSessionsKey);
@@ -1080,7 +1116,7 @@ class ServicioProgreso {
           : sesion.preguntasCorrectas + sesion.preguntasIncorrectas;
       if (totalPreguntas <= 0) continue;
 
-      final duracionSeg = sesion.tiempoSegundos < 0 ?0 : sesion.tiempoSegundos;
+      final duracionSeg = sesion.tiempoSegundos < 0 ? 0 : sesion.tiempoSegundos;
       final fechaFin = sesion.fechaCreacion;
       final fechaInicio = fechaFin.subtract(Duration(seconds: duracionSeg));
       final puntaje = totalPreguntas > 0
@@ -1145,7 +1181,7 @@ class ServicioProgreso {
       for (final item in (rows as List<dynamic>)) {
         final row = _toMap(item);
         final metadata = _toMap(row['metadata']);
-        final guestId = metadata['guest_session_id']?.toString().trim() ??'';
+        final guestId = metadata['guest_session_id']?.toString().trim() ?? '';
         if (guestId.isNotEmpty) ids.add(guestId);
       }
       return ids;
@@ -1177,7 +1213,7 @@ class ServicioProgreso {
             .eq('usuario_id', usuarioId)
             .inFilter('pregunta_id', chunk);
         for (final item in (rows as List<dynamic>)) {
-          final id = _toMap(item)['pregunta_id']?.toString().trim() ??'';
+          final id = _toMap(item)['pregunta_id']?.toString().trim() ?? '';
           if (id.isNotEmpty) yaRegistradas.add(id);
         }
       } catch (e) {
@@ -1210,12 +1246,12 @@ class ServicioProgreso {
         'total_veces_omitida': 0,
         'primera_vez_vista': nowIso,
         'ultima_vez_vista': nowIso,
-        'primera_vez_correcta': estado.totalAciertos > 0 ?nowIso : null,
-        'ultima_vez_incorrecta': estado.totalFallos > 0 ?nowIso : null,
+        'primera_vez_correcta': estado.totalAciertos > 0 ? nowIso : null,
+        'ultima_vez_incorrecta': estado.totalFallos > 0 ? nowIso : null,
         'racha_correctas_consecutivas': estado.rachaAciertos,
         'racha_incorrectas_consecutivas': estado.rachaFallos,
         'estado_dominio': _estadoDominioDesdeMock(estado),
-        'veces_dominada': estado.rachaAciertos >= 3 ?1 : 0,
+        'veces_dominada': estado.rachaAciertos >= 3 ? 1 : 0,
         'necesita_atencion_especial':
             estado.ultimoResultadoCorrecto == false && estado.totalFallos >= 2,
         'actualizado_at': nowIso,
@@ -1290,9 +1326,9 @@ class ServicioProgreso {
       }
 
       final row = _toMap(existente);
-      final respondidasActual = _toInt(row['total_preguntas_respondidas']) ??0;
-      final correctasActual = _toInt(row['total_correctas']) ??0;
-      final incorrectasActual = _toInt(row['total_incorrectas']) ??0;
+      final respondidasActual = _toInt(row['total_preguntas_respondidas']) ?? 0;
+      final correctasActual = _toInt(row['total_correctas']) ?? 0;
+      final incorrectasActual = _toInt(row['total_incorrectas']) ?? 0;
 
       final respondidasNuevo = respondidasActual + resumen.totalRespondidas;
       final correctasNuevo = correctasActual + resumen.totalCorrectas;
@@ -1319,6 +1355,10 @@ class ServicioProgreso {
   }
 
   void _aplicarIntentoEnMocks(_IntentoPendiente intento) {
+    if (intento.fueOmitida) {
+      return;
+    }
+
     final actual =
         _mockEstadoPreguntas[intento.preguntaId] ??
         const _MockPreguntaEstado(
@@ -1329,7 +1369,7 @@ class ServicioProgreso {
           ultimoResultadoCorrecto: null,
         );
 
-    if (intento.esCorrecta) {
+    if (intento.esCorrecta == true) {
       _mockEstadoPreguntas[intento.preguntaId] = _MockPreguntaEstado(
         totalAciertos: actual.totalAciertos + 1,
         totalFallos: actual.totalFallos,
@@ -1351,7 +1391,7 @@ class ServicioProgreso {
 
     _mockIncorrectasMeta[intento.preguntaId] = _MockIncorrectMeta(
       indiceIncorrectoSeleccionado: _indiceDesdeLetraSimple(
-        intento.respuestaSeleccionada,
+        intento.respuestaSeleccionada ?? 'A',
       ),
       fechaIntento: intento.fechaIntento,
     );
@@ -1363,7 +1403,7 @@ class ServicioProgreso {
     }
   }
 
-  List<SesionPractica> _historialMock({bool?soloRanking}) {
+  List<SesionPractica> _historialMock({bool? soloRanking}) {
     final todas = List<SesionPractica>.from(_mockSesiones)
       ..sort((a, b) => b.fechaCreacion.compareTo(a.fechaCreacion));
 
@@ -1378,13 +1418,13 @@ class ServicioProgreso {
 
   SesionPractica _sesionFromMap(Map<String, dynamic> map) {
     return SesionPractica(
-      id: map['id']?.toString() ??'',
-      totalPreguntas: _toInt(map['total_preguntas']) ??0,
-      preguntasCorrectas: _toInt(map['preguntas_correctas']) ??0,
-      preguntasIncorrectas: _toInt(map['preguntas_incorrectas']) ??0,
-      tiempoSegundos: _toInt(map['tiempo_segundos']) ??0,
+      id: map['id']?.toString() ?? '',
+      totalPreguntas: _toInt(map['total_preguntas']) ?? 0,
+      preguntasCorrectas: _toInt(map['preguntas_correctas']) ?? 0,
+      preguntasIncorrectas: _toInt(map['preguntas_incorrectas']) ?? 0,
+      tiempoSegundos: _toInt(map['tiempo_segundos']) ?? 0,
       cuentaParaRanking: map['cuenta_para_ranking'] == true,
-      fechaCreacion: _toDateTime(map['fecha_creacion']) ??DateTime.now(),
+      fechaCreacion: _toDateTime(map['fecha_creacion']) ?? DateTime.now(),
     );
   }
 
@@ -1404,11 +1444,11 @@ class ServicioProgreso {
     final raw = letra.trim().toUpperCase();
     if (raw.isEmpty) return 0;
     final code = raw.codeUnitAt(0) - 65;
-    return code < 0 ?0 : code;
+    return code < 0 ? 0 : code;
   }
 
-  String?_normalizarLetra(String?value) {
-    final raw = (value ??'').trim().toUpperCase();
+  String? _normalizarLetra(String? value) {
+    final raw = (value ?? '').trim().toUpperCase();
     if (raw.isEmpty) return null;
     return raw.substring(0, 1);
   }
@@ -1429,28 +1469,28 @@ class ServicioProgreso {
     return <String, dynamic>{};
   }
 
-  int?_toInt(dynamic value) {
+  int? _toInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
   }
 
-  double?_toDouble(dynamic value) {
+  double? _toDouble(dynamic value) {
     if (value == null) return null;
     if (value is double) return value;
     if (value is num) return value.toDouble();
     return double.tryParse(value.toString());
   }
 
-  DateTime?_toDateTime(dynamic value) {
+  DateTime? _toDateTime(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
     return DateTime.tryParse(value.toString());
   }
 
   String _normalizar(dynamic value) {
-    return (value ??'').toString().trim().toLowerCase();
+    return (value ?? '').toString().trim().toLowerCase();
   }
 
   Future<List<IntentoFallido>>
@@ -1577,7 +1617,7 @@ class ServicioProgreso {
       if (pregunta == null) continue;
 
       final meta = _mockIncorrectasMeta[id];
-      var indice = meta?.indiceIncorrectoSeleccionado ??0;
+      var indice = meta?.indiceIncorrectoSeleccionado ?? 0;
       if (indice < 0) indice = 0;
       if (pregunta.opciones.isNotEmpty && indice >= pregunta.opciones.length) {
         indice = pregunta.opciones.length - 1;
@@ -1595,7 +1635,7 @@ class ServicioProgreso {
   }
 
   Map<String, EstadisticaPregunta> _obtenerEstadisticasMock({
-    List<String>?preguntaIds,
+    List<String>? preguntaIds,
   }) {
     final resultado = <String, EstadisticaPregunta>{};
     for (final entry in _mockEstadoPreguntas.entries) {
@@ -1631,14 +1671,14 @@ class ServicioProgreso {
     if (items.isEmpty) return const [];
     final chunks = <List<T>>[];
     for (var i = 0; i < items.length; i += size) {
-      final end = (i + size < items.length) ?i + size : items.length;
+      final end = (i + size < items.length) ? i + size : items.length;
       chunks.add(items.sublist(i, end));
     }
     return chunks;
   }
 
   Future<Map<String, EstadisticaPregunta>> _obtenerEstadisticasDesdeRespuestas({
-    List<String>?preguntaIds,
+    List<String>? preguntaIds,
   }) async {
     final usuarioId = _usuarioId;
     if (usuarioId == null) return {};
@@ -1759,7 +1799,7 @@ class ServicioProgreso {
     final resultado = <String, bool?>{};
     for (final id in preguntaIds) {
       final row = latest[id];
-      resultado[id] = row == null ?null : row['es_correcta'] == true;
+      resultado[id] = row == null ? null : row['es_correcta'] == true;
     }
     return resultado;
   }
@@ -1771,7 +1811,7 @@ class EstadisticaPregunta {
   final int totalFallos;
   final int rachaAciertos;
   final int rachaFallos;
-  final bool?ultimoResultadoCorrecto;
+  final bool? ultimoResultadoCorrecto;
 
   const EstadisticaPregunta({
     required this.preguntaId,
@@ -1812,16 +1852,18 @@ class _ResumenMigracionInvitado {
 
 class _IntentoPendiente {
   final String preguntaId;
-  final String respuestaSeleccionada;
-  final bool esCorrecta;
-  final int?tiempoSegundos;
-  final int?numeroCambiosRespuesta;
+  final String? respuestaSeleccionada;
+  final bool? esCorrecta;
+  final bool fueOmitida;
+  final int? tiempoSegundos;
+  final int? numeroCambiosRespuesta;
   final DateTime fechaIntento;
 
   const _IntentoPendiente({
     required this.preguntaId,
     required this.respuestaSeleccionada,
     required this.esCorrecta,
+    required this.fueOmitida,
     required this.tiempoSegundos,
     required this.numeroCambiosRespuesta,
     required this.fechaIntento,
@@ -1833,7 +1875,7 @@ class _MockPreguntaEstado {
   final int totalFallos;
   final int rachaAciertos;
   final int rachaFallos;
-  final bool?ultimoResultadoCorrecto;
+  final bool? ultimoResultadoCorrecto;
 
   const _MockPreguntaEstado({
     required this.totalAciertos,
@@ -1845,10 +1887,10 @@ class _MockPreguntaEstado {
 
   factory _MockPreguntaEstado.fromMap(Map<String, dynamic> map) {
     return _MockPreguntaEstado(
-      totalAciertos: (map['total_aciertos'] as num?)?.toInt() ??0,
-      totalFallos: (map['total_fallos'] as num?)?.toInt() ??0,
-      rachaAciertos: (map['racha_aciertos'] as num?)?.toInt() ??0,
-      rachaFallos: (map['racha_fallos'] as num?)?.toInt() ??0,
+      totalAciertos: (map['total_aciertos'] as num?)?.toInt() ?? 0,
+      totalFallos: (map['total_fallos'] as num?)?.toInt() ?? 0,
+      rachaAciertos: (map['racha_aciertos'] as num?)?.toInt() ?? 0,
+      rachaFallos: (map['racha_fallos'] as num?)?.toInt() ?? 0,
       ultimoResultadoCorrecto: map['ultimo_resultado_correcto'] is bool
           ? map['ultimo_resultado_correcto'] as bool
           : null,
@@ -1868,7 +1910,7 @@ class _MockPreguntaEstado {
 
 class _MockIncorrectMeta {
   final int indiceIncorrectoSeleccionado;
-  final DateTime?fechaIntento;
+  final DateTime? fechaIntento;
 
   const _MockIncorrectMeta({
     required this.indiceIncorrectoSeleccionado,
@@ -1878,8 +1920,8 @@ class _MockIncorrectMeta {
   factory _MockIncorrectMeta.fromMap(Map<String, dynamic> map) {
     return _MockIncorrectMeta(
       indiceIncorrectoSeleccionado:
-          (map['indice_incorrecto_seleccionado'] as num?)?.toInt() ??0,
-      fechaIntento: DateTime.tryParse((map['fecha_intento'] ??'').toString()),
+          (map['indice_incorrecto_seleccionado'] as num?)?.toInt() ?? 0,
+      fechaIntento: DateTime.tryParse((map['fecha_intento'] ?? '').toString()),
     );
   }
 
@@ -1896,7 +1938,7 @@ class _AcumuladorEstadistica {
   int totalFallos = 0;
   int rachaAciertos = 0;
   int rachaFallos = 0;
-  bool?ultimoResultadoCorrecto;
+  bool? ultimoResultadoCorrecto;
 }
 
 class SesionPractica {
@@ -1919,7 +1961,7 @@ class SesionPractica {
   });
 
   double get porcentaje =>
-      totalPreguntas > 0 ?(preguntasCorrectas / totalPreguntas) * 100 : 0.0;
+      totalPreguntas > 0 ? (preguntasCorrectas / totalPreguntas) * 100 : 0.0;
 }
 
 class EstadisticasHistorial {

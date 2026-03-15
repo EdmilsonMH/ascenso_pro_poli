@@ -91,7 +91,6 @@ class TutorDashboardInicio {
         'analisis de velocidad',
         'activa mi coach de memoria',
         'indice de memoria',
-        'prediccion de olvido',
         'dame un mensaje motivacional',
       ],
     );
@@ -215,6 +214,7 @@ class TutorInsightCard {
   final List<String> preguntasNuevasIds;
   final List<String> preguntasRepasoIds;
   final List<String> materiasPrioritariasIds;
+  final List<String> materiasPrioritarias;
   final List<TutorRiskItem> riesgos;
 
   const TutorInsightCard({
@@ -234,6 +234,7 @@ class TutorInsightCard {
     this.preguntasNuevasIds = const <String>[],
     this.preguntasRepasoIds = const <String>[],
     this.materiasPrioritariasIds = const <String>[],
+    this.materiasPrioritarias = const <String>[],
     this.riesgos = const <TutorRiskItem>[],
   });
 
@@ -253,6 +254,32 @@ class TutorInsightCard {
           .toList();
     }
 
+    List<String> mergeStringLists(Iterable<dynamic> values) {
+      final salida = <String>[];
+      final vistos = <String>{};
+      for (final value in values) {
+        for (final item in toStringList(value)) {
+          if (vistos.add(item)) salida.add(item);
+        }
+      }
+      return salida;
+    }
+
+    List<String> materiasDesdeListaMaps(dynamic value) {
+      if (value is! List) return const <String>[];
+      final salida = <String>[];
+      final vistos = <String>{};
+      for (final item in value.whereType<Map>()) {
+        final row = Map<String, dynamic>.from(item);
+        final materia = (row['materia'] ?? row['nombre'] ?? '')
+            .toString()
+            .trim();
+        if (materia.isEmpty) continue;
+        if (vistos.add(materia)) salida.add(materia);
+      }
+      return salida;
+    }
+
     final riesgosRaw = map['riesgos'];
     final riesgos = riesgosRaw is List
         ? riesgosRaw
@@ -260,6 +287,26 @@ class TutorInsightCard {
               .map((e) => TutorRiskItem.fromMap(Map<String, dynamic>.from(e)))
               .toList()
         : <TutorRiskItem>[];
+    final materiasPrioritarias = mergeStringLists([
+      map['materias_prioritarias'],
+      map['materias_prioritarias_nombres'],
+      materiasDesdeListaMaps(map['materias_tiempo']),
+      riesgos.map((e) => e.materia).toList(),
+    ]);
+    final preguntaIds = mergeStringLists([
+      map['pregunta_ids'],
+      map['preguntas_lentas_ids'],
+      map['pregunta_ids_prioritarias'],
+      map['preguntas_criticas_ids'],
+    ]);
+    final preguntasRepasoIds = mergeStringLists([
+      map['preguntas_repaso_ids'],
+      map['pregunta_ids_repaso'],
+    ]);
+    final materiaRaw = (map['materia'] ?? '').toString().trim();
+    final materia = materiaRaw.isNotEmpty
+        ? materiaRaw
+        : (materiasPrioritarias.isNotEmpty ? materiasPrioritarias.first : null);
 
     return TutorInsightCard(
       id: (map['id'] ?? 'card').toString(),
@@ -273,11 +320,12 @@ class TutorInsightCard {
       expandable: map['expandable'] != false,
       cantidadPractica: toOptionalInt(map['cantidad_practica']),
       tiempoPractica: toOptionalInt(map['tiempo_practica']),
-      materia: map['materia']?.toString(),
-      preguntaIds: toStringList(map['pregunta_ids']),
+      materia: materia,
+      preguntaIds: preguntaIds,
       preguntasNuevasIds: toStringList(map['preguntas_nuevas_ids']),
-      preguntasRepasoIds: toStringList(map['preguntas_repaso_ids']),
+      preguntasRepasoIds: preguntasRepasoIds,
       materiasPrioritariasIds: toStringList(map['materias_prioritarias_ids']),
+      materiasPrioritarias: materiasPrioritarias,
       riesgos: riesgos,
     );
   }
@@ -303,6 +351,8 @@ class TutorInsightCard {
         'preguntas_repaso_ids': preguntasRepasoIds,
       if (materiasPrioritariasIds.isNotEmpty)
         'materias_prioritarias_ids': materiasPrioritariasIds,
+      if (materiasPrioritarias.isNotEmpty)
+        'materias_prioritarias': materiasPrioritarias,
       'riesgos': riesgos.map((e) => e.toMap()).toList(),
     };
   }
